@@ -121,6 +121,10 @@ export async function checkUpdate() {
     return this.request('/system/check-update');
 }
 
+export async function upgradeSystem() {
+    return this.request('/system/upgrade', { method: 'POST' });
+}
+
 export async function getSystemProcesses() {
     return this.request('/system/processes');
 }

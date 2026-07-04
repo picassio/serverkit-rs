@@ -13,6 +13,8 @@ const AboutTab = () => {
     const [version, setVersion] = useState('...');
     const [updateInfo, setUpdateInfo] = useState(null);
     const [checkingUpdate, setCheckingUpdate] = useState(false);
+    const [upgrading, setUpgrading] = useState(false);
+    const [upgradeMsg, setUpgradeMsg] = useState(null);
     const [showStarPrompt, setShowStarPrompt] = useState(() => {
         return localStorage.getItem(STAR_PROMPT_KEY) !== 'true';
     });
@@ -45,6 +47,31 @@ const AboutTab = () => {
         setCheckingUpdate(false);
     };
 
+    const runUpgrade = async () => {
+        if (!window.confirm('Upgrade ServerKit to the latest release now? The panel will restart and may be briefly unavailable.')) return;
+        setUpgrading(true);
+        setUpgradeMsg('Starting upgrade…');
+        try {
+            await api.upgradeSystem();
+            setUpgradeMsg('Upgrading in the background—the panel will restart shortly. This page will reload when it is back.');
+            const before = version;
+            const started = Date.now();
+            const poll = setInterval(async () => {
+                if (Date.now() - started > 5 * 60 * 1000) { clearInterval(poll); return; }
+                try {
+                    const v = await api.getVersion();
+                    if (v?.version && v.version !== before) {
+                        clearInterval(poll);
+                        window.location.reload();
+                    }
+                } catch { /* server restarting */ }
+            }, 5000);
+        } catch (error) {
+            setUpgradeMsg('Failed to start the upgrade. Check /var/log/serverkit-upgrade.log on the server.');
+            setUpgrading(false);
+        }
+    };
+
     return (
         <div className="settings-section">
             <div className="section-header">
@@ -59,8 +86,8 @@ const AboutTab = () => {
                 <h3>ServerKit</h3>
                 <p className="version">Version {version}</p>
                 <p className="description">
-                    A modern, lightweight server management panel for managing web applications,
-                    databases, domains, and more. Built with Flask and React.
+                    A self-hosted server control panel for web apps, databases, Docker, nginx/PHP,
+                    and full Magento lifecycles, with a built-in AI operator. Built with Rust and React.
                 </p>
 
                 <div className="update-check">
@@ -90,10 +117,13 @@ const AboutTab = () => {
                                 href={updateInfo.release_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="btn btn-accent btn-sm"
+                                className="btn btn-outline btn-sm"
                             >
-                                View Release <ExternalLink size={12} />
+                                Release notes <ExternalLink size={12} />
                             </a>
+                            <Button variant="primary" size="sm" onClick={runUpgrade} disabled={upgrading}>
+                                {upgrading ? (<><RefreshCw size={14} className="spinning" /> Upgrading…</>) : (<><Download size={14} /> Upgrade now</>)}
+                            </Button>
                         </div>
                     ) : (
                         <div className="update-status current">
@@ -101,6 +131,7 @@ const AboutTab = () => {
                             <span>You&apos;re up to date!</span>
                         </div>
                     )}
+                    {upgradeMsg && <p className="update-note" style={{ marginTop: 8, opacity: 0.85 }}>{upgradeMsg}</p>}
                 </div>
             </div>
 
@@ -116,7 +147,7 @@ const AboutTab = () => {
                         <h4>Enjoying ServerKit?</h4>
                         <p>If you find ServerKit useful, consider starring the repository on GitHub. It helps others discover the project!</p>
                         <a
-                            href="https://github.com/jhd3197/ServerKit"
+                            href="https://github.com/picassio/serverkit-rs"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn btn-accent"
@@ -165,23 +196,19 @@ const AboutTab = () => {
             <div className="settings-card">
                 <h3>Links</h3>
                 <div className="link-list">
-                    <a href="https://github.com/jhd3197/ServerKit" target="_blank" rel="noopener noreferrer" className="link-item">
+                    <a href="https://github.com/picassio/serverkit-rs" target="_blank" rel="noopener noreferrer" className="link-item">
                         <Github size={18} />
                         GitHub Repository
                     </a>
-                    <a href="https://github.com/jhd3197/ServerKit#readme" target="_blank" rel="noopener noreferrer" className="link-item">
+                    <a href="https://github.com/picassio/serverkit-rs#readme" target="_blank" rel="noopener noreferrer" className="link-item">
                         <FileText size={18} />
                         Documentation
                     </a>
-                    <a href="https://github.com/jhd3197/ServerKit/issues" target="_blank" rel="noopener noreferrer" className="link-item">
+                    <a href="https://github.com/picassio/serverkit-rs/issues" target="_blank" rel="noopener noreferrer" className="link-item">
                         <HelpCircle size={18} />
                         Support & Issues
                     </a>
-                    <a href="https://github.com/jhd3197/ServerKit/discussions" target="_blank" rel="noopener noreferrer" className="link-item">
-                        <MessageSquare size={18} />
-                        Discussions
-                    </a>
-                    <a href="https://github.com/jhd3197/ServerKit/issues/new" target="_blank" rel="noopener noreferrer" className="link-item">
+                    <a href="https://github.com/picassio/serverkit-rs/issues/new" target="_blank" rel="noopener noreferrer" className="link-item">
                         <Bug size={18} />
                         Report a Bug
                     </a>

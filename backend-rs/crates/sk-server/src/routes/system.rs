@@ -5,7 +5,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
 use axum::extract::{Query, State};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -15,6 +15,8 @@ pub fn router() -> Router<SharedState> {
         .route("/metrics", get(metrics))
         .route("/info", get(info))
         .route("/version", get(version))
+        .route("/check-update", get(check_update))
+        .route("/upgrade", post(upgrade))
         .route("/notices", get(notices))
         .route("/resource-tier", get(resource_tier))
 }
@@ -50,6 +52,92 @@ async fn version(AuthUser(_user): AuthUser) -> Json<Value> {
         "install_dir": std::env::var("SERVERKIT_INSTALL_DIR")
             .unwrap_or_else(|_| "/opt/serverkit".into()),
     }))
+}
+
+/// Compare dotted versions: is `latest` newer than `current`?
+fn is_newer(latest: &str, current: &str) -> bool {
+    let parse = |s: &str| -> Vec<u64> {
+        s.trim_start_matches('v')
+            .split(|c: char| c == '.' || c == '-')
+            .map(|p| p.chars().take_while(|c| c.is_ascii_digit()).collect::<String>())
+            .map(|p| p.parse().unwrap_or(0))
+            .collect()
+    };
+    let (a, b) = (parse(latest), parse(current));
+    for i in 0..a.len().max(b.len()) {
+        let (x, y) = (a.get(i).copied().unwrap_or(0), b.get(i).copied().unwrap_or(0));
+        if x != y {
+            return x > y;
+        }
+    }
+    false
+}
+
+fn serverkit_repo() -> String {
+    std::env::var("SERVERKIT_REPO").unwrap_or_else(|_| "picassio/serverkit-rs".into())
+}
+
+/// GET /system/check-update — compare the running version with the latest
+/// GitHub release.
+async fn check_update(AuthUser(_user): AuthUser) -> Json<Value> {
+    let current = env!("CARGO_PKG_VERSION");
+    let repo = serverkit_repo();
+    let url = format!("https://api.github.com/repos/{repo}/releases/latest");
+    let resp = reqwest::Client::new()
+        .get(&url)
+        .header("User-Agent", "serverkit-rs")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await;
+    match resp {
+        Ok(r) if r.status().is_success() => {
+            let v: Value = r.json().await.unwrap_or(json!({}));
+            let tag = v["tag_name"].as_str().unwrap_or("").to_string();
+            let latest = tag.trim_start_matches('v').to_string();
+            Json(json!({
+                "current_version": current,
+                "latest_version": latest,
+                "update_available": !latest.is_empty() && is_newer(&latest, current),
+                "release_url": v["html_url"].as_str().unwrap_or(""),
+                "notes": v["body"].as_str().unwrap_or(""),
+                "repo": repo,
+            }))
+        }
+        _ => Json(json!({
+            "current_version": current,
+            "latest_version": null,
+            "update_available": false,
+            "error": "Could not reach GitHub",
+        })),
+    }
+}
+
+/// POST /system/upgrade — launch the installer in a detached transient unit so
+/// it survives our own restart, pulling + installing the latest release.
+async fn upgrade(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    let repo = serverkit_repo();
+    let script = format!(
+        "curl -fsSL https://raw.githubusercontent.com/{repo}/main/install.sh | SK_SKIP_PREPARE=1 bash"
+    );
+    let logged = format!("{script} > /var/log/serverkit-upgrade.log 2>&1");
+    // Prefer systemd-run (separate cgroup: survives `systemctl restart serverkit`).
+    let via_systemd = std::process::Command::new("systemd-run")
+        .args(["--collect", "--unit=serverkit-upgrade", "--property=Type=oneshot", "bash", "-lc", &logged])
+        .spawn()
+        .is_ok();
+    if !via_systemd {
+        // Fallback: detach with setsid so a plain restart doesn't kill it.
+        let _ = std::process::Command::new("setsid")
+            .args(["bash", "-lc", &format!("nohup {logged} &")])
+            .spawn();
+    }
+    Ok(Json(json!({
+        "started": true,
+        "method": if via_systemd { "systemd-run" } else { "setsid" },
+        "log": "/var/log/serverkit-upgrade.log",
+        "note": "The panel will restart when the upgrade completes."
+    })))
 }
 
 /// GET /system/notices — TODO(P1): canonical-domain/misconfiguration checks

@@ -115,6 +115,17 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // is any provider usable (logged in via OAuth or an API key present)?
+  if (req.method === "GET" && req.url === "/configured") {
+    let configured = false;
+    try {
+      if (authStorage.list().length > 0) configured = true;
+      else { const avail = await modelRegistry.getAvailable(); configured = (avail?.length || 0) > 0; }
+    } catch { /* ignore */ }
+    sendJson(res, { configured });
+    return;
+  }
+
   // ── provider + model catalog (feeds the Settings dropdowns) ─────────
   if (req.method === "GET" && req.url === "/providers") {
     const all = modelRegistry.getAll() || [];

@@ -210,9 +210,23 @@ tool to confirm state before and after a write. Be careful with destructive acti
 intent in your reply. When no tools are available, give guidance the operator can act on.";
 
 // ── status / settings ───────────────────────────────────────────────────
+/// Is the assistant usable? With the SDK sidecar this means the sidecar has a
+/// provider with credentials (OAuth login or API key) — NOT that a global pi CLI
+/// is installed. Falls back to the CLI check only when there is no sidecar.
+async fn ai_configured() -> bool {
+    if sidecar_url().is_some() {
+        match sidecar_call(reqwest::Method::GET, "/configured", None).await {
+            Ok(Json(v)) => v["configured"].as_bool().unwrap_or(false),
+            Err(_) => false,
+        }
+    } else {
+        pi_available() && auth_present()
+    }
+}
+
 async fn status(AuthUser(_u): AuthUser) -> Json<Value> {
     let cfg = ai_config();
-    let configured = pi_available() && auth_present();
+    let configured = ai_configured().await;
     Json(json!({
         "enabled": cfg["enabled"].as_bool().unwrap_or(true) && configured,
         "configured": configured,
@@ -522,7 +536,7 @@ async fn chat_stream(
     AuthUser(u): AuthUser,
     Json(b): Json<ChatBody>,
 ) -> ApiResult<impl IntoResponse> {
-    if !(pi_available() && auth_present()) {
+    if !ai_configured().await {
         return Err(ApiError::new(
             axum::http::StatusCode::SERVICE_UNAVAILABLE,
             "AI assistant is not configured",
@@ -749,7 +763,7 @@ async fn chat(
     AuthUser(u): AuthUser,
     Json(b): Json<ChatBody>,
 ) -> ApiResult<Json<Value>> {
-    if !(pi_available() && auth_present()) {
+    if !ai_configured().await {
         return Err(ApiError::new(
             axum::http::StatusCode::SERVICE_UNAVAILABLE,
             "AI assistant is not configured",

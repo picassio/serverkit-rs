@@ -40,11 +40,11 @@ const MessageList = () => {
                 <div className="sk-ai-empty">
                     <div className="sk-ai-empty__icon"><Sparkles size={22} /></div>
                     <h3 className="sk-ai-empty__title">ServerKit AI</h3>
-                    <p className="sk-ai-empty__sub">powered by Prompture</p>
+                    <p className="sk-ai-empty__sub">powered by pi</p>
                     {!providerConfigured ? (
                         <p className="sk-ai-empty__hint">
-                            The assistant isn&apos;t configured yet. An admin can set a provider in
-                            {' '}Settings → AI Assistant.
+                            The assistant isn&apos;t connected yet. An admin can sign in to a provider
+                            (e.g. Claude) under Settings → AI Assistant → Provider Login.
                         </p>
                     ) : (
                         <div className="sk-ai-empty__prompts">

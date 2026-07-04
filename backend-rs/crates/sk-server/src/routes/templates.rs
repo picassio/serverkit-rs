@@ -4,12 +4,34 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::path::PathBuf;
+
+fn template_repos_path() -> PathBuf {
+    PathBuf::from(std::env::var("SK_DATA_DIR").unwrap_or_else(|_| "data".into()))
+        .join("template_repos.json")
+}
+
+fn load_repos() -> Vec<Value> {
+    std::fs::read_to_string(template_repos_path())
+        .ok()
+        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .and_then(|v| v.get("repos").and_then(Value::as_array).cloned())
+        .unwrap_or_default()
+}
+
+fn save_repos(repos: &[Value]) -> std::io::Result<()> {
+    let path = template_repos_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, serde_json::to_vec_pretty(&json!({"repos": repos}))?)
+}
 
 pub fn router() -> Router<SharedState> {
     // Full paths + merged (not nested) so both `/templates` and `/templates/`
@@ -18,6 +40,15 @@ pub fn router() -> Router<SharedState> {
         .route("/templates", get(list))
         .route("/templates/", get(list))
         .route("/templates/categories", get(categories))
+        .route(
+            "/templates/repos",
+            get(repos).post(add_repo).delete(remove_repo),
+        )
+        .route("/templates/sync", post(sync_templates))
+        .route("/templates/test-db-connection", post(test_db_connection))
+        .route("/templates/apps/{id}/check-update", get(app_check_update))
+        .route("/templates/apps/{id}/update", post(app_update))
+        .route("/templates/apps/{id}/template-info", get(app_template_info))
         .route("/templates/installed", get(installed))
         .route(
             "/templates/installed/{name}",
@@ -156,5 +187,164 @@ async fn uninstall(
             StatusCode::BAD_REQUEST
         },
         Json(result),
+    ))
+}
+
+#[derive(Deserialize)]
+struct RepoBody {
+    name: Option<String>,
+    url: Option<String>,
+}
+
+async fn repos(AuthUser(_u): AuthUser) -> Json<Value> {
+    Json(json!({ "success": true, "repos": load_repos() }))
+}
+
+async fn add_repo(
+    AuthUser(u): AuthUser,
+    Json(body): Json<RepoBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let url = body
+        .url
+        .filter(|u| u.starts_with("https://") || u.starts_with("http://") || u.starts_with("git@"))
+        .ok_or_else(|| ApiError::bad_request("valid repository url is required"))?;
+    let mut repos = load_repos();
+    let name = body.name.unwrap_or_else(|| url.clone());
+    if !repos
+        .iter()
+        .any(|r| r["url"].as_str() == Some(url.as_str()))
+    {
+        repos.push(json!({"name": name, "url": url, "enabled": true, "added_at": chrono::Utc::now().to_rfc3339()}));
+        save_repos(&repos).map_err(|e| ApiError::bad_request(e.to_string()))?;
+    }
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({"success": true, "repos": repos})),
+    ))
+}
+
+async fn remove_repo(AuthUser(u): AuthUser, Json(body): Json<RepoBody>) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let url = body
+        .url
+        .ok_or_else(|| ApiError::bad_request("url is required"))?;
+    let mut repos = load_repos();
+    let before = repos.len();
+    repos.retain(|r| r["url"].as_str() != Some(url.as_str()));
+    save_repos(&repos).map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok(Json(
+        json!({"success": true, "deleted": before.saturating_sub(repos.len()), "repos": repos}),
+    ))
+}
+
+async fn sync_templates(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let repos = load_repos();
+    // Local bundled templates are authoritative in this Rust build. Remote repos are persisted
+    // as desired state and reported honestly until a repository fetch adapter is configured.
+    Ok(Json(json!({
+        "success": true,
+        "synced": sk_templates::catalog().len(),
+        "remote_repos": repos.len(),
+        "remote_sync": {"configured": false, "reason": "REMOTE_TEMPLATE_REPO_SYNC_NOT_CONFIGURED"}
+    })))
+}
+
+async fn test_db_connection(
+    AuthUser(_u): AuthUser,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    let engine = body
+        .get("engine")
+        .or_else(|| body.get("type"))
+        .and_then(Value::as_str)
+        .unwrap_or("mysql");
+    let host = body
+        .get("host")
+        .and_then(Value::as_str)
+        .unwrap_or("127.0.0.1");
+    let port = body
+        .get("port")
+        .and_then(Value::as_i64)
+        .unwrap_or(if engine == "postgres" { 5432 } else { 3306 });
+    let addr = format!("{host}:{port}");
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        tokio::net::TcpStream::connect(&addr),
+    )
+    .await
+    {
+        Ok(Ok(_)) => (
+            StatusCode::OK,
+            Json(json!({"success": true, "reachable": true, "engine": engine, "address": addr})),
+        ),
+        Ok(Err(e)) => (
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({"success": false, "reachable": false, "engine": engine, "address": addr, "error": e.to_string()}),
+            ),
+        ),
+        Err(_) => (
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({"success": false, "reachable": false, "engine": engine, "address": addr, "error": "connection timed out"}),
+            ),
+        ),
+    }
+}
+
+async fn app_template_info(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let Some(app) = sk_apps::get(&s.db, &id).await.map_err(ApiError::from)? else {
+        return Err(ApiError::not_found("App not found"));
+    };
+    Ok(Json(
+        json!({"success": true, "template": {"app_id": id, "template_id": app["template_id"].clone(), "app": app}}),
+    ))
+}
+
+async fn app_check_update(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let Some(app) = sk_apps::get(&s.db, &id).await.map_err(ApiError::from)? else {
+        return Err(ApiError::not_found("App not found"));
+    };
+    let template_id = app["template_id"].as_str().unwrap_or("");
+    let current = app["template_version"].as_str().unwrap_or("");
+    let latest =
+        sk_templates::detail(template_id).and_then(|t| t["version"].as_str().map(str::to_string));
+    Ok(Json(
+        json!({"success": true, "app_id": id, "template_id": template_id, "current_version": current, "latest_version": latest, "update_available": latest.as_deref().is_some_and(|v| !current.is_empty() && v != current)}),
+    ))
+}
+
+async fn app_update(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let Some(app) = sk_apps::get(&s.db, &id).await.map_err(ApiError::from)? else {
+        return Err(ApiError::not_found("App not found"));
+    };
+    let template_id = app["template_id"].as_str().unwrap_or("");
+    if template_id.is_empty() || sk_templates::detail(template_id).is_none() {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({"success": false, "code": "APP_TEMPLATE_NOT_MANAGED", "error": "App is not linked to a bundled template"}),
+            ),
+        ));
+    }
+    Ok((
+        StatusCode::BAD_REQUEST,
+        Json(
+            json!({"success": false, "code": "TEMPLATE_UPDATE_REDEPLOY_REQUIRED", "error": "Automatic in-place template updates are not safe; reinstall or redeploy with explicit migration plan", "app": app}),
+        ),
     ))
 }

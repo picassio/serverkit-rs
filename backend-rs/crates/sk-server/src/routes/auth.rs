@@ -10,8 +10,11 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use hmac::{Hmac, Mac};
+use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sha1::Sha1;
 use sk_auth::jwt::{create_token, TokenType};
 use sk_auth::password::hash_password;
 use sk_models::{settings, user};
@@ -24,6 +27,15 @@ pub fn router() -> Router<SharedState> {
         .route("/refresh", post(refresh))
         .route("/me", get(me).put(update_me))
         .route("/complete-onboarding", post(complete_onboarding))
+        .route("/2fa/status", get(twofa_status))
+        .route("/2fa/setup", post(twofa_setup))
+        .route("/2fa/setup/confirm", post(twofa_confirm))
+        .route("/2fa/disable", post(twofa_disable))
+        .route(
+            "/2fa/backup-codes/regenerate",
+            post(twofa_backup_regenerate),
+        )
+        .route("/2fa/verify", post(twofa_verify))
 }
 
 fn tokens(state: &SharedState, user_id: i64) -> ApiResult<(String, String)> {
@@ -370,5 +382,213 @@ async fn complete_onboarding(
 
     Ok(Json(
         json!({ "message": "Onboarding completed successfully" }),
+    ))
+}
+
+const B32: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+fn base32(bytes: &[u8]) -> String {
+    let mut out = String::new();
+    let mut buffer: u32 = 0;
+    let mut bits = 0;
+    for b in bytes {
+        buffer = (buffer << 8) | (*b as u32);
+        bits += 8;
+        while bits >= 5 {
+            bits -= 5;
+            out.push(B32[((buffer >> bits) & 31) as usize] as char);
+        }
+    }
+    if bits > 0 {
+        out.push(B32[((buffer << (5 - bits)) & 31) as usize] as char);
+    }
+    out
+}
+fn unbase32(s: &str) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut buffer: u32 = 0;
+    let mut bits = 0;
+    for c in s.chars().filter(|c| *c != ' ' && *c != '=') {
+        let Some(v) = B32
+            .iter()
+            .position(|b| *b as char == c.to_ascii_uppercase())
+            .map(|v| v as u32)
+        else {
+            continue;
+        };
+        buffer = (buffer << 5) | v;
+        bits += 5;
+        if bits >= 8 {
+            bits -= 8;
+            out.push(((buffer >> bits) & 255) as u8);
+        }
+    }
+    out
+}
+fn random_secret() -> String {
+    let bytes: Vec<u8> = (0..20).map(|_| rand::thread_rng().gen::<u8>()).collect();
+    base32(&bytes)
+}
+fn backup_codes() -> Vec<String> {
+    (0..10)
+        .map(|_| {
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from)
+                .collect()
+        })
+        .collect()
+}
+fn hotp(secret: &str, counter: u64) -> Option<u32> {
+    type HmacSha1 = Hmac<Sha1>;
+    let key = unbase32(secret);
+    let mut mac = HmacSha1::new_from_slice(&key).ok()?;
+    mac.update(&counter.to_be_bytes());
+    let bytes = mac.finalize().into_bytes();
+    let off = (bytes[19] & 0x0f) as usize;
+    let bin = ((bytes[off] & 0x7f) as u32) << 24
+        | (bytes[off + 1] as u32) << 16
+        | (bytes[off + 2] as u32) << 8
+        | bytes[off + 3] as u32;
+    Some(bin % 1_000_000)
+}
+fn verify_totp(secret: &str, code: &str) -> bool {
+    let code = code.trim();
+    if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    let now = chrono::Utc::now().timestamp() as u64 / 30;
+    for c in now.saturating_sub(1)..=now + 1 {
+        if hotp(secret, c)
+            .map(|v| format!("{v:06}") == code)
+            .unwrap_or(false)
+        {
+            return true;
+        }
+    }
+    false
+}
+fn hash_codes(codes: &[String]) -> String {
+    serde_json::to_string(&codes.iter().map(|c| hash_password(c)).collect::<Vec<_>>())
+        .unwrap_or_else(|_| "[]".into())
+}
+async fn twofa_status(AuthUser(u): AuthUser) -> Json<Value> {
+    Json(json!({"enabled":u.totp_enabled(),"totp_enabled":u.totp_enabled()}))
+}
+async fn twofa_setup(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+) -> ApiResult<Json<Value>> {
+    let secret = random_secret();
+    sqlx::query("UPDATE users SET totp_secret=?, totp_enabled=0, updated_at=? WHERE id=?")
+        .bind(&secret)
+        .bind(sk_core::time::now_sql())
+        .bind(u.id)
+        .execute(&state.db)
+        .await?;
+    let uri = format!(
+        "otpauth://totp/ServerKit:{}?secret={}&issuer=ServerKit",
+        urlencoding::encode(&u.email),
+        secret
+    );
+    Ok(Json(
+        json!({"secret":secret,"otpauth_url":uri,"qr_code_url":uri}),
+    ))
+}
+#[derive(Deserialize)]
+struct CodeBody {
+    code: Option<String>,
+    temp_token: Option<String>,
+}
+async fn twofa_confirm(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<CodeBody>,
+) -> ApiResult<Json<Value>> {
+    let u = sk_models::user::find_by_id(&state.db, u.id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("User not found"))?;
+    let secret = u
+        .totp_secret
+        .clone()
+        .ok_or_else(|| ApiError::bad_request("2FA setup not started"))?;
+    if !verify_totp(&secret, b.code.as_deref().unwrap_or("")) {
+        return Err(ApiError::bad_request("Invalid 2FA code"));
+    }
+    let codes = backup_codes();
+    sqlx::query("UPDATE users SET totp_enabled=1, totp_confirmed_at=?, backup_codes=?, updated_at=? WHERE id=?").bind(sk_core::time::now_sql()).bind(hash_codes(&codes)).bind(sk_core::time::now_sql()).bind(u.id).execute(&state.db).await?;
+    Ok(Json(json!({"success":true,"backup_codes":codes})))
+}
+async fn twofa_disable(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<CodeBody>,
+) -> ApiResult<Json<Value>> {
+    let fresh = sk_models::user::find_by_id(&state.db, u.id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("User not found"))?;
+    if fresh.totp_enabled() {
+        let sec = fresh.totp_secret.clone().unwrap_or_default();
+        if !verify_totp(&sec, b.code.as_deref().unwrap_or("")) {
+            return Err(ApiError::bad_request("Invalid 2FA code"));
+        }
+    }
+    sqlx::query("UPDATE users SET totp_enabled=0, totp_secret=NULL, backup_codes=NULL, totp_confirmed_at=NULL, updated_at=? WHERE id=?").bind(sk_core::time::now_sql()).bind(u.id).execute(&state.db).await?;
+    Ok(Json(json!({"success":true})))
+}
+async fn twofa_backup_regenerate(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<CodeBody>,
+) -> ApiResult<Json<Value>> {
+    let fresh = sk_models::user::find_by_id(&state.db, u.id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("User not found"))?;
+    let sec = fresh.totp_secret.clone().unwrap_or_default();
+    if !verify_totp(&sec, b.code.as_deref().unwrap_or("")) {
+        return Err(ApiError::bad_request("Invalid 2FA code"));
+    }
+    let codes = backup_codes();
+    sqlx::query("UPDATE users SET backup_codes=?, updated_at=? WHERE id=?")
+        .bind(hash_codes(&codes))
+        .bind(sk_core::time::now_sql())
+        .bind(u.id)
+        .execute(&state.db)
+        .await?;
+    Ok(Json(json!({"success":true,"backup_codes":codes})))
+}
+async fn twofa_verify(
+    State(state): State<SharedState>,
+    Json(b): Json<CodeBody>,
+) -> ApiResult<Json<Value>> {
+    let temp = b
+        .temp_token
+        .as_deref()
+        .ok_or_else(|| ApiError::bad_request("temp_token is required"))?;
+    let claims =
+        sk_auth::jwt::decode_token(temp, &state.config.jwt_secret_key, TokenType::Access, true)
+            .map_err(|_| ApiError::unauthorized("Invalid temporary token"))?;
+    if claims.twofa_pending != Some(true) {
+        return Err(ApiError::bad_request("Token is not pending 2FA"));
+    }
+    let uid = claims
+        .sub
+        .as_i64()
+        .ok_or_else(|| ApiError::unauthorized("Invalid token subject"))?;
+    let u = sk_models::user::find_by_id(&state.db, uid)
+        .await?
+        .ok_or_else(|| ApiError::not_found("User not found"))?;
+    if !u.is_active() || !u.totp_enabled() {
+        return Err(ApiError::unauthorized("2FA is not enabled"));
+    }
+    let sec = u.totp_secret.clone().unwrap_or_default();
+    if !verify_totp(&sec, b.code.as_deref().unwrap_or("")) {
+        return Err(ApiError::bad_request("Invalid 2FA code"));
+    }
+    user::record_successful_login(&state.db, uid).await?;
+    let (access_token, refresh_token) = tokens(&state, uid)?;
+    let u = user::find_by_id(&state.db, uid).await?.unwrap();
+    Ok(Json(
+        json!({"user": u.to_dict(&state.db).await?, "access_token": access_token, "refresh_token": refresh_token}),
     ))
 }

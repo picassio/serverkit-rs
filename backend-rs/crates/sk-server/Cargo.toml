@@ -53,6 +53,9 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 futures-util = "0.3"
 libc = "0.2"
 rand = { workspace = true }
+hmac.workspace = true
+sha1 = "0.10"
+urlencoding = "2"
 socketioxide.workspace = true
 sqlx.workspace = true
 serde.workspace = true

@@ -4,19 +4,32 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use sk_docker::ContainerSpec;
+use std::path::{Path as FsPath, PathBuf};
+use tokio::process::Command;
 
 pub fn router() -> Router<SharedState> {
     Router::new()
         .route("/status", get(status))
         .route("/info", get(info))
         .route("/disk-usage", get(disk_usage))
+        .route("/apps", post(create_docker_app))
+        .route("/prune", post(prune))
+        .route("/cleanup", post(cleanup))
+        .route("/cleanup/apps", post(cleanup_apps))
+        .route("/compose/list", get(compose_list))
+        .route("/compose/up", post(compose_up))
+        .route("/compose/down", post(compose_down))
+        .route("/compose/ps", post(compose_ps))
+        .route("/compose/logs", post(compose_logs))
+        .route("/compose/restart", post(compose_restart))
+        .route("/compose/pull", post(compose_pull))
         .route("/containers", get(list_containers).post(create_container))
         .route("/containers/run", post(run_container))
         .route("/containers/stats", post(containers_stats))
@@ -32,6 +45,7 @@ pub fn router() -> Router<SharedState> {
         .route("/containers/{id}/exec", post(exec_container))
         .route("/images", get(list_images))
         .route("/images/pull", post(pull_image))
+        .route("/images/build", post(build_image))
         .route("/images/tag", post(tag_image))
         .route("/images/{id}", delete(remove_image))
         .route("/networks", get(list_networks).post(create_network))
@@ -392,4 +406,273 @@ async fn remove_volume(
     let force = body.and_then(|b| b.0.force).unwrap_or(false);
     let result = sk_docker::remove_volume(&name, force).await;
     Ok((result_status(&result, StatusCode::OK), Json(result)))
+}
+
+fn command_result(
+    ok_status: StatusCode,
+    output: std::process::Output,
+) -> (StatusCode, Json<Value>) {
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if output.status.success() {
+        (
+            ok_status,
+            Json(json!({"success": true, "stdout": stdout, "stderr": stderr})),
+        )
+    } else {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({"success": false, "stdout": stdout, "stderr": stderr, "code": output.status.code()}),
+            ),
+        )
+    }
+}
+
+fn safe_compose_path(path: &str) -> ApiResult<PathBuf> {
+    if path.trim().is_empty() || path.contains('\0') {
+        return Err(ApiError::bad_request("compose path is required"));
+    }
+    let p = PathBuf::from(path);
+    if !p.is_absolute() {
+        return Err(ApiError::bad_request("compose path must be absolute"));
+    }
+    let file = if p.is_dir() {
+        p.join("docker-compose.yml")
+    } else {
+        p
+    };
+    if !file.exists() {
+        return Err(ApiError::bad_request("compose file does not exist"));
+    }
+    Ok(file)
+}
+
+#[derive(Deserialize, Default)]
+struct ComposeBody {
+    path: Option<String>,
+    service: Option<String>,
+    detach: Option<bool>,
+    build: Option<bool>,
+    volumes: Option<bool>,
+    remove_orphans: Option<bool>,
+    tail: Option<i64>,
+}
+
+async fn docker_compose(file: &FsPath, args: &[&str]) -> (StatusCode, Json<Value>) {
+    match Command::new("docker")
+        .arg("compose")
+        .arg("-f")
+        .arg(file)
+        .args(args)
+        .output()
+        .await
+    {
+        Ok(o) => command_result(StatusCode::OK, o),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"success": false, "error": e.to_string()})),
+        ),
+    }
+}
+
+async fn compose_list(AuthUser(_u): AuthUser) -> Json<Value> {
+    match Command::new("docker")
+        .args(["compose", "ls", "--format", "json"])
+        .output()
+        .await
+    {
+        Ok(o) if o.status.success() => {
+            let text = String::from_utf8_lossy(&o.stdout);
+            let projects: Value = serde_json::from_str(&text).unwrap_or_else(|_| json!([]));
+            Json(json!({"success": true, "projects": projects}))
+        }
+        Ok(o) => command_result(StatusCode::OK, o).1,
+        Err(e) => Json(json!({"success": false, "error": e.to_string()})),
+    }
+}
+
+async fn compose_ps(
+    AuthUser(_u): AuthUser,
+    Json(b): Json<ComposeBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let file = safe_compose_path(&b.path.unwrap_or_default())?;
+    Ok(docker_compose(&file, &["ps", "--format", "json"]).await)
+}
+async fn compose_logs(
+    AuthUser(_u): AuthUser,
+    Json(b): Json<ComposeBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let file = safe_compose_path(&b.path.unwrap_or_default())?;
+    let tail = b.tail.unwrap_or(100).to_string();
+    let mut args = vec!["logs", "--tail", tail.as_str()];
+    if let Some(s) = b.service.as_deref().filter(|s| !s.is_empty()) {
+        args.push(s);
+    }
+    Ok(docker_compose(&file, &args).await)
+}
+async fn compose_up(
+    AuthUser(u): AuthUser,
+    Json(b): Json<ComposeBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let file = safe_compose_path(&b.path.unwrap_or_default())?;
+    let mut args = vec!["up"];
+    if b.detach.unwrap_or(true) {
+        args.push("-d");
+    }
+    if b.build.unwrap_or(false) {
+        args.push("--build");
+    }
+    Ok(docker_compose(&file, &args).await)
+}
+async fn compose_down(
+    AuthUser(u): AuthUser,
+    Json(b): Json<ComposeBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let file = safe_compose_path(&b.path.unwrap_or_default())?;
+    let mut args = vec!["down"];
+    if b.volumes.unwrap_or(false) {
+        args.push("--volumes");
+    }
+    if b.remove_orphans.unwrap_or(true) {
+        args.push("--remove-orphans");
+    }
+    Ok(docker_compose(&file, &args).await)
+}
+async fn compose_restart(
+    AuthUser(u): AuthUser,
+    Json(b): Json<ComposeBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let file = safe_compose_path(&b.path.unwrap_or_default())?;
+    let mut args = vec!["restart"];
+    if let Some(s) = b.service.as_deref().filter(|s| !s.is_empty()) {
+        args.push(s);
+    }
+    Ok(docker_compose(&file, &args).await)
+}
+async fn compose_pull(
+    AuthUser(u): AuthUser,
+    Json(b): Json<ComposeBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let file = safe_compose_path(&b.path.unwrap_or_default())?;
+    let mut args = vec!["pull"];
+    if let Some(s) = b.service.as_deref().filter(|s| !s.is_empty()) {
+        args.push(s);
+    }
+    Ok(docker_compose(&file, &args).await)
+}
+
+#[derive(Deserialize)]
+struct BuildBody {
+    path: Option<String>,
+    tag: Option<String>,
+    dockerfile: Option<String>,
+    no_cache: Option<bool>,
+}
+async fn build_image(
+    AuthUser(u): AuthUser,
+    Json(b): Json<BuildBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let path = b
+        .path
+        .ok_or_else(|| ApiError::bad_request("path is required"))?;
+    let tag = b
+        .tag
+        .ok_or_else(|| ApiError::bad_request("tag is required"))?;
+    let p = PathBuf::from(&path);
+    if !p.is_absolute() || !p.exists() {
+        return Err(ApiError::bad_request(
+            "build path must be an existing absolute path",
+        ));
+    }
+    let dockerfile = b.dockerfile.unwrap_or_else(|| "Dockerfile".into());
+    let mut cmd = Command::new("docker");
+    cmd.arg("build")
+        .arg("-f")
+        .arg(dockerfile)
+        .arg("-t")
+        .arg(tag);
+    if b.no_cache.unwrap_or(false) {
+        cmd.arg("--no-cache");
+    }
+    cmd.arg(path);
+    match cmd.output().await {
+        Ok(o) => Ok(command_result(StatusCode::OK, o)),
+        Err(e) => Ok((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"success":false,"error":e.to_string()})),
+        )),
+    }
+}
+
+async fn create_docker_app(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(mut body): Json<Value>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    if body
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .is_empty()
+    {
+        return Err(ApiError::bad_request("name is required"));
+    }
+    body["app_type"] = json!("docker");
+    let app = sk_apps::create(&s.db, &body, "docker")
+        .await
+        .map_err(ApiError::from)?;
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({"success": true, "app": app})),
+    ))
+}
+
+#[derive(Deserialize, Default)]
+struct PruneBody {
+    all: Option<bool>,
+    volumes: Option<bool>,
+}
+async fn prune(
+    AuthUser(u): AuthUser,
+    body: Option<Json<PruneBody>>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let b = body.map(|x| x.0).unwrap_or_default();
+    let mut cmd = Command::new("docker");
+    cmd.arg("system").arg("prune").arg("-f");
+    if b.all.unwrap_or(false) {
+        cmd.arg("--all");
+    }
+    if b.volumes.unwrap_or(false) {
+        cmd.arg("--volumes");
+    }
+    match cmd.output().await {
+        Ok(o) => Ok(command_result(StatusCode::OK, o)),
+        Err(e) => Ok((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"success":false,"error":e.to_string()})),
+        )),
+    }
+}
+async fn cleanup(
+    AuthUser(u): AuthUser,
+    body: Option<Json<PruneBody>>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    prune(AuthUser(u), body).await
+}
+async fn cleanup_apps(AuthUser(u): AuthUser) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    Ok((
+        StatusCode::BAD_REQUEST,
+        Json(
+            json!({"success": false, "code": "APP_CLEANUP_CONFIRMATION_REQUIRED", "error": "Bulk app cleanup is destructive; delete individual apps or provide an explicit cleanup plan"}),
+        ),
+    ))
 }

@@ -2844,11 +2844,13 @@ dependencies = [
  "axum",
  "chrono",
  "futures-util",
+ "hmac",
  "libc",
  "rand 0.8.6",
  "reqwest",
  "serde",
  "serde_json",
+ "sha1",
  "sk-apps",
  "sk-auth",
  "sk-backups",
@@ -2892,6 +2894,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "urlencoding",
  "uuid",
 ]
 

@@ -25,6 +25,7 @@ pub fn router() -> Router<SharedState> {
     Router::new()
         .route("/status", get(status))
         .route("/settings", get(get_settings).put(put_settings))
+        .route("/settings/test", post(test_settings))
         .route("/providers", get(providers))
         .route("/models", get(models))
         .route("/tools", get(tools))
@@ -40,6 +41,8 @@ pub fn router() -> Router<SharedState> {
         )
         .route("/chat/stream", post(chat_stream))
         .route("/chat", post(chat))
+        .route("/chat/cancel", post(chat_cancel))
+        .route("/chat/confirm", post(chat_confirm))
         .route("/auth/status", get(auth_status))
         .route("/auth/login/start", post(auth_login_start))
         .route("/auth/login/complete", post(auth_login_complete))
@@ -854,5 +857,63 @@ fn uuid_v4() -> String {
         "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:01x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
         b[0], b[1], b[2], b[3], b[4], b[5], b[6] & 0x0f, b[7], (b[8] & 0x3f) | 0x80, b[9],
         b[10], b[11], b[12], b[13], b[14], b[15]
+    )
+}
+
+async fn test_settings(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let configured = ai_configured().await;
+    Ok(Json(json!({
+        "success": configured,
+        "configured": configured,
+        "backend": if sidecar_url().is_some() { "sdk-sidecar" } else { "pi-cli" },
+        "pi_available": pi_available(),
+        "auth_present": auth_present()
+    })))
+}
+
+async fn chat_cancel(
+    AuthUser(_u): AuthUser,
+    Json(body): Json<Value>,
+) -> (axum::http::StatusCode, Json<Value>) {
+    let id = body
+        .get("conversation_id")
+        .or_else(|| body.get("id"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if id.is_empty() {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            Json(json!({"success": false, "error": "conversation_id is required"})),
+        );
+    }
+    (
+        axum::http::StatusCode::ACCEPTED,
+        Json(
+            json!({"success": true, "conversation_id": id, "cancelled": false, "reason": "No active cancellable stream is registered for this conversation"}),
+        ),
+    )
+}
+
+async fn chat_confirm(
+    AuthUser(_u): AuthUser,
+    Json(body): Json<Value>,
+) -> (axum::http::StatusCode, Json<Value>) {
+    let token = body
+        .get("confirmation_id")
+        .or_else(|| body.get("id"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if token.is_empty() {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            Json(json!({"success": false, "error": "confirmation_id is required"})),
+        );
+    }
+    (
+        axum::http::StatusCode::BAD_REQUEST,
+        Json(
+            json!({"success": false, "code": "AI_CONFIRMATION_NOT_PENDING", "error": "No pending AI confirmation exists for this token"}),
+        ),
     )
 }

@@ -641,6 +641,16 @@ Implemented 2026-07-04 (cron/performance/mobile slice):
 - Added `routes/mobile.rs` ownership for all 6 `/mobile/*` routes. Push subscriptions persist per user in SQLite; unregister deletes real rows; quick actions list safe actions; `refresh-summary` returns live summary data, `mark-notifications-read` mutates persisted notifications, and cache mutation is directed to the performance endpoint; summary/offline-cache read real job/notification/telemetry/device counts.
 - Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered cron status/presets/list/create/run/toggle/update/delete/invalid schedule, performance cache stats/flush/jobs/stats/missing job/cleanup, and mobile push register/unregister/quick-actions/execute/summary/offline-cache.
 
+Implemented 2026-07-04 (final parity/audit slice):
+
+- Marked `magento` implemented after auditing first-class `routes/magento.rs` ownership for all 20 `/magento/*` frontend routes backed by `sk-magento` store/provision/action/backup/vhost/health adapters.
+- Completed `templates` ownership by adding missing `/templates/repos`, `/templates/sync`, `/templates/test-db-connection`, and `/templates/apps/{id}/*` helper routes. Repository desired state persists under `SK_DATA_DIR`; sync reports bundled template count and explicit unconfigured remote-sync state; DB connection tests perform real TCP checks; app template helpers read `sk_apps` and bundled template metadata and return typed redeploy-required errors instead of unsafe fake updates.
+- Completed `docker` ownership for all `/docker/*` frontend routes by adding app persistence, image build, Compose list/up/down/ps/logs/restart/pull, prune/cleanup, and typed destructive bulk app cleanup. Docker/Compose routes call the real Docker CLI and validate absolute compose/build paths.
+- Completed `admin` ownership by adding `routes/admin.rs`, SQLite-backed invitations, real settings/users/permissions/activity/audit/base-domain routes, and retiring the old admin stubs. Sites HTTPS setup returns a typed provider-setup error instead of fake success.
+- Completed `auth` ownership by adding real TOTP setup/confirm/status/disable/backup-code regeneration/temp-token verify routes. Setup persists a Base32 secret, confirm/disable/regenerate verify RFC6238 TOTP codes, backup codes are hashed at rest, and temp-token verify exchanges the login-issued pending token for normal JWTs.
+- Completed `ai` ownership by adding missing settings-test and chat cancel/confirm helper routes backed by real sidecar/CLI configured checks or explicit no-pending-state responses.
+- Route ledger now reports all 1092 frontend routes across 72 families as implemented; `routes/stubs.rs` now exports an empty router.
+
 ## Endpoint-family inventory from frontend API modules
 
 Generated from `frontend/src/services/api/*.js` before manual normalization. Counts are useful for scope sizing; the Phase 0 ledger is the authoritative route-by-route source.

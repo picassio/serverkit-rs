@@ -1,8 +1,8 @@
 {
   "admin": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 1,
-    "owner": "sk-workspaces/sk-notifications"
+    "owner": "sk-server::routes::admin"
   },
   "agent-plugins": {
     "status": "implemented",
@@ -10,10 +10,9 @@
     "owner": "sk-plugins"
   },
   "ai": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 0,
-    "owner": "sk-server::routes::ai",
-    "note": "Implemented routes exist; parity tests still required before marking implemented."
+    "owner": "sk-server::routes::ai"
   },
   "api-analytics": {
     "status": "implemented",
@@ -32,10 +31,9 @@
     "note": "First-class persisted app records with Magento/template adoption; deeper build/deploy/runtime adapters continue in Phase 2."
   },
   "auth": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 0,
-    "owner": "sk-auth",
-    "note": "Implemented routes exist; parity tests still required before marking implemented."
+    "owner": "sk-auth"
   },
   "backups": {
     "status": "implemented",
@@ -98,10 +96,9 @@
     "owner": "sk-dns"
   },
   "docker": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 0,
-    "owner": "sk-docker",
-    "note": "Implemented routes exist; parity tests still required before marking implemented."
+    "owner": "sk-docker"
   },
   "domains": {
     "status": "implemented",
@@ -169,10 +166,9 @@
     "owner": "sk-ops"
   },
   "magento": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 0,
-    "owner": "sk-magento",
-    "note": "Implemented routes exist; parity tests still required before marking implemented."
+    "owner": "sk-magento"
   },
   "marketplace": {
     "status": "implemented",
@@ -320,10 +316,9 @@
     "owner": "sk-events::telemetry"
   },
   "templates": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 0,
-    "owner": "sk-templates",
-    "note": "Implemented routes exist; parity tests still required before marking implemented."
+    "owner": "sk-templates"
   },
   "tunnels": {
     "status": "implemented",

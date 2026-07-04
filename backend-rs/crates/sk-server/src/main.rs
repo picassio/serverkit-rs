@@ -66,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
     routes::system::ensure_schema(&pool).await?;
     sk_sso::ensure_schema(&pool).await?;
     routes::mobile::ensure_schema(&pool).await?;
+    routes::admin::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -94,6 +95,7 @@ async fn main() -> anyhow::Result<()> {
 
     let api = Router::new()
         .route("/health", get(routes::health))
+        .nest("/admin", routes::admin::router())
         .nest("/auth", routes::auth::router())
         .nest("/docker", routes::docker::router())
         .nest("/servers", routes::servers::router())

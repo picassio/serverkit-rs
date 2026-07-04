@@ -1,34 +1,11 @@
-//! Shape-correct stubs for endpoints the dashboard calls but whose modules
-//! are not yet ported. Each returns the Flask handler's *empty state* so the
-//! UI renders cleanly instead of erroring on 404s.
+//! Legacy stub router retired by the Rust route-completion roadmap.
 //!
-//! Every stub cites its Flask oracle. Replace with real ports per the phase
-//! plan (wiki: serverkit-exploration-magento-fork).
+//! This module intentionally exports an empty router so old merge wiring remains
+//! harmless while completed families are owned by first-class Rust route modules.
 
-use crate::extract::AuthUser;
 use crate::state::SharedState;
-use axum::routing::get;
-use axum::{Json, Router};
-use serde_json::{json, Value};
+use axum::Router;
 
 pub fn router() -> Router<SharedState> {
     Router::new()
-        // (ai/* is now served by routes::ai, backed by the pi-SDK sidecar)
-        // app/api/admin.py get_settings — Settings page reads the system settings
-        // map; empty list until an admin-settings store is ported.
-        .route(
-            "/admin/settings",
-            get(async |AuthUser(_u): AuthUser| Json(json!({ "settings": [] }))),
-        )
-        // app/api/admin.py activity feed
-        .route(
-            "/admin/activity/feed",
-            get(async |AuthUser(_u): AuthUser| Json(json!({ "items": [], "total": 0 }))),
-        )
-}
-
-// Silence unused warning pattern for stub extractors
-#[allow(dead_code)]
-fn _shape_reference() -> Value {
-    json!(null)
 }

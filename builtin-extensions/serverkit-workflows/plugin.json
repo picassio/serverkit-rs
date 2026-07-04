@@ -1,0 +1,37 @@
+{
+  "name": "serverkit-workflows",
+  "display_name": "Workflow Builder",
+  "version": "1.0.0",
+  "description": "Visual automation builder — chain deploy, build, and notification steps into pipelines on a drag-and-drop canvas.",
+  "author": "ServerKit",
+  "license": "MIT",
+  "category": "deployment",
+  "homepage": "https://github.com/jhd3197/ServerKit",
+  "permissions": ["docker", "shell"],
+  "icon": "<circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><path d=\"M8.59 13.51l6.83 3.98\"/><path d=\"M15.41 6.51l-6.82 3.98\"/>",
+  "contributions": {
+    "nav": [
+      {
+        "id": "workflow",
+        "label": "Workflow Builder",
+        "route": "/workflow",
+        "category": "infrastructure",
+        "icon": "<circle cx=\"18\" cy=\"5\" r=\"3\"/><circle cx=\"6\" cy=\"12\" r=\"3\"/><circle cx=\"18\" cy=\"19\" r=\"3\"/><path d=\"M8.59 13.51l6.83 3.98\"/><path d=\"M15.41 6.51l-6.82 3.98\"/>"
+      }
+    ],
+    "routes": [
+      { "path": "workflow", "component": "WorkflowBuilderPage", "layout": "full" }
+    ],
+    "page_titles": {
+      "/workflow": "Workflow Builder"
+    },
+    "command_palette": [
+      {
+        "label": "Workflow Builder",
+        "path": "/workflow",
+        "category": "Pages",
+        "keywords": "automation pipeline workflow"
+      }
+    ]
+  }
+}

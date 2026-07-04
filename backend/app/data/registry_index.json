@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "updated": "2026-07-01",
+  "note": "Bundled fallback copy of the ServerKit extension registry index. The live index is fetched from SERVERKIT_REGISTRY_URL when configured; this file is used offline and in tests. Curated via PR in the serverkit-extensions repo.",
+  "extensions": [
+    {
+      "slug": "serverkit-gui",
+      "display_name": "ServerKit Agent GUI",
+      "description": "Agent-powered desktop view for managed servers. Streams live screenshots when available, with a synthetic desktop fallback for headless hosts.",
+      "version": "0.1.0",
+      "category": "monitoring",
+      "author": "Juan Denis",
+      "first_party": false,
+      "permissions": ["agent.command:gui:screenshot", "agent.command:gui:capabilities"],
+      "min_panel_version": "1.7.0",
+      "max_panel_version": null,
+      "source": "https://github.com/jhd3197/serverkit-gui",
+      "sha256": null,
+      "homepage": "https://github.com/jhd3197/serverkit-gui",
+      "icon": "<rect x=\"2\" y=\"3\" width=\"20\" height=\"14\" rx=\"2\"/><line x1=\"8\" y1=\"21\" x2=\"16\" y2=\"21\"/><line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/>",
+      "screenshots": []
+    }
+  ]
+}

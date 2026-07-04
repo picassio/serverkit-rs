@@ -1,0 +1,608 @@
+// ============================================
+// CONNECT A REPOSITORY — shared visual language
+// Used by the service connect modal (GitConnectModal) and the WordPress Git tab
+// (GitConnectForm). Intentionally mirrors _new-service.scss so all three
+// "connect a repo" surfaces read as one product. Brand provider marks come from
+// components/git/GitProviders.jsx.
+// ============================================
+
+.git-connect {
+    display: grid;
+    gap: $space-4;
+
+    // Card variant — for surfaces that sit inline on a page (the WP Git tab),
+    // not inside a Modal (which supplies its own chrome).
+    &--card {
+        max-width: 640px;
+        padding: $space-5;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+    }
+
+    &__intro {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-3;
+    }
+
+    &__intro-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 38px;
+        height: 38px;
+        border-radius: $radius-lg;
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+    }
+
+    &__intro-text {
+        strong {
+            display: block;
+            color: $text-primary;
+            font-size: $font-size-base;
+            font-weight: $font-weight-semibold;
+        }
+
+        span {
+            display: block;
+            margin-top: 2px;
+            color: $text-tertiary;
+            font-size: $font-size-xs;
+            line-height: 1.5;
+        }
+    }
+
+    // The "explains the others" provider strip — styled like the new-service
+    // method cards (icon tile dim by default, accent when active).
+    &__providers {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+        gap: $space-2;
+    }
+
+    &__provider {
+        display: grid;
+        gap: $space-1;
+        padding: $space-3;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        transition: border-color $transition-fast, background $transition-fast;
+
+        &--active {
+            border-color: var(--accent-dim);
+            background: var(--accent-bg);
+        }
+
+        // When `onSelect` is passed the chips render as <button>s — make them
+        // read and behave like real, clickable options.
+        &--btn {
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            width: 100%;
+
+            &:hover { border-color: var(--border-strong); }
+            &:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 1px; }
+        }
+    }
+
+    &__provider-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: $radius-md;
+        background: var(--surface-2);
+        color: var(--text-dim);
+        transition: background $transition-fast, color $transition-fast;
+    }
+    &__provider--active &__provider-icon {
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+    }
+
+    &__provider-label {
+        color: $text-primary;
+        font-size: $font-size-sm;
+        font-weight: $font-weight-semibold;
+    }
+
+    &__provider-hint {
+        color: var(--text-faint);
+        font-size: 11.5px;
+        line-height: 1.4;
+    }
+
+    // Inline "detected provider" pill beneath the URL input.
+    &__detected {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        width: max-content;
+        margin-top: $space-1;
+        padding: 3px $space-2;
+        border: 1px solid var(--accent-dim);
+        border-radius: $radius-full;
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+        font-size: $font-size-xs;
+        font-weight: $font-weight-medium;
+        line-height: 1;
+    }
+
+    &__field {
+        display: grid;
+        gap: $space-2;
+
+        label {
+            color: $text-secondary;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-medium;
+        }
+    }
+
+    &__field-hint {
+        color: $text-tertiary;
+        font-size: $font-size-xs;
+        line-height: 1.45;
+    }
+
+    &__toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-4;
+        padding: $space-3;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-md;
+
+        strong,
+        span {
+            display: block;
+        }
+
+        strong {
+            color: $text-primary;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-medium;
+        }
+
+        span {
+            margin-top: 2px;
+            color: $text-tertiary;
+            font-size: $font-size-xs;
+            line-height: 1.4;
+        }
+    }
+
+    // Disclosure for secondary fields (deploy scripts) — mirrors the new-service
+    // "Advanced settings" toggle.
+    &__advanced-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+        min-height: 44px;
+        padding: 0 $space-3;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: $radius-md;
+        color: $text-secondary;
+        cursor: pointer;
+        transition: border-color $transition-fast, background $transition-fast;
+
+        &:hover {
+            background: var(--surface-2);
+            border-color: var(--border-strong);
+        }
+
+        > span {
+            display: flex;
+            align-items: center;
+            gap: $space-2;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-medium;
+        }
+
+        &[aria-expanded='true'] > svg {
+            transform: rotate(180deg);
+        }
+
+        > svg {
+            transition: transform $transition-fast;
+        }
+    }
+
+    &__advanced {
+        display: grid;
+        gap: $space-4;
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: $space-2;
+        margin-top: $space-2;
+        padding-top: $space-4;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    &__actions-spacer {
+        margin-right: auto;
+    }
+}
+
+// Connected-state card — shown on the WordPress Git tab once a repo is linked.
+.git-connect-status {
+    display: grid;
+    gap: $space-4;
+    max-width: 640px;
+    padding: $space-5;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+
+    &__header {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-3;
+    }
+
+    &__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 38px;
+        height: 38px;
+        border-radius: $radius-lg;
+        background: var(--green-bg);
+        color: var(--green);
+    }
+
+    &__title {
+        min-width: 0;
+
+        strong {
+            display: block;
+            color: $text-primary;
+            font-size: $font-size-base;
+            font-weight: $font-weight-semibold;
+        }
+    }
+
+    &__url {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: var(--accent-bright);
+        text-decoration: none;
+        overflow-wrap: anywhere;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    &__meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: $space-3;
+        padding: $space-4;
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-md;
+    }
+
+    &__meta-item {
+        span {
+            display: block;
+            margin-bottom: 3px;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        strong {
+            color: $text-primary;
+            font-size: 13px;
+            font-weight: $font-weight-normal;
+
+            &.mono {
+                font-family: var(--mono);
+                font-size: 12px;
+            }
+        }
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+}
+
+// ---- GitHub one-click picker (GithubRepoPicker) ----------------------------
+// The "connect with GitHub" fast path that sits above the paste-a-URL field in
+// RepoConnectForm. Reuses the same OAuth as /services/new.
+.git-connect__or {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    color: var(--text-faint);
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+
+    &::before,
+    &::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border-soft);
+    }
+}
+
+.git-connect__gh {
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+
+    &--hint {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 11px 13px;
+        font-size: 12.5px;
+        color: var(--text-dim);
+
+        a { color: var(--accent-bright); }
+        svg { color: var(--text-faint); flex-shrink: 0; }
+    }
+
+    &--connect {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 15px;
+
+        > svg { color: var(--text); flex-shrink: 0; }
+    }
+
+    &-text {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+
+        strong { font-size: 13.5px; }
+        span { font-size: 12px; color: var(--text-faint); }
+    }
+
+    &--picker { padding: 12px; display: grid; gap: 10px; }
+
+    &-account {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+
+        img { width: 26px; height: 26px; border-radius: 50%; }
+        .git-connect__gh-account-name {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.25;
+            strong { font-size: 13px; }
+            small { font-size: 11px; color: var(--text-faint); }
+        }
+        > .ui-button { margin-left: auto; }
+    }
+
+    &-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 10px;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+
+        svg { color: var(--text-faint); flex-shrink: 0; }
+        .ui-input { border: none; background: none; padding-left: 0; height: 34px; }
+    }
+
+    &-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+
+    &-state { padding: 12px; font-size: 12.5px; color: var(--text-faint); text-align: center; }
+
+    &-repo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 11px;
+        border: 1px solid var(--border-soft);
+        border-radius: 8px;
+        background: var(--surface);
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.14s, background 0.14s;
+
+        &:hover { border-color: var(--border-strong); }
+        &.is-active {
+            border-color: var(--accent-bright);
+            background: var(--accent-bg);
+            svg { color: var(--accent-bright); margin-left: auto; flex-shrink: 0; }
+        }
+    }
+
+    &-repo-main {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+
+        strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        small { font-size: 11.5px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    }
+
+    &-repo-vis {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--text-faint);
+        flex-shrink: 0;
+    }
+
+    &-branch {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12.5px;
+
+        label { color: var(--text-dim); }
+        select {
+            flex: 1;
+            height: 34px;
+            padding: 0 10px;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            color: var(--text);
+        }
+    }
+}
+
+// Provider card with a detected local service running.
+.git-connect__provider--live {
+    border-color: var(--green-dim, rgba(74, 222, 128, 0.35));
+    background: var(--green-bg);
+
+    .git-connect__provider-icon {
+        background: var(--green-bg);
+        color: var(--green);
+    }
+
+    .git-connect__provider-hint {
+        color: var(--green);
+    }
+}
+
+// Tracked-path selector (replaces the raw textarea).
+.git-path-selector {
+    display: grid;
+    gap: $space-3;
+
+    &__label {
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+    }
+
+    &__quick {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+    }
+
+    &__chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        border: 1px solid var(--border);
+        border-radius: $radius-full;
+        background: var(--surface);
+        color: $text-secondary;
+        font-size: 12px;
+        cursor: pointer;
+        transition: border-color $transition-fast, background $transition-fast, color $transition-fast;
+
+        &:hover {
+            border-color: var(--border-strong);
+            background: var(--surface-2);
+        }
+
+        &--quick.is-active {
+            border-color: var(--accent-dim);
+            background: var(--accent-bg);
+            color: var(--accent-bright);
+        }
+    }
+
+    &__add {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+
+        .ui-input {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+
+    &__add-icon {
+        display: inline-flex;
+        color: var(--text-faint);
+        flex-shrink: 0;
+    }
+
+    &__list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    &__item {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-1;
+        padding: 4px 8px 4px 10px;
+        background: var(--bg-code);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-md;
+        font-size: 12.5px;
+
+        code {
+            font-family: var(--mono);
+            color: var(--text-code);
+        }
+    }
+
+    &__remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: none;
+        border-radius: $radius-sm;
+        background: transparent;
+        color: var(--text-faint);
+        cursor: pointer;
+
+        &:hover {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+    }
+
+    &__empty {
+        margin: 0;
+        color: var(--text-faint);
+        font-size: $font-size-xs;
+    }
+}

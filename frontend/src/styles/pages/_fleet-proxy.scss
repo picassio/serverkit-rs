@@ -1,0 +1,176 @@
+// ============================================
+// FLEET PROXY (fleet-wide reverse-proxy dashboard)
+// ============================================
+//
+// Aggregates every server's managed-proxy posture into one table. Lives inside
+// the Servers tab group, so it renders within `.sk-tabgroup__inner` and uses
+// the shared design-system primitives (DataTable, Pill). Tokens only — no
+// hard-coded colors.
+
+.fleet-proxy {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    // Intro: icon chip + title + one-line explanation.
+    &__intro {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-3;
+    }
+
+    &__intro-icon {
+        display: inline-flex;
+        flex: none;
+        padding: $space-2;
+        border-radius: $radius-md;
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+    }
+
+    &__intro-text {
+        h1 {
+            margin: 0 0 $space-1;
+            font-size: $font-size-lg;
+            font-weight: 600;
+            color: $text-primary;
+        }
+
+        p {
+            margin: 0;
+            max-width: 62ch;
+            font-size: $font-size-sm;
+            color: $text-secondary;
+        }
+    }
+
+    // Summary strip: counts by proxy type, fleet app total, and ingress
+    // mismatches. Auto-fit so the row reflows as tiles are added.
+    &__summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: $space-3;
+
+        @media (max-width: $breakpoint-md) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    &__summary-tile {
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+        padding: $space-3;
+        background: $bg-elevated;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+
+        // Mismatch tile when the fleet has at least one ingress mismatch.
+        &--warn {
+            background: $warning-bg;
+            border-color: $warning-border;
+
+            .fleet-proxy__summary-label,
+            .fleet-proxy__summary-value {
+                color: $warning;
+            }
+        }
+    }
+
+    // "Apps" cell: count plus an optional amber mismatch pill.
+    &__apps {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        flex-wrap: wrap;
+
+        .sk-pill svg {
+            margin-right: 2px;
+        }
+    }
+
+    &__summary-label {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+    }
+
+    &__summary-value {
+        font-size: $font-size-xl;
+        font-weight: 700;
+        color: $text-primary;
+    }
+
+    // Small color swatch standing in for a type icon in the summary labels.
+    &__swatch {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: $text-secondary;
+
+        &--cyan { background: var(--cyan, #06b6d4); }
+        &--violet { background: var(--violet, #8b5cf6); }
+        &--gray { background: $text-secondary; }
+        &--green { background: $success; }
+    }
+
+    &__table {
+        background: $bg-card;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+        overflow: hidden;
+    }
+
+    &__row:hover {
+        background: $bg-elevated;
+    }
+
+    // Server name cell links through to the per-server Proxy tab.
+    &__server {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        color: $text-primary;
+        font-weight: 500;
+        text-decoration: none;
+
+        &:hover {
+            color: var(--accent-bright);
+        }
+    }
+
+    &__muted {
+        color: $text-secondary;
+        font-size: $font-size-sm;
+    }
+
+    // Per-row actionable recommendation pill. The text can be a full sentence,
+    // so allow it to wrap and clamp its width rather than stretch the row.
+    &__recommendation {
+        max-width: 32ch;
+        white-space: normal;
+        text-align: left;
+        line-height: 1.3;
+    }
+
+    &__col-actions {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    &__error {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: $space-3;
+        padding: $space-4;
+        background: $danger-bg;
+        border: 1px solid $danger-border;
+        border-radius: $radius-md;
+        color: $danger;
+        font-size: $font-size-sm;
+    }
+}

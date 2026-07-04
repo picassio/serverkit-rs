@@ -1,0 +1,14 @@
+[package]
+name = "sk-db"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+regex = "1"
+hex.workspace = true
+rand.workspace = true
+tracing.workspace = true

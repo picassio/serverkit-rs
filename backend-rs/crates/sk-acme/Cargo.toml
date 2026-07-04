@@ -1,0 +1,20 @@
+[package]
+name = "sk-acme"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rustls = { version = "0.23", features = ["aws_lc_rs"] }
+instant-acme = { version = "0.8", features = ["rcgen"] }
+tracing-subscriber = { workspace = true }
+
+[[bin]]
+name = "sk-acme-cli"
+path = "src/bin/cli.rs"

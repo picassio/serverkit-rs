@@ -1,0 +1,42 @@
+[package]
+name = "sk-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sk-server"
+path = "src/main.rs"
+
+[dependencies]
+sk-core.workspace = true
+sk-auth.workspace = true
+sk-models.workspace = true
+sk-system.workspace = true
+sk-docker.workspace = true
+sk-terminal.workspace = true
+sk-ops.workspace = true
+sk-files.workspace = true
+sk-web.workspace = true
+sk-db.workspace = true
+sk-magento.workspace = true
+sk-monitor = { workspace = true }
+sk-templates = { workspace = true }
+tokio.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tokio-util.workspace = true
+tokio-stream = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+futures-util = "0.3"
+libc = "0.2"
+rand = { workspace = true }
+socketioxide.workspace = true
+sqlx.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

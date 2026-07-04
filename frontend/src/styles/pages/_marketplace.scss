@@ -1,0 +1,940 @@
+// Marketplace page styles
+
+.marketplace-page {
+    .card {
+        border-radius: $radius-lg;
+    }
+
+    .marketplace-hero {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: $space-6;
+        margin-bottom: $space-5;
+        padding: $space-6;
+        overflow: hidden;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+        background: $bg-card;
+    }
+
+    .marketplace-hero__content {
+        min-width: 0;
+    }
+
+    .marketplace-hero__actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .marketplace-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        margin-bottom: $space-3;
+        color: $accent-primary;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: $font-weight-medium;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+
+        svg {
+            width: 15px;
+            height: 15px;
+        }
+    }
+
+    .page-header-content {
+        h1 {
+            margin: 0 0 $space-2;
+            font-size: $font-size-3xl;
+            line-height: $line-height-tight;
+            letter-spacing: 0;
+        }
+
+        .page-description {
+            max-width: 680px;
+            color: $text-secondary;
+            font-size: $font-size-base;
+            line-height: $line-height-normal;
+        }
+    }
+
+    .marketplace-tabs__list {
+        margin-bottom: $space-5;
+
+        svg {
+            width: 16px;
+            height: 16px;
+        }
+    }
+
+    .marketplace-toolbar {
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) 220px auto;
+        gap: $space-3;
+        align-items: center;
+        margin-bottom: $space-6;
+    }
+
+    .marketplace-search {
+        position: relative;
+        min-width: 0;
+
+        .ui-input {
+            padding-left: 42px;
+            background: $bg-card;
+        }
+    }
+
+    .marketplace-search__icon {
+        position: absolute;
+        top: 50%;
+        left: $space-4;
+        z-index: 1;
+        width: 16px;
+        height: 16px;
+        color: $text-tertiary;
+        transform: translateY(-50%);
+        pointer-events: none;
+    }
+
+    .marketplace-category-select {
+        width: 100%;
+        height: 40px;
+    }
+
+    .cat-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+        margin-bottom: $space-5;
+    }
+
+    .cat-chip {
+        padding: $space-1 $space-3;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        background: $bg-elevated;
+        color: $text-tertiary;
+        font-family: inherit;
+        font-size: $font-size-sm + 0.5;
+        font-weight: $font-weight-medium;
+        text-transform: capitalize;
+        cursor: pointer;
+        transition:
+            color $transition-base,
+            background $transition-base,
+            border-color $transition-base;
+
+        &:hover {
+            border-color: $border-active;
+            color: $text-primary;
+        }
+
+        &--active {
+            border-color: var(--accent-dim);
+            background: var(--accent-bg);
+            color: var(--accent-bright);
+        }
+    }
+
+    .marketplace-browse-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 292px;
+        gap: $space-6;
+        align-items: start;
+    }
+
+    .marketplace-main-stack,
+    .plugins-section {
+        display: flex;
+        flex-direction: column;
+        gap: $space-8;
+        min-width: 0;
+    }
+
+    .marketplace-section {
+        min-width: 0;
+    }
+
+    .marketplace-section__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: $space-4;
+        margin-bottom: $space-4;
+
+        h2 {
+            margin: 0;
+            color: $text-primary;
+            font-size: $font-size-lg;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0;
+        }
+    }
+
+    .marketplace-kicker {
+        margin: 0 0 $space-1;
+        color: var(--text-ghost);
+        font-family: var(--mono);
+        font-size: $font-size-xs;
+        font-weight: $font-weight-medium;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .extensions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: $space-4;
+    }
+
+    .extension-card {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+        min-height: 284px;
+        padding: $space-5;
+        background: $bg-card;
+        transition:
+            transform $transition-base,
+            border-color $transition-base,
+            box-shadow $transition-base;
+
+        &:hover {
+            transform: translateY(-2px);
+            border-color: $border-active;
+            box-shadow: var(--shadow-lg);
+        }
+    }
+
+    .extension-card--clickable {
+        cursor: pointer;
+
+        &:focus-visible {
+            outline: 2px solid $accent-primary;
+            outline-offset: 2px;
+        }
+    }
+
+    .extension-card__topline,
+    .extension-card__footer,
+    .extension-card__info,
+    .extension-card__actions,
+    .extension-card__signals {
+        display: flex;
+        align-items: center;
+    }
+
+    .extension-card__topline,
+    .extension-card__footer {
+        justify-content: space-between;
+        gap: $space-3;
+    }
+
+    .extension-card__badges {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: $space-2;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
+    .extension-card__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        border-radius: $radius-lg;
+        color: $accent-primary;
+        background: fade($accent-primary-raw, 12%);
+
+        svg {
+            width: 21px;
+            height: 21px;
+        }
+    }
+
+    .extension-card__icon--monitoring {
+        color: $info;
+        background: fade($info, 12%);
+    }
+
+    .extension-card__icon--security {
+        color: $success;
+        background: fade($success, 12%);
+    }
+
+    .extension-card__icon--deployment {
+        color: $warning;
+        background: fade($warning, 12%);
+    }
+
+    .extension-card__icon--integration {
+        color: $color-docker;
+        background: fade($color-docker, 12%);
+    }
+
+    .extension-card__icon--ui {
+        color: #ec4899;
+        background: rgba(236, 72, 153, 0.12);
+    }
+
+    .extension-card__body {
+        min-width: 0;
+
+        h3 {
+            margin: 0 0 $space-2;
+            color: $text-primary;
+            font-size: $font-size-md;
+            line-height: $line-height-tight;
+            letter-spacing: 0;
+        }
+    }
+
+    .extension-card__desc {
+        display: -webkit-box;
+        min-height: 64px;
+        margin: 0;
+        overflow: hidden;
+        color: $text-secondary;
+        font-size: $font-size-base;
+        line-height: $line-height-normal;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+    }
+
+    .extension-card__signals {
+        justify-content: space-between;
+        gap: $space-3;
+        margin-top: auto;
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+
+        > span {
+            display: inline-flex;
+            align-items: center;
+            gap: $space-2;
+            min-width: 0;
+        }
+    }
+
+    .extension-card__stars {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        color: $text-tertiary;
+
+        svg {
+            width: 13px;
+            height: 13px;
+        }
+
+        .is-filled {
+            color: $warning;
+            fill: currentColor;
+        }
+    }
+
+    .extension-card__signal-text {
+        color: $text-tertiary;
+    }
+
+    .extension-card__footer {
+        padding-top: $space-4;
+        border-top: 1px solid $border-subtle;
+    }
+
+    .extension-card__info {
+        flex-wrap: wrap;
+        gap: $space-2;
+        min-width: 0;
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    .marketplace-side-panel {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+        position: sticky;
+        top: $space-4;
+    }
+
+    .marketplace-panel {
+        padding: $space-4;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+        background: fade($bg-card-raw, 92%);
+    }
+
+    .marketplace-panel__title {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        margin-bottom: $space-3;
+        color: $text-primary;
+        font-size: $font-size-base;
+        font-weight: $font-weight-semibold;
+
+        svg {
+            width: 16px;
+            height: 16px;
+            color: $accent-primary;
+        }
+    }
+
+    .marketplace-category-list {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+    }
+
+    .marketplace-category {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        width: 100%;
+        height: 36px;
+        padding: 0 $space-3;
+        border: 1px solid transparent;
+        border-radius: $radius-md;
+        background: transparent;
+        color: $text-secondary;
+        font-family: inherit;
+        font-size: $font-size-sm + 1;
+        font-weight: $font-weight-medium;
+        text-align: left;
+        cursor: pointer;
+        transition:
+            color $transition-base,
+            background $transition-base,
+            border-color $transition-base;
+
+        svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        &:hover {
+            border-color: $border-active;
+            background: $bg-hover;
+            color: $text-primary;
+        }
+
+        &--active {
+            border-color: var(--accent-dim);
+            background: var(--accent-bg);
+            color: var(--accent-bright);
+        }
+    }
+
+    .marketplace-runtime {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+    }
+
+    .marketplace-runtime__row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+        padding: $space-2 0;
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        border-bottom: 1px solid $border-subtle;
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        strong {
+            color: $text-primary;
+            font-weight: $font-weight-semibold;
+        }
+
+        &--danger strong {
+            color: $danger;
+        }
+    }
+
+    .installed-list {
+        display: flex;
+        flex-direction: column;
+        gap: $space-3;
+    }
+
+    .installed-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-4;
+        padding: $space-4;
+    }
+
+    .installed-item__main {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .installed-item__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        border-radius: $radius-lg;
+
+        svg {
+            width: 19px;
+            height: 19px;
+        }
+    }
+
+    .installed-item__icon--extension {
+        color: $success;
+        background: fade($success, 12%);
+    }
+
+    .installed-item__icon--local {
+        color: $warning;
+        background: fade($warning, 12%);
+    }
+
+    .installed-item__icon--plugin {
+        color: $accent-primary;
+        background: fade($accent-primary-raw, 12%);
+    }
+
+    .installed-item__content {
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+        min-width: 0;
+
+        strong {
+            color: $text-primary;
+            font-size: $font-size-base;
+        }
+    }
+
+    .installed-item__title-line,
+    .installed-item__actions {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        flex-wrap: wrap;
+    }
+
+    .installed-item__description,
+    .installed-item__error {
+        margin: $space-1 0 0;
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        line-height: $line-height-normal;
+    }
+
+    .installed-item__error {
+        color: $danger;
+    }
+
+    .installed-item--error {
+        border-color: fade($danger, 30%);
+    }
+
+    // "Update available" pill on plugin rows. Uses the info badge variant for
+    // color; this just tightens the icon/text rhythm and weight.
+    .plugin-update-badge {
+        gap: $space-1;
+        font-weight: $font-weight-semibold;
+    }
+
+    .plugin-install-form {
+        padding: $space-5;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+        background: fade($bg-card-raw, 92%);
+    }
+
+    .plugin-install-form__heading {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-3;
+        margin-bottom: $space-4;
+
+        h3 {
+            margin: 0 0 $space-1;
+            color: $text-primary;
+            font-size: $font-size-md;
+            font-weight: $font-weight-semibold;
+        }
+
+        p {
+            margin: 0;
+        }
+    }
+
+    .plugin-install-form__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        border-radius: $radius-lg;
+        color: $accent-primary;
+        background: fade($accent-primary-raw, 12%);
+
+        svg {
+            width: 19px;
+            height: 19px;
+        }
+    }
+
+    .plugin-install-tabs {
+        display: inline-flex;
+        gap: $space-1;
+        margin-bottom: $space-4;
+        padding: $space-1;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+        background: $bg-body;
+    }
+
+    .plugin-install-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        height: 32px;
+        padding: 0 $space-3;
+        border: 1px solid transparent;
+        border-radius: $radius-md;
+        background: transparent;
+        color: $text-secondary;
+        font-family: inherit;
+        font-size: $font-size-sm + 1;
+        font-weight: $font-weight-semibold;
+        cursor: pointer;
+        transition:
+            background $transition-base,
+            color $transition-base,
+            border-color $transition-base;
+
+        svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        &:hover {
+            color: $text-primary;
+        }
+
+        &--active {
+            border-color: $accent-primary;
+            background: fade($accent-primary-raw, 12%);
+            color: $text-primary;
+        }
+    }
+
+    .plugin-install-source {
+        p {
+            margin: 0 0 $space-3;
+            font-size: $font-size-sm;
+        }
+    }
+
+    .plugin-install-row {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+
+        .ui-input,
+        input[type='text'] {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+
+    .marketplace-file-input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .plugin-file-note {
+        margin-top: $space-2;
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    .marketplace-empty {
+        border-radius: $radius-lg;
+
+        svg {
+            width: 30px;
+            height: 30px;
+        }
+    }
+
+    @media (max-width: 1180px) {
+        .marketplace-browse-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .marketplace-side-panel {
+            position: static;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: $breakpoint-md) {
+        .marketplace-hero {
+            grid-template-columns: 1fr;
+            padding: $space-5;
+        }
+
+        .marketplace-hero__actions {
+            justify-content: stretch;
+
+            .btn {
+                width: 100%;
+            }
+        }
+
+        .marketplace-side-panel {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .marketplace-toolbar {
+            grid-template-columns: 1fr;
+        }
+
+        .extensions-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .installed-item {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .installed-item__actions {
+            width: 100%;
+
+            .btn {
+                flex: 1;
+            }
+        }
+
+        .plugin-install-row {
+            align-items: stretch;
+            flex-direction: column;
+
+            .btn {
+                width: 100%;
+            }
+        }
+
+    }
+
+    @media (max-width: $breakpoint-sm) {
+        .page-header-content h1 {
+            font-size: $font-size-2xl;
+        }
+
+        .marketplace-side-panel {
+            grid-template-columns: 1fr;
+        }
+
+        .marketplace-section__header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .extension-card__topline,
+        .extension-card__footer,
+        .extension-card__signals {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .extension-card__actions,
+        .extension-card__actions .btn {
+            width: 100%;
+        }
+    }
+}
+
+// First-party "by ServerKit" badge. Rendered both inside .marketplace-page
+// (cards) and inside the detail Modal (a Radix portal outside the page tree),
+// so it lives at the root. Matches the `secondary` variant selector specificity
+// and wins on source order to apply the accent tint.
+[data-slot='badge'].extension-firstparty {
+    gap: 4px;
+    border-color: var(--accent-dim);
+    background: var(--accent-bg);
+    color: var(--accent-bright);
+    font-weight: $font-weight-semibold;
+}
+
+// Extension detail modal (rendered in a Radix Dialog portal).
+.extension-detail {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    &__header {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-4;
+    }
+
+    &__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        flex: 0 0 52px;
+        border-radius: $radius-lg;
+        color: $accent-primary;
+        background: fade($accent-primary-raw, 12%);
+
+        svg {
+            width: 26px;
+            height: 26px;
+        }
+    }
+
+    &__heading {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+        min-width: 0;
+    }
+
+    &__badges {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: $space-2;
+    }
+
+    &__meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: $space-3;
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    &__desc {
+        margin: 0;
+        color: $text-secondary;
+        font-size: $font-size-base;
+        line-height: $line-height-normal;
+    }
+
+    &__gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: $space-3;
+    }
+
+    &__shot {
+        width: 100%;
+        height: auto;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        background: $bg-elevated;
+        object-fit: cover;
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: $space-4;
+        border-top: 1px solid $border-subtle;
+    }
+
+    &__section-label {
+        margin: 0 0 $space-2;
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+    }
+
+    &__consent,
+    &__config {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+    }
+
+    &__chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+    }
+
+    &__config-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+
+        code {
+            font-size: $font-size-sm;
+            color: $text-secondary;
+        }
+    }
+}
+
+// Keep-vs-purge data policy dialog on plugin uninstall.
+.plugin-uninstall-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    p {
+        margin: 0;
+        line-height: $line-height-normal;
+    }
+}
+
+// Per-plugin config editor (#49) — fields generated from config_schema.
+.plugin-config-form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    &__field {
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+    }
+
+    &__label {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-semibold;
+    }
+
+    &__hint {
+        font-size: $font-size-xs;
+        line-height: $line-height-normal;
+    }
+}

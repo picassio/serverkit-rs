@@ -1,0 +1,1030 @@
+// ============================================
+// SHADCN-STYLE UI COMPONENT CLASSES
+// ============================================
+//
+// SCSS classes used by `frontend/src/components/ui/*.jsx`.
+// These are paired one-to-one with React components so that
+// geometry/color/typography lives in SCSS only — JSX just composes
+// classes. tailwindcss-animate utility classes (animate-in, slide-in-from-*)
+// remain in JSX because they are behavior-only and don't conflict.
+//
+// Naming convention: `.ui-<component>-<part>` to avoid collisions with
+// existing legacy classes like `.card`, `.tab`, `.modal` that are
+// referenced from many places.
+// ============================================
+
+// --------------------------------------------
+// LABEL
+// --------------------------------------------
+.ui-label {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-sm + 1;
+    font-weight: $font-weight-medium;
+    line-height: 1;
+    color: $text-secondary;
+    user-select: none;
+
+    &[data-disabled='true'],
+    .peer:disabled ~ & {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+// --------------------------------------------
+// INPUT / TEXTAREA shared styles
+// --------------------------------------------
+%ui-field-base {
+    display: block;
+    width: 100%;
+    padding: 0 $space-3 + 1; // 13px
+    background: $bg-body;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    color: $text-primary;
+    font-family: inherit;
+    font-size: $font-size-base;
+    line-height: 1.5;
+    @include transition(border-color);
+
+    &::placeholder {
+        color: $text-tertiary;
+    }
+
+    &:focus,
+    &:focus-visible {
+        border-color: $accent-primary;
+        outline: none;
+        box-shadow: 0 0 0 3px fade($accent-primary-raw, 18%);
+    }
+
+    &:disabled,
+    &[aria-disabled='true'] {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    &[aria-invalid='true'] {
+        border-color: $danger;
+        box-shadow: 0 0 0 3px fade($danger, 18%);
+    }
+}
+
+.ui-input {
+    @extend %ui-field-base;
+    height: 40px;
+
+    &::file-selector-button {
+        margin-right: $space-3;
+        padding: 0 $space-2;
+        height: 28px;
+        background: transparent;
+        border: none;
+        color: $text-primary;
+        font-weight: $font-weight-medium;
+        font-size: $font-size-sm + 1;
+        cursor: pointer;
+    }
+}
+
+.ui-textarea {
+    @extend %ui-field-base;
+    min-height: 80px;
+    padding-top: $space-2 + 1;
+    padding-bottom: $space-2 + 1;
+    resize: vertical;
+}
+
+// --------------------------------------------
+// CHECKBOX (Radix)
+// --------------------------------------------
+.ui-checkbox {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1px solid $border-active;
+    border-radius: $radius-sm;
+    background: $bg-body;
+    cursor: pointer;
+    @include transition();
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+
+    &:focus-visible {
+        outline: 2px solid $accent-primary;
+        outline-offset: 2px;
+    }
+
+    &:disabled,
+    &[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    &[data-state='checked'] {
+        background: $accent-primary;
+        border-color: $accent-primary;
+    }
+
+    svg {
+        width: 12px;
+        height: 12px;
+    }
+}
+
+// --------------------------------------------
+// SWITCH (Radix)
+// --------------------------------------------
+.ui-switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 36px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: $radius-full;
+    background: $bg-tertiary;
+    cursor: pointer;
+    @include transition(background-color);
+
+    &:focus-visible {
+        outline: 2px solid $accent-primary;
+        outline-offset: 2px;
+    }
+
+    &:disabled,
+    &[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    &[data-state='checked'] {
+        background: $accent-primary;
+    }
+
+    .ui-switch-thumb {
+        display: block;
+        width: 16px;
+        height: 16px;
+        margin: 2px;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        transition: transform 150ms ease;
+        transform: translateX(0);
+    }
+
+    &[data-state='checked'] .ui-switch-thumb {
+        transform: translateX(16px);
+    }
+}
+
+// --------------------------------------------
+// CARD (shadcn-style)
+// --------------------------------------------
+.ui-card {
+    background: $bg-card;
+    color: $text-primary;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-xl;
+    box-shadow: $shadow-sm;
+    display: flex;
+    flex-direction: column;
+}
+
+.ui-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1 + 2; // 6px
+    padding: $space-6;
+}
+
+.ui-card-title {
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    line-height: 1.2;
+    color: $text-primary;
+    margin: 0;
+}
+
+.ui-card-description {
+    font-size: $font-size-sm + 1;
+    color: $text-tertiary;
+    line-height: 1.45;
+    margin: 0;
+}
+
+.ui-card-content {
+    padding: 0 $space-6 $space-6;
+    flex: 1;
+}
+
+.ui-card-footer {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: 0 $space-6 $space-6;
+}
+
+// --------------------------------------------
+// TABLE (shadcn-style)
+// --------------------------------------------
+.ui-table-wrapper {
+    position: relative;
+    width: 100%;
+    overflow-x: auto;
+    @include custom-scrollbar();
+}
+
+.ui-table {
+    width: 100%;
+    caption-side: bottom;
+    border-collapse: collapse;
+    font-size: $font-size-sm + 1;
+}
+
+.ui-table-header tr {
+    border-bottom: 1px solid $border-default;
+}
+
+.ui-table-body tr:not(:last-child) {
+    border-bottom: 1px solid $border-subtle;
+}
+
+.ui-table-footer {
+    border-top: 1px solid $border-default;
+    background: fade($bg-hover-raw, 50%);
+    font-weight: $font-weight-medium;
+
+    tr:last-child {
+        border-bottom: 0;
+    }
+}
+
+.ui-table-row {
+    @include transition(background-color);
+
+    &:hover {
+        background: fade($bg-hover-raw, 50%);
+    }
+
+    &[data-state='selected'] {
+        background: $bg-hover;
+    }
+}
+
+.ui-table-head {
+    height: 40px;
+    padding: 0 $space-4;
+    text-align: left;
+    vertical-align: middle;
+    color: $text-tertiary;
+    font-weight: $font-weight-medium;
+    font-size: $font-size-xs + 1;
+}
+
+.ui-table-cell {
+    padding: $space-3 + 1 $space-4; // 13px 16px
+    vertical-align: middle;
+    color: $text-primary;
+}
+
+.ui-table-caption {
+    margin-top: $space-4;
+    color: $text-tertiary;
+    font-size: $font-size-sm + 1;
+}
+
+// --------------------------------------------
+// DIALOG / ALERT DIALOG (Radix)
+// --------------------------------------------
+.ui-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: $z-modal-backdrop;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.ui-dialog-content {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    z-index: $z-modal-backdrop + 1;
+    width: calc(100% - #{$space-8});
+    max-width: 560px;
+    max-height: calc(100vh - #{$space-10});
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+    padding: $space-6;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-2xl;
+    box-shadow: $shadow-lg;
+    overflow-y: auto;
+    @include custom-scrollbar();
+
+    &:focus,
+    &:focus-visible {
+        outline: none;
+    }
+}
+
+.ui-dialog-close {
+    position: absolute;
+    top: $space-4;
+    right: $space-4;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: $radius-sm;
+    color: $text-tertiary;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    @include transition();
+
+    &:hover {
+        color: $text-primary;
+        background: $bg-hover;
+    }
+
+    &:focus-visible {
+        outline: 2px solid $accent-primary;
+        outline-offset: 2px;
+    }
+
+    svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+.ui-dialog-header {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1 + 2;
+    text-align: left;
+}
+
+.ui-dialog-footer {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: $space-2;
+    margin-top: $space-2;
+
+    @media (min-width: $breakpoint-sm) {
+        flex-direction: row;
+        justify-content: flex-end;
+    }
+}
+
+.ui-dialog-title {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-semibold;
+    line-height: 1.2;
+    color: $text-primary;
+    margin: 0;
+}
+
+.ui-dialog-description {
+    font-size: $font-size-sm + 1;
+    color: $text-tertiary;
+    line-height: 1.5;
+    margin: 0;
+}
+
+// --------------------------------------------
+// SHEET (Radix Dialog used as side drawer)
+// --------------------------------------------
+.ui-sheet-overlay {
+    @extend .ui-dialog-overlay;
+}
+
+.ui-sheet-content {
+    position: fixed;
+    z-index: $z-modal-backdrop + 1;
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+    padding: $space-6;
+    background: $bg-card;
+    border-color: $border-subtle;
+    box-shadow: $shadow-lg;
+    overflow-y: auto;
+    @include custom-scrollbar();
+
+    &:focus,
+    &:focus-visible {
+        outline: none;
+    }
+
+    &--top {
+        top: 0;
+        left: 0;
+        right: 0;
+        border-bottom: 1px solid $border-subtle;
+    }
+
+    &--bottom {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        border-top: 1px solid $border-subtle;
+    }
+
+    &--left {
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        max-width: 28rem;
+        border-right: 1px solid $border-subtle;
+    }
+
+    &--right {
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 100%;
+        max-width: 28rem;
+        border-left: 1px solid $border-subtle;
+    }
+}
+
+.ui-sheet-close {
+    @extend .ui-dialog-close;
+}
+
+.ui-sheet-header {
+    @extend .ui-dialog-header;
+}
+
+.ui-sheet-footer {
+    @extend .ui-dialog-footer;
+}
+
+.ui-sheet-title {
+    @extend .ui-dialog-title;
+}
+
+.ui-sheet-description {
+    @extend .ui-dialog-description;
+}
+
+// --------------------------------------------
+// SELECT (Radix)
+// --------------------------------------------
+.ui-select-trigger {
+    @extend %ui-field-base;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2;
+    cursor: pointer;
+    text-align: left;
+
+    &[data-placeholder] {
+        color: $text-tertiary;
+    }
+
+    > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ui-select-icon {
+        width: 16px;
+        height: 16px;
+        color: $text-tertiary;
+        flex-shrink: 0;
+    }
+}
+
+.ui-select-content {
+    position: relative;
+    z-index: $z-tooltip;
+    min-width: 8rem;
+    max-height: 24rem;
+    overflow: hidden;
+    background: $bg-elevated;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-md;
+    color: $text-primary;
+}
+
+.ui-select-viewport {
+    padding: $space-1;
+}
+
+.ui-select-scroll-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    cursor: default;
+    color: $text-tertiary;
+}
+
+.ui-select-label {
+    padding: $space-1 + 2 $space-2;
+    font-size: $font-size-xs + 1;
+    font-weight: $font-weight-semibold;
+    color: $text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.ui-select-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: $space-2 $space-2 $space-2 $space-8;
+    border-radius: $radius-md;
+    font-size: $font-size-sm + 1;
+    color: $text-primary;
+    cursor: default;
+    user-select: none;
+    outline: none;
+    @include transition(background-color);
+
+    &[data-highlighted],
+    &:focus {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+
+    &[data-disabled] {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    .ui-select-item-indicator {
+        position: absolute;
+        left: $space-2;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        color: $accent-primary;
+
+        svg {
+            width: 14px;
+            height: 14px;
+        }
+    }
+}
+
+.ui-select-separator {
+    height: 1px;
+    margin: $space-1 -#{$space-1};
+    background: $border-subtle;
+}
+
+// --------------------------------------------
+// POPOVER (Radix)
+// --------------------------------------------
+.ui-popover-content {
+    z-index: $z-tooltip;
+    min-width: 12rem;
+    padding: $space-1;
+    background: $bg-elevated;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-md;
+    color: $text-primary;
+    outline: none;
+}
+
+// Default popover surface for `components/ui/popover.jsx` (roomy content
+// container — replicates the original shadcn `w-72 p-4` look).
+.ui-popover-panel {
+    z-index: $z-tooltip;
+    width: 18rem;
+    padding: $space-4;
+    background: $bg-elevated;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+    box-shadow: $shadow-md;
+    color: $text-primary;
+    outline: none;
+}
+
+// --------------------------------------------
+// DROPDOWN MENU (Radix)
+// --------------------------------------------
+.ui-dropdown-content,
+.ui-dropdown-sub-content {
+    z-index: $z-tooltip;
+    min-width: 8rem;
+    overflow: hidden;
+    padding: $space-1;
+    background: $bg-elevated;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+    box-shadow: $shadow-md;
+    color: $text-primary;
+}
+
+.ui-dropdown-sub-content {
+    box-shadow: $shadow-lg;
+}
+
+.ui-dropdown-item,
+.ui-dropdown-sub-trigger,
+.ui-dropdown-checkbox-item,
+.ui-dropdown-radio-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-1 + 2 $space-2; // 6px 8px
+    border-radius: $radius-sm;
+    font-size: $font-size-sm + 1;
+    color: $text-primary;
+    cursor: default;
+    user-select: none;
+    outline: none;
+    @include transition(background-color);
+
+    &:focus,
+    &[data-highlighted],
+    &[data-state='open'] {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+
+    &[data-disabled] {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        pointer-events: none;
+    }
+}
+
+.ui-dropdown-checkbox-item,
+.ui-dropdown-radio-item {
+    padding-left: $space-8;
+    padding-right: $space-2;
+}
+
+.ui-dropdown-item-indicator {
+    position: absolute;
+    left: $space-2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+}
+
+.ui-dropdown-sub-trigger svg.ui-dropdown-chevron {
+    margin-left: auto;
+}
+
+.ui-dropdown-label {
+    padding: $space-1 + 2 $space-2;
+    font-size: $font-size-xs + 1;
+    font-weight: $font-weight-semibold;
+    color: $text-tertiary;
+
+    &--inset { padding-left: $space-8; }
+}
+
+.ui-dropdown-separator {
+    height: 1px;
+    margin: $space-1 -#{$space-1};
+    background: $border-subtle;
+}
+
+.ui-dropdown-shortcut {
+    margin-left: auto;
+    font-size: $font-size-xs + 1;
+    letter-spacing: 0.1em;
+    opacity: 0.6;
+}
+
+.ui-dropdown-inset { padding-left: $space-8; }
+
+// --------------------------------------------
+// COMMAND PALETTE (cmdk)
+// --------------------------------------------
+.ui-command {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: $radius-md;
+    background: $bg-elevated;
+    color: $text-primary;
+}
+
+.ui-command-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: 0 $space-3;
+    border-bottom: 1px solid $border-default;
+}
+
+.ui-command-input-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: $text-tertiary;
+    opacity: 0.7;
+}
+
+.ui-command-input {
+    flex: 1;
+    width: 100%;
+    height: 44px;
+    padding: $space-3 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: $text-primary;
+    font-family: inherit;
+    font-size: $font-size-base;
+
+    &::placeholder { color: $text-tertiary; }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+}
+
+.ui-command-list {
+    max-height: 320px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    @include custom-scrollbar();
+}
+
+.ui-command-empty {
+    padding: $space-6 0;
+    text-align: center;
+    font-size: $font-size-sm + 1;
+    color: $text-tertiary;
+}
+
+.ui-command-group {
+    overflow: hidden;
+    padding: $space-1;
+    color: $text-primary;
+
+    [cmdk-group-heading] {
+        padding: $space-1 + 2 $space-2;
+        font-size: $font-size-xs + 1;
+        font-weight: $font-weight-medium;
+        color: $text-tertiary;
+    }
+}
+
+.ui-command-separator {
+    height: 1px;
+    margin: 0 -#{$space-1};
+    background: $border-subtle;
+}
+
+.ui-command-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-1 + 2 $space-2;
+    border-radius: $radius-sm;
+    font-size: $font-size-sm + 1;
+    color: $text-primary;
+    cursor: default;
+    user-select: none;
+    outline: none;
+    @include transition(background-color);
+
+    &[data-selected='true'] {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+
+    &[data-disabled='true'] {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        pointer-events: none;
+    }
+}
+
+.ui-command-shortcut {
+    margin-left: auto;
+    font-size: $font-size-xs + 1;
+    letter-spacing: 0.1em;
+    color: $text-tertiary;
+}
+
+// Command palette mounted inside a Dialog: drop the dialog's default padding
+// and gap so the command surface fills it edge-to-edge.
+.ui-command-dialog {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+}
+
+// --------------------------------------------
+// SKELETON
+// --------------------------------------------
+.ui-skeleton {
+    border-radius: $radius-md;
+    background: $bg-secondary;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+// --------------------------------------------
+// MODAL (components/Modal.jsx — built on the Dialog primitive)
+// --------------------------------------------
+.sk-modal {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    max-width: 32rem; // = md default
+    max-height: 90vh;
+
+    &--sm { max-width: 24rem; }
+    &--md { max-width: 32rem; }
+    &--lg { max-width: 42rem; }
+    &--xl { max-width: 56rem; }
+    &--2xl { max-width: 72rem; }
+}
+
+.sk-modal__header {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1 + 2;
+    padding: $space-4 $space-10 $space-4 $space-6; // right pad clears the close btn
+    border-bottom: 1px solid $border-subtle;
+}
+
+.sk-modal__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: $space-4 $space-6;
+    @include custom-scrollbar();
+}
+
+.sk-modal__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $space-2;
+    padding: $space-3 $space-6;
+    border-top: 1px solid $border-subtle;
+    background: $bg-card;
+}
+
+// --------------------------------------------
+// CONFIRM DIALOG (components/ConfirmDialog.jsx — built on AlertDialog)
+// --------------------------------------------
+.sk-confirm {
+    text-align: center;
+}
+
+.sk-confirm__head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-3;
+}
+
+.sk-confirm__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+
+    &--danger {
+        color: $danger;
+        background: fade($danger, 10%);
+        border-color: fade($danger, 20%);
+    }
+    &--warning {
+        color: $warning;
+        background: fade($warning, 10%);
+        border-color: fade($warning, 20%);
+    }
+    &--info {
+        color: $accent-primary;
+        background: fade($accent-primary-raw, 10%);
+        border-color: fade($accent-primary-raw, 20%);
+    }
+}
+
+.sk-confirm__body {
+    min-width: 0;
+}
+
+.sk-confirm__details {
+    margin: $space-1 + 2 0 0;
+    font-size: $font-size-sm + 1;
+    color: $text-tertiary;
+}
+
+.sk-confirm__confirm-field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    width: 100%;
+    margin-top: $space-2;
+    text-align: left;
+}
+
+.sk-confirm__footer {
+    flex-direction: row;
+    justify-content: center;
+}
+
+// --------------------------------------------
+// ENTER / EXIT ANIMATIONS (replaces tailwindcss-animate utilities)
+// Radix sets data-state="open|closed" on overlays/content; these keyframes
+// give the same fade/zoom/slide polish without Tailwind.
+// --------------------------------------------
+@keyframes ui-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ui-modal-in {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes ui-modal-out {
+    from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    to { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+@keyframes ui-pop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-pop-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ui-slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes ui-slide-out-right { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@keyframes ui-slide-in-left { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes ui-slide-out-left { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes ui-slide-in-top { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@keyframes ui-slide-out-top { from { transform: translateY(0); } to { transform: translateY(-100%); } }
+@keyframes ui-slide-in-bottom { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes ui-slide-out-bottom { from { transform: translateY(0); } to { transform: translateY(100%); } }
+
+.ui-dialog-overlay,
+.ui-sheet-overlay {
+    &[data-state='open'] { animation: ui-overlay-in 150ms ease; }
+    &[data-state='closed'] { animation: ui-overlay-out 130ms ease; }
+}
+
+.ui-dialog-content {
+    &[data-state='open'] { animation: ui-modal-in 160ms ease; }
+    &[data-state='closed'] { animation: ui-modal-out 140ms ease; }
+}
+
+.ui-popover-content,
+.ui-popover-panel,
+.ui-select-content,
+.ui-dropdown-content,
+.ui-dropdown-sub-content {
+    &[data-state='open'] { animation: ui-pop-in 120ms ease; }
+    &[data-state='closed'] { animation: ui-pop-out 100ms ease; }
+}
+
+.ui-sheet-content {
+    &--right[data-state='open'] { animation: ui-slide-in-right 200ms ease; }
+    &--right[data-state='closed'] { animation: ui-slide-out-right 180ms ease; }
+    &--left[data-state='open'] { animation: ui-slide-in-left 200ms ease; }
+    &--left[data-state='closed'] { animation: ui-slide-out-left 180ms ease; }
+    &--top[data-state='open'] { animation: ui-slide-in-top 200ms ease; }
+    &--top[data-state='closed'] { animation: ui-slide-out-top 180ms ease; }
+    &--bottom[data-state='open'] { animation: ui-slide-in-bottom 200ms ease; }
+    &--bottom[data-state='closed'] { animation: ui-slide-out-bottom 180ms ease; }
+}

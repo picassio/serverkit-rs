@@ -1,0 +1,289 @@
+// ============================================
+// MAIN CONTENT LAYOUT
+// ============================================
+
+.dashboard-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.main-content {
+    margin-left: $sidebar-width;
+    flex: 1;
+    min-width: 0;
+    padding: $space-10;
+    overflow-y: auto;
+    background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 40px 40px;
+
+    @media (max-width: $breakpoint-md) {
+        margin-left: 0;
+        // Clear the fixed mobile header (plus the notch inset, if any).
+        padding: calc(#{$mobile-header-height} + env(safe-area-inset-top) + #{$space-5}) $space-5 $space-5;
+    }
+
+    // Remove padding for routed tool surfaces that manage their own layout.
+    &--full-page,
+    &:has(.workflow-page.fullscreen),
+    &:has(.page-container--full-bleed) {
+        padding: 0;
+        overflow: hidden;
+        height: 100vh;
+
+        // Full-bleed tools still sit below the fixed mobile header.
+        @media (max-width: $breakpoint-md) {
+            height: calc(100dvh - #{$mobile-header-height} - env(safe-area-inset-top));
+            margin-top: calc(#{$mobile-header-height} + env(safe-area-inset-top));
+        }
+    }
+}
+
+// Top bar (page header)
+.top-bar {
+    @include flex-between();
+    margin-bottom: $space-10;
+
+    h1 {
+        font-size: $font-size-2xl;
+        font-weight: $font-weight-semibold;
+        letter-spacing: -0.5px;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: $space-4;
+    }
+}
+
+.top-bar-actions {
+    display: flex;
+    gap: $space-3;
+}
+
+// Shared Page Wrapper
+.page-container {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding-bottom: $space-10;
+
+    &--full-bleed {
+        max-width: none;
+        margin: 0;
+        padding-bottom: 0;
+    }
+}
+
+// Tab group shell (Servers / Domains-style route groups). A parent layout
+// renders the PageTopbar + routed sub-nav once (see layouts/ServersLayout.jsx)
+// and swaps only the content below, so switching tabs feels like real tabs
+// instead of a full-page remount. The shell is full-bleed so the header pins
+// to the very top and never shifts between tabs.
+.sk-tabgroup {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+
+    > .sk-topbar {
+        flex-shrink: 0;
+        padding: 10px $space-4;
+        margin: 0;
+
+        // Match the 18px header icon the per-page top bars used to render.
+        .sk-topbar__ico svg { width: 18px; height: 18px; }
+    }
+
+    &__content {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+
+        // Full-bleed pages (Servers ops, File Manager) fill the region edge-to-
+        // edge and manage their own internal scroll. Centered pages instead
+        // wrap their content in .sk-tabgroup__inner (below).
+        > .servers-page--ops,
+        > .sk-tabgroup__fill { flex: 1; min-height: 0; }
+    }
+
+    // Centered pages (Agent Fleet, Fleet Monitor, Cloud Servers, Config
+    // Templates) keep their max-width framing inside the full-bleed shell.
+    &__inner {
+        width: 100%;
+        max-width: 1400px;
+        margin-inline: auto;
+        padding: $space-6 $space-6 $space-10;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        > .sk-topbar { padding: 10px $space-3; }
+
+        &__inner { padding: $space-4 $space-4 $space-8; }
+    }
+}
+
+// Page Header (shared base)
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: $space-6;
+    flex-wrap: wrap;
+    gap: $space-4;
+
+    .page-header-content,
+    .header-info {
+        h1 {
+            font-size: $font-size-2xl;
+            font-weight: $font-weight-semibold;
+            margin: 0 0 $space-1 0;
+            color: $text-primary;
+        }
+
+        .page-description,
+        p {
+            color: $text-secondary;
+            font-size: $font-size-sm;
+            margin: 0;
+        }
+    }
+
+    .page-header-actions,
+    .header-actions {
+        display: flex;
+        gap: $space-2;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        flex-direction: column;
+        align-items: stretch;
+
+        .page-header-actions,
+        .header-actions {
+            justify-content: flex-end;
+        }
+    }
+}
+
+// .page is a legacy alias for .page-container — kept for any stragglers, no styling.
+// New pages should use .page-container directly.
+
+// Loading state (full-page spinner)
+.loading {
+    @include flex-center();
+    min-height: 60vh;
+    color: $text-secondary;
+}
+
+// Route-level loading (within dashboard)
+.loading-state {
+    min-height: 40vh;
+}
+
+// ============================================================
+// APP-LEVEL INITIAL LOADER
+// Full-screen splash shown while auth/setup state resolves.
+// ============================================================
+.app-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: $space-4;
+    background: var(--surface);
+
+    // Branded tile holding the server glyph — same mark as the sidebar + favicon.
+    &__logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 76px;
+        height: 76px;
+        border-radius: 20px;
+        color: #fff;
+        background: linear-gradient(150deg, var(--accent-bright), var(--accent-hover));
+        box-shadow: 0 14px 34px -10px var(--accent-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.10);
+        animation: app-loader-breathe 2.6s ease-in-out infinite;
+    }
+
+    &__glyph {
+        width: 42px;
+        height: 42px;
+    }
+
+    // Status LEDs blink like a booting machine; the lower one is "online" green.
+    &__led {
+        animation: app-loader-blink 1.4s ease-in-out infinite;
+
+        &--2 {
+            stroke: var(--green);
+            animation-delay: 0.55s;
+        }
+    }
+
+    // Slim indeterminate bar replaces the old spinner.
+    &__bar {
+        position: relative;
+        width: 132px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--surface-3);
+        overflow: hidden;
+    }
+
+    &__bar-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 40%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, transparent, var(--accent-bright), transparent);
+        animation: app-loader-slide 1.3s ease-in-out infinite;
+    }
+
+    &__label {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+        color: var(--text-dim);
+        letter-spacing: 0.02em;
+    }
+}
+
+@keyframes app-loader-breathe {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-2px) scale(1.025); }
+}
+
+@keyframes app-loader-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+}
+
+@keyframes app-loader-slide {
+    0% { transform: translateX(-130%); }
+    100% { transform: translateX(330%); }
+}
+
+// Respect reduced-motion: hold everything still, keep the bar visible.
+@media (prefers-reduced-motion: reduce) {
+    .app-loader__logo,
+    .app-loader__led,
+    .app-loader__bar-fill {
+        animation: none;
+    }
+
+    .app-loader__bar-fill {
+        width: 100%;
+    }
+}

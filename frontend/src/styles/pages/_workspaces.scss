@@ -1,0 +1,593 @@
+// ============================================
+// WORKSPACES PAGE (redesign — infra console look)
+// ============================================
+
+.workspaces-page {
+
+    // Dense table list reuses the WordPress .wp-list + .sk-dtable primitives.
+    // Outer padding/centering comes from the enclosing .sk-tabgroup__inner
+    // (Organization tab group), so the list itself stays flush.
+    .wp-list { padding: 0; }
+
+    // ── modals: mono eyebrow headings + soft separators ─────
+    .modal-body {
+        h4 {
+            margin: 0 0 $space-3;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        hr {
+            margin: $space-5 0;
+            border: none;
+            border-top: 1px solid var(--border-soft);
+        }
+
+        .form-group label {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        .form-hint {
+            display: block;
+            margin-top: $space-2;
+            font-family: var(--mono);
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--text-faint);
+        }
+    }
+
+    // ── modal entity rows (members / grants / resources) ────
+    .ws-rows {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ws-row {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-soft);
+
+        &:last-child { border-bottom: none; }
+
+        // round member/grant avatars (apps/servers keep the square tile)
+        &__av { border-radius: 50%; }
+
+        &__id {
+            flex: 1;
+            min-width: 0;
+
+            strong {
+                font-size: 13px;
+                font-weight: 550;
+                color: var(--text);
+            }
+
+            .sk-tag { margin-left: $space-2; }
+        }
+
+        &__sub {
+            margin-top: 2px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-faint);
+            @include truncate();
+        }
+    }
+
+}
+
+// ── clickable "add / move into this workspace" lists ────
+.ws-pick-label {
+    margin: $space-4 0 $space-2;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-ghost);
+}
+
+.ws-pick {
+    width: 100%;
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    background: var(--surface);
+    @include custom-scrollbar();
+
+    &__item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 10px 14px;
+        cursor: pointer;
+        transition: background 0.12s, border-color 0.12s;
+
+        + .ws-pick__item { border-top: 1px solid var(--border-soft); }
+
+        &:hover {
+            background: var(--accent-bg-soft);
+
+            .ws-pick__plus {
+                color: var(--accent-bright);
+                transform: scale(1.1);
+            }
+        }
+    }
+
+    &__tile {
+        flex-shrink: 0;
+        border-radius: 8px;
+    }
+
+    &__name {
+        flex: 1;
+        min-width: 0;
+        font-size: 13px;
+        font-weight: $font-weight-medium;
+        color: var(--text);
+        @include truncate();
+    }
+
+    &__plus {
+        flex-shrink: 0;
+        color: var(--text-ghost);
+        transition: color 0.12s, transform 0.12s;
+    }
+}
+
+// ============================================
+// WORKSPACE DETAIL (/workspaces/:id — prototype WorkspaceDetail)
+// ============================================
+.ws-detail {
+
+    &__back {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin: $space-4 0 $space-3;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-faint);
+        text-decoration: none;
+        transition: color 0.14s;
+
+        &:hover { color: var(--accent-bright); }
+    }
+
+    // hero header (prototype .site-header)
+    &__header {
+        display: flex;
+        align-items: center;
+        gap: $space-4;
+        padding: 18px 20px;
+        background: linear-gradient(135deg, var(--surface), var(--surface-2));
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+
+        .ws-detail__tile { border-radius: 14px; flex-shrink: 0; }
+    }
+
+    &__info { flex: 1; min-width: 0; }
+
+    &__title {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+
+        h1 {
+            margin: 0;
+            font-size: 21px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: -0.01em;
+            color: var(--text);
+        }
+    }
+
+    &__meta {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 5px;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-faint);
+
+        .dotsep { color: var(--text-ghost); }
+    }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: $space-2;
+        flex-shrink: 0;
+    }
+
+    &__desc {
+        margin: $space-3 0 0;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--text-dim);
+        max-width: 720px;
+    }
+
+    // info + resources band (prototype dash-grid span-2 cards)
+    &__grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $space-4;
+        margin: $space-4 0 $space-5;
+
+        @media (max-width: $breakpoint-md) { grid-template-columns: 1fr; }
+    }
+
+    &__card {
+        padding: 16px 18px;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+
+        h3 {
+            margin: 0 0 $space-2;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+    }
+
+    &__stats { margin: $space-3 0 0; }
+}
+
+.ws-resource-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $space-3;
+
+    &__item {
+        padding: $space-3;
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-sm);
+        text-align: center;
+        transition: background 0.12s, border-color 0.12s;
+
+        &:hover {
+            background: var(--surface-hover);
+            border-color: var(--border-strong);
+        }
+    }
+
+    &__value {
+        font-family: var(--mono);
+        font-size: 24px;
+        font-weight: $font-weight-semibold;
+        color: var(--text);
+        line-height: 1.2;
+    }
+
+    &__label {
+        margin-top: 4px;
+        font-size: 11.5px;
+        font-weight: $font-weight-medium;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+}
+
+.ws-detail {
+    // tab strip (prototype wp-tabs: accent underline + mono counts)
+    &__tabs {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--border-soft);
+    }
+
+    &__tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 13px;
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        font-size: 13px;
+        color: var(--text-dim);
+        cursor: pointer;
+        transition: color 0.14s, border-color 0.14s;
+
+        &:hover { color: var(--text); }
+
+        &.is-active {
+            color: var(--accent-bright);
+            border-bottom-color: var(--accent);
+            font-weight: $font-weight-medium;
+        }
+    }
+
+    &__tabcount {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-ghost);
+    }
+
+    &__pane { margin-top: $space-4; }
+
+    &__tablecard {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    &__rowactions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: $space-2;
+    }
+
+    &__manage {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--text-faint);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color 0.14s;
+
+        &:hover { color: var(--accent-bright); }
+    }
+}
+
+.main-content:has(.ws-detail-page) {
+    padding: 0;
+
+    @media (max-width: $breakpoint-md) {
+        padding: calc(#{$mobile-header-height} + env(safe-area-inset-top) + #{$space-5}) $space-5 $space-5;
+    }
+}
+
+// Workspace detail page using the shared app-detail-page chrome.
+.ws-detail-page {
+    gap: 0;
+
+    // Full-bleed top bar with breadcrumb + title; matches the WordPress/service
+    // detail pages and the Workspaces list page chrome.
+    .ws-detail-topbar {
+        padding: 10px $space-4;
+        flex-wrap: wrap;
+        row-gap: 8px;
+
+        .sk-topbar__spacer { display: none; }
+        .sk-topbar__titles { flex-shrink: 0; }
+
+        .ws-crumbs {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+
+            a {
+                color: var(--text-dim);
+                text-decoration: none;
+                &:hover { color: var(--accent-bright); }
+            }
+            &__sep { color: var(--text-ghost); }
+            &__cur { color: var(--text); }
+        }
+
+        .sk-topbar__actions {
+            margin-left: auto;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            row-gap: 6px;
+        }
+    }
+
+    // Centered max-width column below the full-bleed top bar, same as WordPress
+    // and service detail pages.
+    .app-detail-body {
+        display: flex;
+        flex-direction: column;
+        gap: $space-5;
+        width: 100%;
+        max-width: 1200px;
+        margin-inline: auto;
+        padding: $space-6 $space-6 $space-10;
+    }
+
+    // Identity row — flat on the page, no card background.
+    .app-detail-header {
+        gap: $space-4;
+        padding: 4px 0 0;
+        background: none;
+        border: none;
+        border-radius: 0;
+    }
+
+    .ws-detail__tile { border-radius: 14px; }
+
+    .ws-detail__desc {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--text-dim);
+        max-width: 720px;
+    }
+
+    // Tabs wrap instead of scroll so the right-pinned Settings tab is reachable.
+    .app-detail-tabs {
+        flex-wrap: wrap;
+        overflow-x: visible;
+        row-gap: 2px;
+    }
+
+    // Settings tab pinned to the far right of the tab strip.
+    .app-detail-tab--end { margin-left: auto; }
+}
+
+// Brand-color picker in the workspace create modal (#33). Top-level so it also
+// applies if the modal is ever portaled outside the page block.
+.workspace-color-input {
+    width: 48px;
+    height: 32px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    cursor: pointer;
+}
+
+// Per-app row actions (Share + Remove) in the workspace Resources modal (#33).
+.workspace-row-actions {
+    display: flex;
+    gap: $space-2;
+    flex-shrink: 0;
+}
+
+// Navigation permission checkboxes in the workspace settings modal.
+.ws-nav-role {
+    margin-top: $space-3;
+
+    &__label {
+        font-size: 12px;
+        font-weight: $font-weight-semibold;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-faint);
+        margin-bottom: $space-2;
+    }
+
+    &__items {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: $space-2;
+    }
+
+    &__item {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: 12.5px;
+        color: var(--text);
+        cursor: pointer;
+
+        .ui-checkbox {
+            flex-shrink: 0;
+        }
+    }
+}
+
+// Workspace settings page — left sub-nav + content, matching WordPress/service detail.
+.ws-settings {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: $space-4;
+    align-items: start;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: 1fr;
+    }
+
+    &__nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        position: sticky;
+        top: $space-4;
+
+        @media (max-width: $breakpoint-md) {
+            position: static;
+        }
+    }
+
+    &__group + &__group { margin-top: $space-4; }
+
+    &__grouplabel {
+        padding: 0 12px;
+        margin-bottom: 6px;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    &__navitem {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 12px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-dim);
+        font-size: 13px;
+        cursor: pointer;
+        transition: background-color 0.14s, color 0.14s;
+
+        &:hover {
+            background: var(--surface-hover);
+            color: var(--text);
+        }
+
+        &.is-active {
+            background: var(--accent-bg);
+            color: var(--accent-bright);
+            font-weight: $font-weight-medium;
+        }
+    }
+
+    &__content {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+    }
+
+    &__section-title {
+        margin: 0 0 $space-3;
+        font-size: 15px;
+        font-weight: $font-weight-semibold;
+        color: var(--text);
+    }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: $space-2;
+        margin-top: $space-2;
+    }
+
+    &__management {
+        .ws-settings__actions-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: $space-3;
+            align-items: center;
+        }
+    }
+}

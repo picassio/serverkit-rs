@@ -1,0 +1,265 @@
+import { useCallback, useEffect, useState } from 'react';
+import api from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../hooks/useConfirm';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import JobProgressModal from '../JobProgressModal';
+
+// Quick-install presets — packages most users want first when setting
+// up a new server. The agent's manager-detect handles distro mapping;
+// for the few packages whose names actually differ across distros
+// (docker.io vs docker-ce, php-fpm versioning) we keep the most common
+// Debian/Ubuntu name and let the user override via the search field.
+const QUICK_PRESETS = [
+    { name: 'nginx', label: 'nginx' },
+    { name: 'redis-server', label: 'redis' },
+    { name: 'mariadb-server', label: 'mariadb' },
+    { name: 'postgresql', label: 'postgresql' },
+    { name: 'docker.io', label: 'docker' },
+    { name: 'fail2ban', label: 'fail2ban' },
+    { name: 'certbot', label: 'certbot' },
+    { name: 'htop', label: 'htop' },
+];
+
+const PackagesTab = ({ serverId, serverStatus }) => {
+    const toast = useToast();
+    const { confirm } = useConfirm();
+
+    const [installedRaw, setInstalledRaw] = useState('');
+    const [manager, setManager] = useState('');
+    const [loadingInstalled, setLoadingInstalled] = useState(true);
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState(null);
+    const [searching, setSearching] = useState(false);
+
+    const [job, setJob] = useState(null); // { channel, title }
+
+    const loadInstalled = useCallback(async () => {
+        try {
+            const data = await api.getRemotePackages(serverId);
+            setInstalledRaw(data?.output || '');
+            setManager(data?.manager || '');
+        } catch (err) {
+            toast.error(err.message || 'Failed to load packages');
+        } finally {
+            setLoadingInstalled(false);
+        }
+    }, [serverId, toast]);
+
+    useEffect(() => {
+        if (serverStatus !== 'online') {
+            setLoadingInstalled(false);
+            return;
+        }
+        loadInstalled();
+    }, [serverStatus, loadInstalled]);
+
+    async function handleSearch(e) {
+        e?.preventDefault?.();
+        const q = searchQuery.trim();
+        if (!q) {
+            setSearchResults(null);
+            return;
+        }
+        setSearching(true);
+        try {
+            const data = await api.searchRemotePackages(serverId, q, 100);
+            setSearchResults(data?.results || []);
+        } catch (err) {
+            toast.error(err.message || 'Search failed');
+            setSearchResults([]);
+        } finally {
+            setSearching(false);
+        }
+    }
+
+    async function handleInstall(name) {
+        try {
+            const result = await api.installRemotePackages(serverId, [name]);
+            const channel = result?.channel || `job:${result?.job_id}`;
+            setJob({ channel, title: `Installing ${name}` });
+        } catch (err) {
+            toast.error(err.message || `Failed to start install`);
+        }
+    }
+
+    async function handleRemove(name) {
+        const ok = await confirm({
+            title: `Remove ${name}`,
+            message: `Uninstall ${name} from this server?`,
+            variant: 'danger',
+        });
+        if (!ok) return;
+        try {
+            await api.removeRemotePackage(serverId, name);
+            toast.success(`${name} removed`);
+        } catch (err) {
+            toast.error(err.message || 'Remove failed');
+        }
+    }
+
+    async function handleUpdateCache() {
+        try {
+            await api.updateRemotePackageCache(serverId);
+            toast.success(`Package cache updated (${manager || 'manager'})`);
+        } catch (err) {
+            toast.error(err.message || 'Update failed');
+        }
+    }
+
+    async function handleUpgradeAll() {
+        const ok = await confirm({
+            title: 'Upgrade all packages',
+            message: 'Run a full system upgrade? This may take several minutes.',
+        });
+        if (!ok) return;
+        try {
+            const result = await api.upgradeRemotePackages(serverId, { all: true });
+            const channel = result?.channel || `job:${result?.job_id}`;
+            setJob({ channel, title: 'Upgrading all packages' });
+        } catch (err) {
+            toast.error(err.message || 'Upgrade failed to start');
+        }
+    }
+
+    function handleJobComplete() {
+        // Refresh the installed-list once an install/upgrade settles so
+        // the user sees the new state without a manual reload.
+        loadInstalled();
+    }
+
+    if (serverStatus !== 'online') {
+        return (
+            <div className="empty-state">
+                <p>Server is offline. Reconnect to manage packages.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="server-packages">
+            <div className="server-packages__toolbar">
+                <form onSubmit={handleSearch} className="server-packages__search">
+                    <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search packages…"
+                    />
+                    <Button type="submit" variant="outline" disabled={searching}>
+                        {searching ? 'Searching…' : 'Search'}
+                    </Button>
+                </form>
+                <div className="server-packages__actions">
+                    <Button variant="outline" onClick={handleUpdateCache}>Update cache</Button>
+                    <Button variant="outline" onClick={handleUpgradeAll}>Upgrade all</Button>
+                </div>
+            </div>
+
+            <section className="server-packages__presets">
+                <h3>Quick install</h3>
+                <div className="server-packages__chips">
+                    {QUICK_PRESETS.map((p) => (
+                        <button
+                            key={p.name}
+                            type="button"
+                            className="server-packages__chip"
+                            onClick={() => handleInstall(p.name)}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            {searchResults !== null && (
+                <section className="server-packages__results">
+                    <h3>Search results {manager && <Badge>{manager}</Badge>}</h3>
+                    {searchResults.length === 0 ? (
+                        <p className="text-muted-foreground">No matches.</p>
+                    ) : (
+                        <ul className="server-packages__list">
+                            {searchResults.map((line, i) => {
+                                // First whitespace-separated token is the package name on
+                                // every supported manager output format. Anything after is
+                                // the description and gets truncated visually by CSS.
+                                const name = line.split(/\s+/)[0]?.replace(/[-/].*/, '') || line;
+                                return (
+                                    <li key={`${name}-${i}`} className="server-packages__list-item">
+                                        <span className="server-packages__list-name">{line}</span>
+                                        <Button size="sm" variant="outline" onClick={() => handleInstall(name)}>
+                                            Install
+                                        </Button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </section>
+            )}
+
+            <section className="server-packages__installed">
+                <h3>Installed packages {manager && <Badge>{manager}</Badge>}</h3>
+                {loadingInstalled ? (
+                    <p className="text-muted-foreground">Loading…</p>
+                ) : (
+                    <pre className="server-packages__raw">
+                        {installedRaw || 'No packages reported.'}
+                    </pre>
+                )}
+                <p className="server-packages__hint text-muted-foreground">
+                    Output is the raw package-manager listing. Use search to find a specific
+                    package, then click Install.
+                </p>
+            </section>
+
+            <JobProgressModal
+                open={!!job}
+                serverId={serverId}
+                channel={job?.channel}
+                title={job?.title}
+                onClose={() => setJob(null)}
+                onComplete={handleJobComplete}
+            />
+
+            <div className="server-packages__remove-tip text-muted-foreground">
+                Tip: to remove a specific package, search for it and use the row&apos;s
+                <em> Install </em>
+                button to reinstall, or open a terminal session for advanced operations.
+                Direct remove from this UI:
+                <RemoveByName onRemove={handleRemove} />
+            </div>
+        </div>
+    );
+};
+
+// Small inline form for ad-hoc package removal. Kept separate so the
+// main render stays readable.
+function RemoveByName({ onRemove }) {
+    const [name, setName] = useState('');
+    return (
+        <form
+            onSubmit={(e) => {
+                e.preventDefault();
+                if (!name.trim()) return;
+                onRemove(name.trim());
+                setName('');
+            }}
+            className="server-packages__remove-form"
+        >
+            <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="package name"
+                size="sm"
+            />
+            <Button type="submit" variant="outline" size="sm" disabled={!name.trim()}>
+                Remove
+            </Button>
+        </form>
+    );
+}
+
+export default PackagesTab;

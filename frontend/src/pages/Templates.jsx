@@ -1,0 +1,976 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+    Search, X, Star, ExternalLink, BookOpen, Container, Globe, BarChart3,
+    Database, Shield, Cloud, MessageSquare, Video, Music, Image, Home,
+    Code, Server, GitBranch, Workflow, HardDrive, Lock, Users, FileText,
+    Settings, Layers, LayoutTemplate, ChevronDown, Copy, Check, Tag, Cpu,
+    Newspaper, TrendingUp, Rocket
+} from 'lucide-react';
+import api from '../services/api';
+import { useToast } from '../contexts/ToastContext';
+import Modal from '@/components/Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useTopbarActions } from '@/hooks/useTopbarActions';
+import EmptyState from '../components/EmptyState';
+
+// Featured templates (curated list)
+const FEATURED_TEMPLATES = [
+    'prompture-hub', 'wordpress', 'nextcloud', 'grafana', 'portainer',
+    'uptime-kuma', 'gitea', 'vaultwarden', 'jellyfin', 'ghost', 'n8n'
+];
+
+// Icon strategy: every template ships an inline lucide-style base64 SVG in its
+// YAML `icon:` field (rendered first by renderIcon). This map is the keyed
+// fallback used when a template has no inline icon or it fails to load, so the
+// grid never shows a broken image. Keep ids here in sync with backend/templates.
+const TEMPLATE_ICONS = {
+    // AI / LLM
+    'prompture-hub': Cpu,
+    'ollama-webui': Cpu,
+    'qdrant': Database,
+    'chroma': Database,
+    'litellm': Cpu,
+    'flowise': Workflow,
+    'langflow': Workflow,
+    'anythingllm': Cpu,
+    'librechat': MessageSquare,
+    // Monitoring
+    'uptime-kuma': BarChart3,
+    'grafana': BarChart3,
+    'prometheus': BarChart3,
+    'netdata': BarChart3,
+    'loki': BarChart3,
+    'jaeger': BarChart3,
+    'plausible': BarChart3,
+    'umami': BarChart3,
+    'beszel': BarChart3,
+    'signoz': BarChart3,
+    // Search
+    'meilisearch': Search,
+    'typesense': Search,
+    'searxng': Search,
+    // CMS / Blog
+    'wordpress': Globe,
+    'ghost': FileText,
+    'strapi': Layers,
+    'directus': Database,
+    'payload': Layers,
+    'grav': FileText,
+    // DevOps
+    'portainer': Container,
+    'jenkins': Workflow,
+    'drone': Workflow,
+    'gitlab-runner': GitBranch,
+    'sonarqube': Code,
+    'registry': Container,
+    'vault': Lock,
+    // Storage
+    'nextcloud': Cloud,
+    'minio': Cloud,
+    'seafile': Cloud,
+    'filebrowser': HardDrive,
+    'syncthing': Cloud,
+    'duplicati': HardDrive,
+    // Collaboration
+    'rocketchat': MessageSquare,
+    'mattermost': MessageSquare,
+    'matrix-synapse': MessageSquare,
+    'jitsi': Video,
+    // Media
+    'jellyfin': Video,
+    'plex': Video,
+    'photoprism': Image,
+    'immich': Image,
+    'navidrome': Music,
+    'audiobookshelf': Music,
+    'calibre-web': BookOpen,
+    'sonarr': Video,
+    'radarr': Video,
+    'jellyseerr': Video,
+    'prowlarr': Search,
+    'qbittorrent': HardDrive,
+    // News / RSS
+    'freshrss': Newspaper,
+    'miniflux': Newspaper,
+    // Documents
+    'paperless-ngx': FileText,
+    'stirling-pdf': FileText,
+    'memos': FileText,
+    // Finance
+    'actualbudget': TrendingUp,
+    'firefly-iii': TrendingUp,
+    // Project management
+    'vikunja': Check,
+    'plane': Workflow,
+    // Productivity
+    'bookstack': BookOpen,
+    'wikijs': BookOpen,
+    'outline': FileText,
+    'excalidraw': FileText,
+    'n8n': Workflow,
+    // Notifications
+    'gotify': MessageSquare,
+    'ntfy': MessageSquare,
+    // Security
+    'vaultwarden': Lock,
+    'authelia': Shield,
+    'keycloak': Shield,
+    'crowdsec': Shield,
+    'authentik': Shield,
+    'wg-easy': Shield,
+    'pihole': Shield,
+    // Business / niche
+    'chatwoot': MessageSquare,
+    'documenso': FileText,
+    'metabase': BarChart3,
+    'posthog': TrendingUp,
+    'nodebb': Users,
+    'linkding': BookOpen,
+    'karakeep': BookOpen,
+    // Database tools
+    'phpmyadmin': Database,
+    'pgadmin': Database,
+    'redis-commander': Database,
+    'mongo-express': Database,
+    // Home Automation
+    'homeassistant': Home,
+    'nodered': Workflow,
+    'mosquitto': Home,
+    'zigbee2mqtt': Home,
+    // Development
+    'code-server': Code,
+    'gitea': GitBranch,
+    // Networking
+    'traefik': Server,
+    'caddy': Server,
+    'nginx-proxy-manager': Server,
+    // Custom apps
+    'php-app': Code,
+    'python-app': Code,
+    'node-app': Code
+};
+
+const Templates = () => {
+    const navigate = useNavigate();
+    const toast = useToast();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const [templates, setTemplates] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [failedIcons, setFailedIcons] = useState(new Set());
+    const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [showInstallModal, setShowInstallModal] = useState(false);
+    const [copiedCompose, setCopiedCompose] = useState(false);
+    const [showAllCategories, setShowAllCategories] = useState(false);
+
+    // Initialize from URL params
+    const selectedCategory = searchParams.get('category') || null;
+    const searchQuery = searchParams.get('search') || '';
+    const sortBy = searchParams.get('sort') || 'featured';
+    const installTemplateId = searchParams.get('install');
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    // Auto-open install modal if template ID is in URL
+    useEffect(() => {
+        if (installTemplateId && templates.length > 0 && !loading) {
+            // WordPress has its own dedicated page
+            if (installTemplateId === 'wordpress') {
+                navigate('/wordpress', { replace: true });
+                return;
+            }
+            const template = templates.find(t => t.id === installTemplateId);
+            if (template) {
+                handleViewTemplate(template).then(() => {
+                    setShowInstallModal(true);
+                });
+                // Clear the install param from URL
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete('install');
+                setSearchParams(newParams, { replace: true });
+            }
+        }
+    }, [installTemplateId, templates, loading]);
+
+    useEffect(() => {
+        loadTemplates();
+    }, [selectedCategory, searchQuery]);
+
+    function updateFilters(updates) {
+        const newParams = new URLSearchParams(searchParams);
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value) {
+                newParams.set(key, value);
+            } else {
+                newParams.delete(key);
+            }
+        });
+        setSearchParams(newParams);
+    }
+
+    function setSelectedCategoryFilter(category) {
+        updateFilters({ category });
+    }
+
+    function setSearchQueryFilter(search) {
+        updateFilters({ search: search || null });
+    }
+
+    function setSortByFilter(sort) {
+        updateFilters({ sort });
+    }
+
+    function clearAllFilters() {
+        setSearchParams(new URLSearchParams());
+    }
+
+    async function loadData() {
+        try {
+            const [templatesRes, categoriesRes] = await Promise.all([
+                api.listTemplates(),
+                api.getTemplateCategories()
+            ]);
+            setTemplates(templatesRes.templates || []);
+            setCategories(categoriesRes.categories || []);
+        } catch (err) {
+            toast.error('Failed to load templates');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function loadTemplates() {
+        try {
+            const result = await api.listTemplates(selectedCategory, searchQuery || null);
+            setTemplates(result.templates || []);
+        } catch (err) {
+            console.error('Failed to load templates:', err);
+        }
+    }
+
+    function handleIconError(templateId) {
+        setFailedIcons(prev => new Set(prev).add(templateId));
+    }
+
+    function getTemplateIcon(templateId) {
+        return TEMPLATE_ICONS[templateId] || Layers;
+    }
+
+    function renderIcon(template, size = 32) {
+        const IconComponent = getTemplateIcon(template.id);
+        const hasIcon = template.icon && !failedIcons.has(template.id);
+
+        if (hasIcon) {
+            return (
+                <img
+                    src={template.icon}
+                    alt={template.name}
+                    onError={() => handleIconError(template.id)}
+                />
+            );
+        }
+        return <IconComponent size={size} />;
+    }
+
+    function getCategoryIcon(category) {
+        const icons = {
+            monitoring: BarChart3,
+            devops: Settings,
+            docker: Container,
+            cms: FileText,
+            blog: BookOpen,
+            storage: HardDrive,
+            collaboration: Users,
+            git: GitBranch,
+            development: Code,
+            networking: Globe,
+            proxy: Workflow,
+            ssl: Lock,
+            productivity: Layers,
+            management: Server,
+            publishing: Newspaper,
+            media: Video,
+            security: Shield,
+            database: Database,
+            'home-automation': Home,
+            analytics: TrendingUp,
+            iot: Cpu,
+            // AI / LLM
+            ai: Cpu,
+            llm: Cpu,
+            gateway: Server,
+            rag: Cpu,
+            chat: MessageSquare,
+            'low-code': Workflow,
+            workflow: Workflow,
+            // Search
+            search: Search,
+            vector: Database,
+            // Notifications / messaging
+            notifications: MessageSquare,
+            messaging: MessageSquare,
+            communication: MessageSquare,
+            support: MessageSquare,
+            // Documents / news
+            documents: FileText,
+            pdf: FileText,
+            notes: FileText,
+            rss: Newspaper,
+            news: Newspaper,
+            // Finance / business
+            finance: TrendingUp,
+            business: TrendingUp,
+            // Productivity / tasks
+            tasks: Workflow,
+            'project-management': Workflow,
+            bookmarks: BookOpen,
+            ebooks: BookOpen,
+            audiobooks: Music,
+            automation: Workflow,
+            downloads: HardDrive,
+            // Identity / networking / privacy
+            identity: Shield,
+            sso: Shield,
+            vpn: Shield,
+            privacy: Lock,
+            dns: Globe,
+            forum: Users,
+            community: Users,
+            // Observability
+            observability: BarChart3,
+            apm: BarChart3
+        };
+        const Icon = icons[category] || Container;
+        return <Icon size={14} />;
+    }
+
+    async function handleViewTemplate(template) {
+        // WordPress has its own dedicated page
+        if (template.id === 'wordpress') {
+            navigate('/wordpress');
+            return;
+        }
+        try {
+            const result = await api.getTemplate(template.id);
+            if (result.template) {
+                setSelectedTemplate(result.template);
+            }
+        } catch (err) {
+            toast.error('Failed to load template details');
+        }
+    }
+
+    // Hover-reveal Deploy: skip the detail modal, go straight to install
+    async function handleDeploy(template) {
+        if (template.id === 'wordpress') {
+            navigate('/wordpress');
+            return;
+        }
+        try {
+            const result = await api.getTemplate(template.id);
+            if (result.template) {
+                setSelectedTemplate(result.template);
+                setShowInstallModal(true);
+            }
+        } catch (err) {
+            toast.error('Failed to load template details');
+        }
+    }
+
+    function isFeatured(templateId) {
+        return FEATURED_TEMPLATES.includes(templateId);
+    }
+
+    // Sort templates
+    function sortTemplates(templates) {
+        const sorted = [...templates];
+        switch (sortBy) {
+            case 'name-asc':
+                return sorted.sort((a, b) => a.name.localeCompare(b.name));
+            case 'name-desc':
+                return sorted.sort((a, b) => b.name.localeCompare(a.name));
+            case 'featured':
+                return sorted.sort((a, b) => {
+                    const aFeatured = isFeatured(a.id);
+                    const bFeatured = isFeatured(b.id);
+                    if (aFeatured && !bFeatured) return -1;
+                    if (!aFeatured && bFeatured) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+            default:
+                return sorted;
+        }
+    }
+
+    const sortedTemplates = sortTemplates(templates);
+    const hasActiveFilters = selectedCategory || searchQuery;
+    const visibleCategories = showAllCategories ? categories : categories.slice(0, 10);
+    const hiddenCategoryCount = Math.max(categories.length - visibleCategories.length, 0);
+
+    useTopbarActions(() =>
+        <div className="search-box">
+            <Search size={18} className="search-icon" />
+            <Input
+                type="text"
+                placeholder="Search templates..."
+                value={searchQuery}
+                onChange={(e) => setSearchQueryFilter(e.target.value)}
+            />
+            {searchQuery && (
+                <Button variant="ghost" size="icon" className="search-clear" onClick={() => setSearchQueryFilter('')}>
+                    <X size={16} />
+                </Button>
+            )}
+        </div>,
+        [searchQuery]
+    );
+
+    if (loading) {
+        return (
+            <div className="sk-tabgroup__inner">
+                <EmptyState loading title="Loading templates" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="sk-tabgroup__inner templates-page">
+            {/* Results and Filters */}
+            <div className="templates-results-header">
+                <span className="results-count">
+                    {sortedTemplates.length} template{sortedTemplates.length !== 1 ? 's' : ''}
+                </span>
+                <div className="category-filters" aria-label="Template categories">
+                    <button type="button"
+                        className={`category-btn ${!selectedCategory ? 'active' : ''}`}
+                        onClick={() => setSelectedCategoryFilter(null)}
+                    >
+                        All
+                    </button>
+                    {visibleCategories.map(category => (
+                        <button type="button"
+                            key={category}
+                            className={`category-btn ${selectedCategory === category ? 'active' : ''}`}
+                            onClick={() => setSelectedCategoryFilter(category)}
+                        >
+                            {getCategoryIcon(category)} {category}
+                        </button>
+                    ))}
+                    {categories.length > 10 && (
+                        <button type="button"
+                            className="category-btn category-btn--more"
+                            onClick={() => setShowAllCategories(prev => !prev)}
+                        >
+                            {showAllCategories ? 'Less' : `More +${hiddenCategoryCount}`}
+                        </button>
+                    )}
+                </div>
+                <div className="sort-dropdown">
+                    <label>Sort by:</label>
+                    <select value={sortBy} onChange={(e) => setSortByFilter(e.target.value)}>
+                        <option value="name-asc">Name (A-Z)</option>
+                        <option value="name-desc">Name (Z-A)</option>
+                        <option value="featured">Featured First</option>
+                    </select>
+                    <ChevronDown size={16} className="dropdown-icon" />
+                </div>
+            </div>
+
+            {/* Active Filters */}
+            {hasActiveFilters && (
+                <div className="active-filters">
+                    {selectedCategory && (
+                        <span className="filter-chip">
+                            <Tag size={14} />
+                            {selectedCategory}
+                            <button type="button" onClick={() => setSelectedCategoryFilter(null)}>
+                                <X size={14} />
+                            </button>
+                        </span>
+                    )}
+                    {searchQuery && (
+                        <span className="filter-chip">
+                            <Search size={14} />
+                            &ldquo;{searchQuery}&rdquo;
+                            <button type="button" onClick={() => setSearchQueryFilter('')}>
+                                <X size={14} />
+                            </button>
+                        </span>
+                    )}
+                    <Button variant="ghost" size="sm" className="clear-all-btn" onClick={clearAllFilters}>
+                        Clear All
+                    </Button>
+                </div>
+            )}
+
+            {/* Templates Grid */}
+            <div className="templates-grid">
+                {sortedTemplates.length === 0 ? (
+                    <EmptyState
+                        icon={LayoutTemplate}
+                        title="No templates found"
+                        description={hasActiveFilters ? 'Try adjusting your filters' : 'No templates are available yet'}
+                        action={hasActiveFilters && (
+                            <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                                Clear Filters
+                            </Button>
+                        )}
+                    />
+                ) : (
+                    sortedTemplates.map(template => (
+                        <div key={template.id} className="tpl-card" onClick={() => handleViewTemplate(template)}>
+                            {isFeatured(template.id) && (
+                                <span className="tpl-ft" title="Featured">
+                                    <Star size={14} />
+                                </span>
+                            )}
+                            <div className="tpl-top">
+                                <span className="tpl-ico">
+                                    {renderIcon(template, 22)}
+                                </span>
+                                <div className="tpl-id">
+                                    <div className="tpl-name">{template.name}</div>
+                                    <div className="tpl-ver">v{template.version}</div>
+                                </div>
+                            </div>
+                            <p className="tpl-desc">{template.description}</p>
+                            <div className="tpl-tags">
+                                {(template.categories || []).slice(0, 3).map(cat => (
+                                    <span key={cat} className="tg">
+                                        {cat}
+                                    </span>
+                                ))}
+                                {template.website && (
+                                    <span className="tpl-link" title="Has website">
+                                        <ExternalLink size={12} />
+                                    </span>
+                                )}
+                                {template.documentation && (
+                                    <span className="tpl-link" title="Has documentation">
+                                        <BookOpen size={12} />
+                                    </span>
+                                )}
+                                <Button
+                                    size="sm"
+                                    className="tpl-deploy"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeploy(template);
+                                    }}
+                                >
+                                    <Rocket size={12} /> Deploy
+                                </Button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Template Detail Modal */}
+            {selectedTemplate && !showInstallModal && (
+                <div className="modal-overlay" onClick={() => setSelectedTemplate(null)}>
+                    <div className="modal template-detail-drawer" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div className="template-detail-header">
+                                <div className="template-icon-large">
+                                    {renderIcon(selectedTemplate, 40)}
+                                </div>
+                                <div>
+                                    <h2>{selectedTemplate.name}</h2>
+                                    <span className="template-version">Version {selectedTemplate.version}</span>
+                                </div>
+                            </div>
+                            <button type="button" className="modal-close" onClick={() => setSelectedTemplate(null)}>&times;</button>
+                        </div>
+                        <div className="modal-body">
+                            <p className="template-full-description">{selectedTemplate.description}</p>
+
+                            <div className="template-links">
+                                {selectedTemplate.website && (
+                                    <a href={selectedTemplate.website} target="_blank" rel="noopener noreferrer">
+                                        <Button variant="outline" size="sm">
+                                            <ExternalLink size={14} /> Website
+                                        </Button>
+                                    </a>
+                                )}
+                                {selectedTemplate.documentation && (
+                                    <a href={selectedTemplate.documentation} target="_blank" rel="noopener noreferrer">
+                                        <Button variant="outline" size="sm">
+                                            <BookOpen size={14} /> Documentation
+                                        </Button>
+                                    </a>
+                                )}
+                            </div>
+
+                            <div className="template-details-grid">
+                                <div className="detail-section">
+                                    <h4><Tag size={16} /> Categories</h4>
+                                    <div className="template-categories">
+                                        {(selectedTemplate.categories || []).map(cat => (
+                                            <span key={cat} className="category-badge">
+                                                {getCategoryIcon(cat)} {cat}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {selectedTemplate.requirements && (
+                                    <div className="detail-section">
+                                        <h4><Cpu size={16} /> Requirements</h4>
+                                        <div className="requirements-list">
+                                            {selectedTemplate.requirements.memory && (
+                                                <div className="requirement-item">
+                                                    <span className="requirement-label">Memory:</span>
+                                                    <span className="requirement-value">{selectedTemplate.requirements.memory}</span>
+                                                </div>
+                                            )}
+                                            {selectedTemplate.requirements.storage && (
+                                                <div className="requirement-item">
+                                                    <span className="requirement-label">Storage:</span>
+                                                    <span className="requirement-value">{selectedTemplate.requirements.storage}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedTemplate.variables && selectedTemplate.variables.length > 0 && (
+                                    <div className="detail-section">
+                                        <h4><Settings size={16} /> Configuration Variables</h4>
+                                        <div className="variables-list">
+                                            {selectedTemplate.variables
+                                                .filter(v => !v.hidden)
+                                                .sort((a, b) => (b.required ? 1 : 0) - (a.required ? 1 : 0))
+                                                .map(variable => (
+                                                <div key={variable.name} className={`variable-item ${variable.required ? 'required' : ''}`}>
+                                                    <div className="variable-header">
+                                                        <span className="variable-name">{variable.name}</span>
+                                                        {variable.required && <span className="required-badge">Required</span>}
+                                                        {variable.auto_generated && <span className="auto-badge">Auto</span>}
+                                                    </div>
+                                                    {variable.description && (
+                                                        <span className="variable-description">{variable.description}</span>
+                                                    )}
+                                                    {variable.default && !variable.auto_generated && (
+                                                        <span className="variable-default">Default: {variable.default}</span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedTemplate.ports && selectedTemplate.ports.length > 0 && (
+                                    <div className="detail-section">
+                                        <h4><Server size={16} /> Exposed Ports</h4>
+                                        <div className="ports-list">
+                                            {selectedTemplate.ports.map((port, index) => (
+                                                <div key={index} className="port-item">
+                                                    <span className="port-number">{port.port}</span>
+                                                    <span className="port-protocol">{port.protocol}</span>
+                                                    {port.description && (
+                                                        <span className="port-description">{port.description}</span>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedTemplate.has_compose && (
+                                    <div className="detail-section">
+                                        <h4>
+                                            <Container size={16} /> Docker Compose
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="copy-btn"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText('docker-compose.yml available after install');
+                                                    setCopiedCompose(true);
+                                                    setTimeout(() => setCopiedCompose(false), 2000);
+                                                }}
+                                            >
+                                                {copiedCompose ? <Check size={14} /> : <Copy size={14} />}
+                                            </Button>
+                                        </h4>
+                                        <div className="compose-preview">
+                                            <code>Docker Compose configuration will be generated during installation</code>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <Button variant="outline" onClick={() => setSelectedTemplate(null)}>
+                                Close
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    setShowInstallModal(true);
+                                }}
+                            >
+                                Install Template
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Install Modal */}
+            {showInstallModal && selectedTemplate && (
+                <InstallModal
+                    template={selectedTemplate}
+                    onClose={() => {
+                        setShowInstallModal(false);
+                        setSelectedTemplate(null);
+                    }}
+                    onSuccess={(appId) => {
+                        setShowInstallModal(false);
+                        setSelectedTemplate(null);
+                        toast.success('Application installed successfully!');
+                        navigate(`/apps/${appId}`);
+                    }}
+                />
+            )}
+        </div>
+    );
+};
+
+const InstallModal = ({ template, onClose, onSuccess }) => {
+    const toast = useToast();
+    const [appName, setAppName] = useState(template.id.toLowerCase().replace(/[^a-z0-9-]/g, '-'));
+    const [variables, setVariables] = useState({});
+    const [servers, setServers] = useState([{ id: 'local', name: 'Local server', is_local: true }]);
+    const [selectedServerId, setSelectedServerId] = useState('local');
+    const [installing, setInstalling] = useState(false);
+    const [errors, setErrors] = useState([]);
+    const [job, setJob] = useState(null);
+    const [jobLogs, setJobLogs] = useState([]);
+    const pollRef = useRef(null);
+
+    useEffect(() => {
+        // Initialize variables with defaults
+        const defaults = {};
+        (template.variables || []).forEach(v => {
+            if (v.default) {
+                defaults[v.name] = v.default;
+            }
+        });
+        setVariables(defaults);
+    }, [template]);
+
+    useEffect(() => {
+        loadServers();
+        return () => {
+            if (pollRef.current) {
+                clearInterval(pollRef.current);
+            }
+        };
+    }, []);
+
+    async function loadServers() {
+        try {
+            const data = await api.getAvailableServers();
+            const list = Array.isArray(data) ? data : [];
+            if (list.length > 0) {
+                setServers(list);
+                setSelectedServerId(list[0].id);
+            }
+        } catch {
+            setServers([{ id: 'local', name: 'Local server', is_local: true }]);
+            setSelectedServerId('local');
+        }
+    }
+
+    function startPolling(jobId) {
+        if (pollRef.current) {
+            clearInterval(pollRef.current);
+        }
+
+        pollRef.current = setInterval(async () => {
+            try {
+                const data = await api.getDeploymentJob(jobId, true);
+                const latestJob = data.job;
+                setJob(latestJob);
+                setJobLogs(latestJob.logs || []);
+
+                if (latestJob.status === 'succeeded' && latestJob.result?.app_id) {
+                    clearInterval(pollRef.current);
+                    pollRef.current = null;
+                    setInstalling(false);
+                    onSuccess(latestJob.result?.app_id);
+                } else if (latestJob.status === 'failed') {
+                    clearInterval(pollRef.current);
+                    pollRef.current = null;
+                    setInstalling(false);
+                    setErrors([latestJob.error_message || 'Deployment failed']);
+                    toast.error(latestJob.error_message || 'Deployment failed');
+                }
+            } catch (err) {
+                console.error('Failed to poll deployment job:', err);
+            }
+        }, 1500);
+    }
+
+    async function handleInstall(e) {
+        e.preventDefault();
+        setInstalling(true);
+        setErrors([]);
+        setJob(null);
+        setJobLogs([]);
+
+        try {
+            // Validate first
+            const validation = await api.validateTemplateInstall(template.id, appName, variables);
+            if (!validation.valid) {
+                setErrors(validation.errors || ['Validation failed']);
+                setInstalling(false);
+                return;
+            }
+
+            // Install
+            const result = await api.installTemplate(template.id, appName, variables, {
+                serverId: selectedServerId
+            });
+            if (result.success && result.job_id) {
+                setJob(result.job);
+                setJobLogs(result.job?.logs || []);
+                startPolling(result.job_id);
+            } else if (result.success) {
+                onSuccess(result.app_id);
+            } else {
+                setErrors([result.error || 'Installation failed']);
+                setInstalling(false);
+            }
+        } catch (err) {
+            setErrors([err.message || 'Installation failed']);
+            setInstalling(false);
+        }
+    }
+
+    return (
+        <Modal open onClose={onClose} title={`Install ${template.name}`} size="lg">
+            <form onSubmit={handleInstall}>
+                <div className="modal-body">
+                        {errors.length > 0 && (
+                            <div className="alert alert-danger">
+                                <ul>
+                                    {errors.map((error, i) => <li key={i}>{error}</li>)}
+                                </ul>
+                            </div>
+                        )}
+
+                        <div className="form-group">
+                            <label>Application Name *</label>
+                            <Input
+                                type="text"
+                                value={appName}
+                                onChange={(e) => setAppName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                                placeholder="my-app"
+                                minLength={2}
+                                required
+                            />
+                            <span className="form-help">Lowercase letters, numbers, and hyphens only (min 2 chars)</span>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Target Server</label>
+                            <select
+                                value={selectedServerId}
+                                onChange={(e) => setSelectedServerId(e.target.value)}
+                                disabled={installing}
+                            >
+                                {servers.map(server => (
+                                    <option key={server.id} value={server.id}>
+                                        {server.name}{server.is_local ? ' (local)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {(template.variables || []).filter(v => !v.hidden).length > 0 && (
+                            <>
+                                <h4>Configuration</h4>
+                                {template.variables.filter(v => !v.hidden).map(variable => (
+                                    <div key={variable.name} className="form-group">
+                                        <label>
+                                            {variable.name}
+                                            {variable.required && ' *'}
+                                        </label>
+                                        {variable.options ? (
+                                            <select
+                                                value={variables[variable.name] || ''}
+                                                onChange={(e) => setVariables({...variables, [variable.name]: e.target.value})}
+                                                required={variable.required}
+                                            >
+                                                <option value="">Select...</option>
+                                                {variable.options.map(opt => (
+                                                    <option key={opt} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                        ) : variable.type === 'password' ? (
+                                            <Input
+                                                type="password"
+                                                value={variables[variable.name] || ''}
+                                                onChange={(e) => setVariables({...variables, [variable.name]: e.target.value})}
+                                                placeholder={variable.default ? '(auto-generated)' : ''}
+                                                required={variable.required && !variable.default}
+                                            />
+                                        ) : (
+                                            <Input
+                                                type={variable.type === 'port' ? 'number' : 'text'}
+                                                value={variables[variable.name] || ''}
+                                                onChange={(e) => setVariables({...variables, [variable.name]: e.target.value})}
+                                                placeholder={variable.default || ''}
+                                                required={variable.required}
+                                            />
+                                        )}
+                                        {variable.description && (
+                                            <span className="form-help">{variable.description}</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </>
+                        )}
+
+                        {job && (
+                            <div className="detail-section">
+                                <h4>Deployment Status</h4>
+                                <div className="deployment-progress">
+                                    <div className="deployment-progress-track">
+                                        <div
+                                            className="deployment-progress-fill"
+                                            style={{ width: `${job.progress_percent || 0}%` }}
+                                        />
+                                    </div>
+                                    <span>{job.status} {job.progress_percent || 0}%</span>
+                                </div>
+                                <pre className="log-viewer">
+                                    {(jobLogs || []).map(log => {
+                                        const prefix = log.step_index ? `[${log.step_index}] ` : '';
+                                        return `${prefix}${log.message}`;
+                                    }).join('\n') || 'Waiting for deployment logs...'}
+                                </pre>
+                            </div>
+                        )}
+                    </div>
+                    <div className="modal-footer">
+                        <Button type="button" variant="outline" onClick={onClose} disabled={installing}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={installing}>
+                            {installing ? 'Installing...' : 'Install'}
+                        </Button>
+                    </div>
+                </form>
+        </Modal>
+    );
+};
+
+export default Templates;

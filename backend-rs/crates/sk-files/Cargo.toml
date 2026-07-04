@@ -1,0 +1,12 @@
+[package]
+name = "sk-files"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+chrono.workspace = true
+sysinfo.workspace = true
+mime_guess = "2"
+tracing.workspace = true

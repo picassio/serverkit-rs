@@ -1,0 +1,12 @@
+{
+  "name": "sk-ai-sidecar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ServerKit AI sidecar embedding the pi SDK (@earendil-works/pi-coding-agent).",
+  "main": "server.mjs",
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.79.6"
+  }
+}

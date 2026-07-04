@@ -1,0 +1,15 @@
+{{ subject }}
+========================================
+{{ data.alerts|length }} alert(s) on {{ hostname }}
+
+{% for alert in data.alerts %}
+[{{ alert.severity|upper }}] {{ alert.type or 'alert' }}
+{{ alert.message }}
+{% if 'value' in alert %}  Current: {{ alert.value }}
+{% endif %}
+{% if 'threshold' in alert %}  Threshold: {{ alert.threshold }}
+{% endif %}
+
+{% endfor %}
+----------------------------------------
+Sent by ServerKit ({{ hostname }}) at {{ now }}

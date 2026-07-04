@@ -1,0 +1,190 @@
+"""AI assistant persistence models (core primitive — powered by Prompture).
+
+Three tables back the in-panel assistant:
+
+- ``AiConversation`` — one chat thread per user. Holds the full Prompture
+  ``Conversation.export()`` blob so a thread can be resumed across requests
+  (tools are re-supplied on resume; only the message/usage state is stored).
+- ``AiMessage`` — denormalized per-turn rows for fast list/transcript rendering
+  without re-parsing the export blob (also replays tool-call cards).
+- ``AiPendingAction`` — audit/record of a guarded write-tool confirmation. The
+  live approve/deny coordination happens in-memory (see ai_service streaming),
+  but every request is persisted here for visibility and audit.
+
+JSON columns use the store-as-Text + property pattern from ``plugin.py`` to stay
+dialect-agnostic (SQLite/PostgreSQL).
+"""
+import json
+import uuid
+from datetime import datetime, timedelta
+
+from app import db
+
+
+def _new_id() -> str:
+    """Opaque, URL-safe conversation id (also used as Prompture conversation_id)."""
+    return uuid.uuid4().hex
+
+
+class AiConversation(db.Model):
+    """A single AI chat thread owned by a user."""
+    __tablename__ = 'ai_conversations'
+
+    MODE_ASSISTANT = 'assistant'   # tools + page context
+    MODE_SIMPLE = 'simple'         # plain chat, no tools
+
+    id = db.Column(db.String(64), primary_key=True, default=_new_id)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), index=True, nullable=False)
+    title = db.Column(db.String(256))
+    mode = db.Column(db.String(16), default=MODE_ASSISTANT)
+    model_name = db.Column(db.String(128))           # 'provider/model' snapshot at creation
+    export_json = db.Column(db.Text)                 # Prompture conv.export(strip_images=True)
+    last_page = db.Column(db.String(256))            # last route the assistant saw (for resume context)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    messages = db.relationship(
+        'AiMessage', backref='conversation', cascade='all, delete-orphan',
+        order_by='AiMessage.created_at', lazy='dynamic',
+    )
+    pending_actions = db.relationship(
+        'AiPendingAction', backref='conversation', cascade='all, delete-orphan', lazy='dynamic',
+    )
+
+    @property
+    def export(self) -> dict:
+        return json.loads(self.export_json) if self.export_json else {}
+
+    @export.setter
+    def export(self, value) -> None:
+        self.export_json = json.dumps(value) if value is not None else None
+
+    def to_dict(self, include_messages: bool = False) -> dict:
+        data = {
+            'id': self.id,
+            'user_id': self.user_id,
+            'title': self.title or 'New chat',
+            'mode': self.mode,
+            'model_name': self.model_name,
+            'last_page': self.last_page,
+            'message_count': self.messages.count(),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+        if include_messages:
+            data['messages'] = [m.to_dict() for m in self.messages]
+        return data
+
+
+class AiMessage(db.Model):
+    """One persisted turn in a conversation (user, assistant, or tool)."""
+    __tablename__ = 'ai_messages'
+
+    ROLE_USER = 'user'
+    ROLE_ASSISTANT = 'assistant'
+    ROLE_TOOL = 'tool'
+
+    id = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(
+        db.String(64), db.ForeignKey('ai_conversations.id', ondelete='CASCADE'), index=True, nullable=False,
+    )
+    role = db.Column(db.String(16), nullable=False)
+    content = db.Column(db.Text)
+    tool_calls_json = db.Column(db.Text)   # [{id,name,input,output,is_error}] for ToolCallCard replay
+    usage_json = db.Column(db.Text)        # {input_tokens, output_tokens, cost}
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def tool_calls(self) -> list:
+        return json.loads(self.tool_calls_json) if self.tool_calls_json else []
+
+    @tool_calls.setter
+    def tool_calls(self, value) -> None:
+        self.tool_calls_json = json.dumps(value) if value else None
+
+    @property
+    def usage(self) -> dict:
+        return json.loads(self.usage_json) if self.usage_json else {}
+
+    @usage.setter
+    def usage(self, value) -> None:
+        self.usage_json = json.dumps(value) if value else None
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'conversation_id': self.conversation_id,
+            'role': self.role,
+            'content': self.content,
+            'tool_calls': self.tool_calls,
+            'usage': self.usage,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AiPendingAction(db.Model):
+    """A guarded write-tool action awaiting human confirmation.
+
+    Live approve/deny is coordinated in-memory by the streaming worker; this
+    row is the durable record (status + result) for audit and admin visibility.
+    """
+    __tablename__ = 'ai_pending_actions'
+
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_DENIED = 'denied'
+    STATUS_EXPIRED = 'expired'
+    STATUS_EXECUTED = 'executed'
+    STATUS_FAILED = 'failed'
+
+    DEFAULT_TTL_SECONDS = 300
+
+    id = db.Column(db.String(64), primary_key=True)   # action token (secrets.token_urlsafe)
+    conversation_id = db.Column(
+        db.String(64), db.ForeignKey('ai_conversations.id', ondelete='CASCADE'), index=True, nullable=False,
+    )
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), index=True, nullable=False)
+    tool_name = db.Column(db.String(128), nullable=False)   # qualified name, e.g. core__restart_docker_container
+    plugin_slug = db.Column(db.String(128))                 # None => built-in tool
+    params_json = db.Column(db.Text)
+    summary = db.Column(db.Text)
+    status = db.Column(db.String(16), default=STATUS_PENDING)
+    result_json = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime)
+
+    @property
+    def params(self) -> dict:
+        return json.loads(self.params_json) if self.params_json else {}
+
+    @params.setter
+    def params(self, value) -> None:
+        self.params_json = json.dumps(value) if value else None
+
+    @property
+    def result(self):
+        return json.loads(self.result_json) if self.result_json else None
+
+    @result.setter
+    def result(self, value) -> None:
+        self.result_json = json.dumps(value) if value is not None else None
+
+    def is_expired(self) -> bool:
+        return self.expires_at is not None and datetime.utcnow() > self.expires_at
+
+    def to_dict(self) -> dict:
+        return {
+            'action_token': self.id,
+            'conversation_id': self.conversation_id,
+            'tool_name': self.tool_name,
+            'plugin_slug': self.plugin_slug,
+            'params': self.params,
+            'summary': self.summary,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+        }
+
+    @classmethod
+    def make_expiry(cls, ttl_seconds: int | None = None) -> datetime:
+        return datetime.utcnow() + timedelta(seconds=ttl_seconds or cls.DEFAULT_TTL_SECONDS)

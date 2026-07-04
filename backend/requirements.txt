@@ -1,0 +1,86 @@
+# Flask core
+Flask==3.1.3
+Werkzeug==3.1.6
+
+# Database
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.23
+Flask-Migrate==4.0.7
+
+# Authentication
+Flask-JWT-Extended==4.6.0
+PyJWT==2.13.0
+
+# CORS
+Flask-Cors==6.0.2
+
+# WebSocket support
+Flask-SocketIO==5.6.1
+python-socketio==5.14.0
+python-engineio==4.11.2
+
+# System monitoring
+psutil==5.9.7
+
+# Production server. WebSocket is served by simple-websocket (engineio's
+# threading driver) under a plain threaded gunicorn worker — do NOT deploy
+# with the gevent-websocket worker class; it double-answers the WS handshake
+# against async_mode='threading' (browser: "Invalid frame header").
+gunicorn==23.0.0
+simple-websocket==1.1.0
+gevent==25.4.2
+gevent-websocket==0.10.1
+
+# Environment variables
+python-dotenv==1.2.2
+
+# YAML / TOML parsing (for Docker Compose and repository manifests)
+PyYAML==6.0.1
+tomli>=2.0.0; python_version < '3.11'
+
+# Rate limiting
+Flask-Limiter==3.5.0
+
+# CLI
+click==8.1.7
+
+schedule==1.2.2
+croniter==6.0.0
+passlib==1.7.4
+bcrypt==4.2.1
+
+# Encryption for env vars
+cryptography==48.0.1
+
+# Two-Factor Authentication
+pyotp==2.9.0
+qrcode[pil]==7.4.2
+
+# WebAuthn / Passkeys
+webauthn==2.5.0
+
+# HTTP Requests (for webhooks & notifications)
+requests==2.33.1
+
+# S3-compatible storage (AWS S3, Backblaze B2, MinIO, Wasabi)
+boto3==1.35.0
+
+# SSO / OAuth
+Authlib==1.6.12
+python3-saml==1.16.0
+
+# Cross-platform local IANA timezone resolution (SystemService.get_server_time
+# falls back to this on hosts without /etc/timezone or timedatectl, e.g. Windows
+# dev boxes) so the panel never reports a non-IANA zone the UI can't format.
+tzlocal>=5.0
+
+# OpenAPI documentation
+apispec==6.4.0
+apispec-webframeworks==1.2.0
+
+# AI assistant (core primitive — powered by Prompture)
+# Multi-provider LLM orchestration: Conversation, ToolRegistry, ask_live streaming,
+# ProviderEnvironment, guardrails. Provider SDKs (openai/anthropic/...) are optional
+# extras installed per the configured provider; the base package is provider-agnostic.
+# Installed from the Prompture repo (pip install -e path/to/prompture) until published.
+prompture>=1.4

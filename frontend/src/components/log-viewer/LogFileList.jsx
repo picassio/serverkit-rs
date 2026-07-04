@@ -1,0 +1,127 @@
+import { useMemo, useState } from 'react';
+import { Search, RefreshCw, ChevronDown, ChevronRight, FileText, AlertTriangle, Activity, Database, Globe, Mail, Shield, Server } from 'lucide-react';
+import { LOG_GROUPS, categoriseLog, logKindFromPath, formatBytes, formatRelativeTime } from './logHelpers';
+
+const GROUP_ICONS = {
+    web: Globe,
+    app: Activity,
+    database: Database,
+    system: Server,
+    mail: Mail,
+    security: Shield,
+    other: FileText,
+};
+
+export default function LogFileList({ files, selectedPath, onSelect, onRefresh, loading }) {
+    const [query, setQuery] = useState('');
+    const [collapsed, setCollapsed] = useState(new Set());
+
+    const groups = useMemo(() => {
+        const filtered = files.filter((f) => {
+            if (!query.trim()) return true;
+            const q = query.toLowerCase();
+            return f.name?.toLowerCase().includes(q) || f.path?.toLowerCase().includes(q);
+        });
+        const buckets = new Map();
+        for (const f of filtered) {
+            const id = categoriseLog(f);
+            if (!buckets.has(id)) buckets.set(id, []);
+            buckets.get(id).push(f);
+        }
+        // Order groups, putting empty ones last
+        const order = [...LOG_GROUPS.map((g) => g.id), 'other'];
+        return order
+            .map((id) => ({
+                id,
+                label: id === 'other' ? 'Other' : LOG_GROUPS.find((g) => g.id === id)?.label,
+                files: (buckets.get(id) || []).sort((a, b) => (b.size || 0) - (a.size || 0)),
+            }))
+            .filter((g) => g.files.length > 0);
+    }, [files, query]);
+
+    const toggleGroup = (id) => {
+        const next = new Set(collapsed);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        setCollapsed(next);
+    };
+
+    return (
+        <div className="lv-sidebar">
+            <div className="lv-sidebar-header">
+                <div className="lv-search">
+                    <Search size={13} className="lv-search-icon" />
+                    <input
+                        type="text"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Filter log files…"
+                    />
+                </div>
+                <button type="button"
+                    className="lv-icon-btn"
+                    onClick={onRefresh}
+                    disabled={loading}
+                    title="Reload list"
+                >
+                    <RefreshCw size={13} className={loading ? 'spinning' : ''} />
+                </button>
+            </div>
+
+            <div className="lv-sidebar-body">
+                {files.length === 0 ? (
+                    <div className="lv-empty-hint">
+                        <AlertTriangle size={20} />
+                        <p>No log files found.</p>
+                    </div>
+                ) : groups.length === 0 ? (
+                    <div className="lv-empty-hint">
+                        <p>No matches for &quot;{query}&quot;.</p>
+                    </div>
+                ) : (
+                    groups.map((group) => {
+                        const Icon = GROUP_ICONS[group.id] || FileText;
+                        const isCollapsed = collapsed.has(group.id);
+                        return (
+                            <div key={group.id} className="lv-group">
+                                <button type="button"
+                                    className="lv-group-header"
+                                    onClick={() => toggleGroup(group.id)}
+                                >
+                                    {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                                    <Icon size={13} className="lv-group-icon" />
+                                    <span>{group.label}</span>
+                                    <span className="lv-group-count">{group.files.length}</span>
+                                </button>
+                                {!isCollapsed && (
+                                    <div className="lv-group-files">
+                                        {group.files.map((log) => {
+                                            const kind = logKindFromPath(log.path || log.name);
+                                            const isActive = selectedPath === log.path;
+                                            return (
+                                                <button type="button"
+                                                    key={log.path}
+                                                    className={`lv-file ${isActive ? 'active' : ''}`}
+                                                    onClick={() => onSelect(log)}
+                                                    title={log.path}
+                                                >
+                                                    <span className={`lv-file-dot kind-${kind}`} />
+                                                    <span className="lv-file-name">{log.name}</span>
+                                                    <span className="lv-file-size">{formatBytes(log.size)}</span>
+                                                    {log.modified && (
+                                                        <span className="lv-file-time">
+                                                            {formatRelativeTime(log.modified)}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+}

@@ -1,0 +1,14 @@
+{% extends 'email/base.html' %}
+{% from 'email/partials/_macros.html' import alert_card, button with context %}
+{% block heading %}{{ data.alerts|length }} alert{{ 's' if data.alerts|length != 1 else '' }} on {{ hostname }}{% endblock %}
+{% block content %}
+  {% if data.intro %}
+  <p style="margin:0 0 18px;">{{ data.intro }}</p>
+  {% endif %}
+  {% for alert in data.alerts %}
+  {{ alert_card(alert) }}
+  {% endfor %}
+  {% if action_url %}
+  <div style="margin-top:14px;">{{ button(action_url, action_label) }}</div>
+  {% endif %}
+{% endblock %}

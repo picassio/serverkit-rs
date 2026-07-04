@@ -1,0 +1,144 @@
+import { Search, RefreshCw, FileText } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+
+export function LogViewer({
+    files = [],
+    selectedPath,
+    onSelectFile,
+    onRefreshFiles,
+    content,
+    contentLoading = false,
+    contentEmpty,
+    searchPattern = '',
+    onSearchChange,
+    onSearchSubmit,
+    lineCount,
+    onLineCountChange,
+    lineCountOptions = [50, 100, 200, 500, 1000],
+    autoRefresh = false,
+    onAutoRefreshChange,
+    onRefreshContent,
+    onDownload,
+    onClear,
+    formatFileSize = defaultFormatFileSize,
+    getLogIconType = () => 'default',
+}) {
+    return (
+        <div className="logs-layout">
+            <div className="logs-sidebar">
+                <div className="sidebar-header">
+                    <h3>Log Files</h3>
+                    {onRefreshFiles && (
+                        <Button variant="outline" size="sm" onClick={onRefreshFiles}>
+                            <RefreshCw size={14} />
+                        </Button>
+                    )}
+                </div>
+                <div className="log-files-list">
+                    {files.length === 0 ? (
+                        <div className="empty-hint">No log files found</div>
+                    ) : (
+                        files.map((log) => (
+                            <div
+                                key={log.path}
+                                className={`log-file-item ${selectedPath === log.path ? 'active' : ''}`}
+                                onClick={() => onSelectFile?.(log)}
+                            >
+                                <div className={`log-icon ${getLogIconType(log)}`}>
+                                    <FileText size={16} />
+                                </div>
+                                <div className="log-file-info">
+                                    <span className="log-file-name">{log.name}</span>
+                                    <span className="log-file-path">{log.path}</span>
+                                </div>
+                                <span className="log-file-size">{formatFileSize(log.size)}</span>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            <div className="logs-viewer">
+                <div className="viewer-toolbar">
+                    <div className="toolbar-left">
+                        <div className="search-input">
+                            <Search size={16} />
+                            <Input
+                                type="text"
+                                value={searchPattern}
+                                onChange={(e) => onSearchChange?.(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit?.()}
+                                placeholder="Search pattern..."
+                            />
+                        </div>
+                        {onLineCountChange && (
+                            <select
+                                value={lineCount}
+                                onChange={(e) => onLineCountChange(parseInt(e.target.value, 10))}
+                                className="form-select lines-select"
+                            >
+                                {lineCountOptions.map(n => (
+                                    <option key={n} value={n}>{n} lines</option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                    <div className="toolbar-right">
+                        {onAutoRefreshChange && (
+                            <label className="auto-refresh-toggle">
+                                <Switch
+                                    checked={autoRefresh}
+                                    onCheckedChange={onAutoRefreshChange}
+                                />
+                                <span>Auto-refresh</span>
+                            </label>
+                        )}
+                        {onRefreshContent && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onRefreshContent}
+                                disabled={!selectedPath || contentLoading}
+                            >
+                                Refresh
+                            </Button>
+                        )}
+                        {onDownload && (
+                            <Button variant="outline" size="sm" onClick={onDownload} disabled={!content}>
+                                Download
+                            </Button>
+                        )}
+                        {onClear && (
+                            <Button variant="destructive" size="sm" onClick={onClear} disabled={!selectedPath}>
+                                Clear
+                            </Button>
+                        )}
+                    </div>
+                </div>
+                <div className="log-content">
+                    {contentLoading ? (
+                        <div className="logs-viewer__loading">Loading...</div>
+                    ) : !content ? (
+                        <div className="logs-viewer__empty">
+                            {contentEmpty ?? 'Select a log file to view its contents.'}
+                        </div>
+                    ) : (
+                        <pre>{content}</pre>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function defaultFormatFileSize(bytes) {
+    if (bytes == null) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+export default LogViewer;

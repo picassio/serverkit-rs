@@ -1,0 +1,343 @@
+"""Built-in periodic job handlers + their schedules.
+
+These are the platform's own recurring tasks. They used to each run in a
+dedicated daemon thread spawned from ``app/__init__.py`` (auto-sync,
+snapshot-retention, workflow scheduler, health-check poller, WP safe-update,
+hourly API background, pairing pruner, registrar expiry). They now run as
+``ScheduledJob`` rows enqueued by the single ``JobScheduler`` and executed by the
+single ``JobConsumer``.
+
+The check/run functions below are relocated verbatim from ``app/__init__.py`` so
+behavior — cadence handling, per-task de-dup, idempotency — is unchanged; only
+the trigger moved from a bare thread to the unified job system.
+"""
+import logging
+
+from app.jobs.registry import register
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Relocated check/run functions (formerly in app/__init__.py)
+# ---------------------------------------------------------------------------
+def check_auto_sync_schedules():
+    """Check all auto-sync enabled sites and run syncs that are due."""
+    from app.models.wordpress_site import WordPressSite
+    from datetime import datetime
+
+    sites = WordPressSite.query.filter_by(auto_sync_enabled=True).all()
+    if not sites:
+        return
+
+    try:
+        from croniter import croniter
+    except ImportError:
+        logger.debug('croniter not installed, skipping auto-sync check')
+        return
+
+    now = datetime.utcnow()
+
+    for site in sites:
+        if not site.auto_sync_schedule:
+            continue
+        try:
+            if not croniter.is_valid(site.auto_sync_schedule):
+                continue
+            cron = croniter(site.auto_sync_schedule, now)
+            prev_run = cron.get_prev(datetime)
+            # Was a run due in the last 90 seconds (accounts for the tick interval)?
+            seconds_since_due = (now - prev_run).total_seconds()
+            if seconds_since_due <= 90:
+                logger.info(f'Auto-sync triggered for site {site.id} ({site.name})')
+                from app.services.environment_pipeline_service import EnvironmentPipelineService
+                EnvironmentPipelineService.sync_from_production(
+                    env_site_id=site.id,
+                    sync_type='full',
+                    user_id=None,
+                )
+        except Exception as e:
+            logger.error(f'Auto-sync check failed for site {site.id}: {e}')
+
+
+def check_workflow_schedules():
+    """Check all active workflows with cron triggers and run those that are due."""
+    from app.models.workflow import Workflow
+    from app.services.workflow_engine import WorkflowEngine
+    from datetime import datetime
+    import json
+
+    try:
+        from croniter import croniter
+    except ImportError:
+        logger.debug('croniter not installed, skipping workflow schedule check')
+        return
+
+    workflows = Workflow.query.filter_by(is_active=True, trigger_type='cron').all()
+    if not workflows:
+        return
+
+    now = datetime.utcnow()
+
+    for workflow in workflows:
+        try:
+            config = json.loads(workflow.trigger_config) if workflow.trigger_config else {}
+            cron_expr = config.get('cron')
+            if not cron_expr or not croniter.is_valid(cron_expr):
+                continue
+            cron = croniter(cron_expr, now)
+            prev_run = cron.get_prev(datetime)
+            seconds_since_due = (now - prev_run).total_seconds()
+            # Don't run multiple times for the same slot.
+            if 0 < seconds_since_due <= 90:
+                if workflow.last_run_at:
+                    seconds_since_last_run = (now - workflow.last_run_at).total_seconds()
+                    if seconds_since_last_run < 110:
+                        continue
+                logger.info(f'Scheduled workflow triggered: {workflow.name} (ID: {workflow.id})')
+                WorkflowEngine.enqueue_execution(
+                    workflow_id=workflow.id,
+                    trigger_type='cron',
+                    context={'scheduled_at': prev_run.isoformat()},
+                )
+        except Exception as e:
+            logger.error(f'Workflow schedule check failed for workflow {workflow.id}: {e}')
+
+
+# How often the per-site WordPress health poller runs (seconds).
+HEALTH_CHECK_INTERVAL = 300
+# Retention for recorded health-check samples (days) — bounds unbounded growth
+# from the continuous poller; matches the longest uptime window (uptime_90d).
+# Pruned at most once per day.
+HEALTH_CHECK_RETENTION_DAYS = 90
+_last_health_prune = None
+
+
+def run_health_checks():
+    """Run a health check for every managed (production) WordPress site and sync
+    any status-page components bound to it. Per-site try/except so one hung site
+    never stalls the whole sweep."""
+    from app import db
+    from app.models.wordpress_site import WordPressSite
+    from app.models.status_page import StatusComponent
+    from app.services.environment_health_service import EnvironmentHealthService
+    from app.services.status_page_service import StatusPageService
+
+    _prune_old_health_checks()
+
+    sites = WordPressSite.query.filter_by(is_production=True).all()
+    for site in sites:
+        try:
+            # Only poll sites the operator expects to be up — skip archived/stopped
+            # stacks so an intentional stop never looks like an outage.
+            if not site.application or site.application.status != 'running':
+                continue
+            result = EnvironmentHealthService.check_health(site.id)
+            overall = result.get('overall_status')
+            if not overall:
+                continue
+            components = StatusComponent.query.filter_by(wordpress_site_id=site.id).all()
+            for comp in components:
+                StatusPageService.sync_component_from_health(comp, overall)
+        except Exception as e:
+            logger.error(f'Health check failed for site {site.id}: {e}')
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
+
+def _prune_old_health_checks():
+    """Delete health-check samples older than the retention window, at most once
+    per day, so the continuous poller doesn't grow the health_checks table without
+    bound. Best-effort — failure never stalls the health sweep."""
+    global _last_health_prune
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    if _last_health_prune is not None and (now - _last_health_prune).total_seconds() < 86400:
+        return
+    from app import db
+    from app.models.status_page import HealthCheck
+    cutoff = now - timedelta(days=HEALTH_CHECK_RETENTION_DAYS)
+    try:
+        deleted = HealthCheck.query.filter(HealthCheck.checked_at < cutoff).delete(synchronize_session=False)
+        db.session.commit()
+        _last_health_prune = now
+        if deleted:
+            logger.info(f'Pruned {deleted} health-check row(s) older than {HEALTH_CHECK_RETENTION_DAYS}d')
+    except Exception as e:
+        logger.error(f'Health-check prune failed: {e}')
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+
+def check_update_schedules():
+    from app.models.wordpress_site import WordPressSite, WordPressUpdateRun
+    from app.services.wordpress_bridge import wp_update_service
+    WpUpdateService = wp_update_service()
+    from datetime import datetime
+    import json as _json
+
+    try:
+        from croniter import croniter
+    except ImportError:
+        return
+
+    sites = WordPressSite.query.filter(WordPressSite.auto_update_schedule.isnot(None)).all()
+    if not sites:
+        return
+    now = datetime.utcnow()
+    for site in sites:
+        try:
+            expr = (site.auto_update_schedule or '').strip()
+            if not expr or not croniter.is_valid(expr):
+                continue
+            if not site.application or site.application.status != 'running':
+                continue
+            prev = croniter(expr, now).get_prev(datetime)
+            if not (0 < (now - prev).total_seconds() <= 90):
+                continue
+            # de-dup: skip if a run already started in the last ~10 minutes
+            last = (WordPressUpdateRun.query.filter_by(site_id=site.id)
+                    .order_by(WordPressUpdateRun.started_at.desc()).first())
+            if last and last.started_at and (now - last.started_at).total_seconds() < 600:
+                continue
+            exclude = []
+            if site.auto_update_exclude:
+                try:
+                    exclude = _json.loads(site.auto_update_exclude)
+                except Exception:
+                    exclude = []
+            logger.info(f'Scheduled WordPress safe-update: site {site.id}')
+            WpUpdateService.start_update(site, exclude=exclude, trigger='scheduled')
+        except Exception as e:
+            logger.error(f'Update schedule check failed for site {site.id}: {e}')
+
+
+def run_snapshot_retention():
+    """Set DatabaseSnapshot.expires_at per the retention policy and prune expired
+    snapshots (file + DB row)."""
+    from app.services.db_sync_service import DatabaseSyncService
+    from app.services.settings_service import SettingsService
+    days = SettingsService.get(
+        'snapshot_retention_days',
+        DatabaseSyncService.DEFAULT_SNAPSHOT_RETENTION_DAYS,
+    )
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        days = DatabaseSyncService.DEFAULT_SNAPSHOT_RETENTION_DAYS
+    result = DatabaseSyncService.prune_expired_snapshots(retention_days=days)
+    return result if isinstance(result, dict) else None
+
+
+def run_pairing_prune():
+    """Prune expired pending agent pairings."""
+    from app.services import pairing_service
+    pairing_service.prune_expired()
+
+
+def run_registrar_expiry():
+    """Notify when a registrar domain crosses an expiry threshold."""
+    from app.services.registrar_service import RegistrarService
+    n = RegistrarService.notify_expiring()
+    if n:
+        logger.info(f'Registrar expiry: sent {n} notification(s)')
+        return {'notified': n}
+    return None
+
+
+def run_api_background():
+    """Hourly API analytics aggregation + event delivery retry."""
+    from app.services.api_analytics_service import ApiAnalyticsService
+    from app.services.event_service import EventService
+    ApiAnalyticsService.aggregate_hourly()
+    EventService.retry_failed()
+
+
+def run_backup_scheduler():
+    """Enqueue any scheduled backups that are due (gated by backup config)."""
+    from app.services.backup_service import BackupService
+    BackupService.check_backup_schedules()
+
+
+def run_extension_update_check():
+    """Daily registry check for installed-extension updates (#50).
+
+    Notifies admins through the Notifications Bus — but only when the set of
+    available (slug, version) pairs CHANGED since the last notification, so a
+    pending update nags once per release, not once per day. The Marketplace
+    badge remains the always-current surface.
+    """
+    import json as _json
+    from app.services.plugin_service import check_for_updates
+    from app.services.settings_service import SettingsService
+
+    try:
+        updates = [u for u in check_for_updates() if u.get('update_available')]
+    except Exception as e:
+        logger.debug(f'Extension update check skipped: {e}')
+        return None
+    if not updates:
+        return None
+
+    fingerprint = _json.dumps(sorted(
+        f"{u.get('slug')}@{u.get('available_version')}" for u in updates))
+    marker_key = 'extensions.update_notified'
+    if fingerprint == SettingsService.get(marker_key, ''):
+        return {'updates': len(updates), 'notified': False}
+
+    summary = ', '.join(
+        f"{u.get('slug')} v{u.get('installed_version')} → v{u.get('available_version')}"
+        for u in updates[:5])
+    if len(updates) > 5:
+        summary += f' (+{len(updates) - 5} more)'
+
+    from app.notifications.sdk import NotifySdk
+    NotifySdk().send(
+        'extensions.updates_available',
+        to='admins',
+        data={'count': len(updates), 'summary': summary,
+              'message': f'Updates available: {summary}. '
+                         f'Review them on the Marketplace → Installed tab.'},
+    )
+    SettingsService.set(marker_key, fingerprint)
+    return {'updates': len(updates), 'notified': True}
+
+
+# ---------------------------------------------------------------------------
+# Handler registration + schedule seeding
+# ---------------------------------------------------------------------------
+# (kind, handler, schedule-name, interval seconds, startup-delay seconds)
+# The interval/delay pairs reproduce the original per-thread cadence: each
+# former loop's sleep(settle) + sleep(interval) maps to startup_delay + interval.
+_BUILTINS = [
+    ('builtin.auto_sync',           check_auto_sync_schedules, 'auto-sync',          60,    60),
+    ('builtin.snapshot_retention',  run_snapshot_retention,    'snapshot-retention', 3600,  120),
+    ('builtin.workflow_schedules',  check_workflow_schedules,  'workflow-schedules', 60,    60),
+    ('builtin.health_check',        run_health_checks,         'health-check',       300,   30),
+    ('builtin.wp_update',           check_update_schedules,    'wp-update',          60,    105),
+    ('builtin.api_background',      run_api_background,        'api-background',     3600,  3600),
+    ('builtin.pairing_prune',       run_pairing_prune,         'pairing-prune',      3600,  60),
+    ('builtin.registrar_expiry',    run_registrar_expiry,      'registrar-expiry',   86400, 300),
+    ('builtin.backup_scheduler',    run_backup_scheduler,      'backup-scheduler',   30,    30),
+    ('builtin.extension_updates',   run_extension_update_check, 'extension-updates', 86400, 600),
+]
+
+
+def register_builtin_handlers():
+    """Register all built-in periodic handlers. Pure in-memory; idempotent."""
+    for kind, fn, _name, _interval, _delay in _BUILTINS:
+        # Wrap so handlers match the fn(job) signature and ignore the job arg.
+        register(kind, (lambda f: (lambda job: f()))(fn), replace=True)
+
+
+def seed_builtin_schedules():
+    """Idempotently create the ScheduledJob rows for the built-in tasks."""
+    from app.jobs.service import ScheduledJobService
+    for kind, _fn, name, interval, delay in _BUILTINS:
+        ScheduledJobService.ensure(
+            name, kind, interval_seconds=interval, startup_delay_seconds=delay,
+        )

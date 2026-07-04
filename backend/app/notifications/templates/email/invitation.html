@@ -1,0 +1,14 @@
+{% extends 'email/base.html' %}
+{% from 'email/partials/_macros.html' import button, metrics with context %}
+{% block content %}
+  <p style="margin:0 0 16px;">{% if data.inviter %}<strong class="sk-ink" style="color:{{ brand.ink }};">{{ data.inviter }}</strong> has invited you{% else %}You've been invited{% endif %} to join {% if data.workspace %}<strong class="sk-ink" style="color:{{ brand.ink }};">{{ data.workspace }}</strong> on {% endif %}ServerKit.</p>
+  {% if data.role %}
+  {{ metrics([{'label': 'Your role', 'value': data.role}]) }}
+  {% endif %}
+  {% if action_url %}
+  <div style="margin-top:24px;">{{ button(action_url, action_label) }}</div>
+  {% endif %}
+  {% if data.expires %}
+  <p class="sk-faint" style="margin:18px 0 0; font-size:13px; color:{{ brand.faint }};">This invitation expires {{ data.expires }}.</p>
+  {% endif %}
+{% endblock %}

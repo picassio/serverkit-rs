@@ -1,0 +1,81 @@
+import { ArrowDown, Sparkles } from 'lucide-react';
+import { useServerkitAI } from '../../contexts/AIContext';
+import { useContributions } from '../../plugins/contributions';
+import useAutoScroll from '../../hooks/ai/useAutoScroll';
+import Message from './Message';
+import TypingIndicator from './TypingIndicator';
+import ConfirmActionCard from './ConfirmActionCard';
+
+const routeMatches = (pattern, route) => {
+    if (!pattern || pattern === '*') return true;
+    if (pattern === route) return true;
+    return route.startsWith(pattern.replace(/\/?\*$/, ''));
+};
+
+const MessageList = () => {
+    const {
+        messages, isStreaming, pageContext, mode, ask, providerConfigured, pendingConfirm,
+    } = useServerkitAI();
+    const contributions = useContributions();
+    const { ref, isPinned, checkPinned, scrollToBottom } = useAutoScroll([messages, isStreaming]);
+
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    const showTyping = isStreaming
+        && lastAssistant
+        && !lastAssistant.content
+        && !(lastAssistant.toolCalls || []).length
+        && !pendingConfirm;
+
+    const isEmpty = messages.length === 0;
+    // Core per-page prompts + any plugin-contributed prompts matching this route.
+    const corePrompts = (pageContext.suggestedPrompts || []).map((p) => ({ label: p, prompt: p }));
+    const pluginPrompts = (contributions.ai?.suggested_prompts || [])
+        .filter((p) => p && p.prompt && routeMatches(p.route, pageContext.route))
+        .map((p) => ({ label: p.label || p.prompt, prompt: p.prompt }));
+    const suggestions = mode === 'assistant' ? [...corePrompts, ...pluginPrompts] : [];
+
+    return (
+        <div className="sk-ai-messages" ref={ref} onScroll={checkPinned} aria-live="polite">
+            {isEmpty ? (
+                <div className="sk-ai-empty">
+                    <div className="sk-ai-empty__icon"><Sparkles size={22} /></div>
+                    <h3 className="sk-ai-empty__title">ServerKit AI</h3>
+                    <p className="sk-ai-empty__sub">powered by Prompture</p>
+                    {!providerConfigured ? (
+                        <p className="sk-ai-empty__hint">
+                            The assistant isn&apos;t configured yet. An admin can set a provider in
+                            {' '}Settings → AI Assistant.
+                        </p>
+                    ) : (
+                        <div className="sk-ai-empty__prompts">
+                            {suggestions.map((p) => (
+                                <button
+                                    key={p.label}
+                                    type="button"
+                                    className="sk-ai-suggested"
+                                    onClick={() => ask(p.prompt, { open: true })}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <>
+                    {messages.map((m) => <Message key={m.id} message={m} />)}
+                    {showTyping ? <TypingIndicator label={lastAssistant?.thinking ? 'Thinking…' : null} /> : null}
+                    <ConfirmActionCard />
+                </>
+            )}
+
+            {!isPinned && !isEmpty ? (
+                <button type="button" className="sk-ai-jump" onClick={scrollToBottom} aria-label="Jump to latest">
+                    <ArrowDown size={16} />
+                </button>
+            ) : null}
+        </div>
+    );
+};
+
+export default MessageList;

@@ -1,0 +1,67 @@
+{# Reusable, email-client-safe building blocks. Import WITH CONTEXT so the
+   macros can read `brand` and `palette` from the render context:
+     {% from 'email/partials/_macros.html' import status_pill, button, metrics, chip with context %}
+#}
+
+{# A severity pill: tinted lozenge + leading dot, all solid colors. #}
+{% macro status_pill(label=None) -%}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr>
+<td style="background:{{ palette.bg }};border-radius:999px;padding:6px 13px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;font-weight:600;line-height:1;letter-spacing:.5px;text-transform:uppercase;color:{{ palette.text }};">
+&#9679;&nbsp; {{ label or palette.label }}
+</td>
+</tr></table>
+{%- endmacro %}
+
+{# Bulletproof CTA button. #}
+{% macro button(url, label) -%}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr>
+<td align="center" bgcolor="{{ brand.accent }}" style="border-radius:9px;">
+<a href="{{ url }}" target="_blank" style="display:inline-block;padding:13px 30px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;border-radius:9px;">{{ label }}</a>
+</td>
+</tr></table>
+{%- endmacro %}
+
+{# Inline monospace value chip — for hostnames, sizes, ids, durations. #}
+{% macro chip(value) -%}
+<span class="sk-code" style="font-family:'SFMono-Regular',ui-monospace,Consolas,'Liberation Mono',Menlo,monospace;font-size:13px;background:{{ brand.code_bg }};color:{{ brand.ink }};padding:2px 7px;border-radius:5px;white-space:nowrap;">{{ value }}</span>
+{%- endmacro %}
+
+{# A facts table. rows = list of {label, value, mono?}. #}
+{% macro metrics(rows) -%}
+<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:6px 0 2px;">
+{% for row in rows %}
+<tr>
+<td class="sk-muted" style="padding:9px 0;border-bottom:1px solid {{ brand.border }};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;color:{{ brand.muted }};">{{ row.label }}</td>
+<td align="right" class="sk-ink" style="padding:9px 0;border-bottom:1px solid {{ brand.border }};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;color:{{ brand.ink }};">
+{% if row.mono %}{{ chip(row.value) }}{% else %}{{ row.value }}{% endif %}
+</td>
+</tr>
+{% endfor %}
+</table>
+{%- endmacro %}
+
+{# One alert in a multi-alert (monitoring) email — left-bordered, colored by
+   its own severity. ``severity_styles`` comes from the render context. #}
+{% macro alert_card(alert) -%}
+{% set st = severity_styles.get(alert.severity, severity_styles['info']) %}
+<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin-bottom:12px;"><tr>
+<td style="background:{{ st.bg }};border-left:4px solid {{ st.dot }};border-radius:8px;padding:14px 16px;">
+<div style="font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:{{ st.text }};">{{ st.label }}{% if alert.type %} &middot; {{ alert.type }}{% endif %}</div>
+<div class="sk-ink" style="margin-top:6px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:{{ brand.ink }};">{{ alert.message }}</div>
+{% if 'value' in alert or 'threshold' in alert %}
+<div class="sk-muted" style="margin-top:8px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:{{ brand.muted }};">
+{% if 'value' in alert %}Current: <strong class="sk-ink" style="color:{{ brand.ink }};">{{ alert.value }}</strong>{% endif %}
+{% if 'value' in alert and 'threshold' in alert %}&nbsp;&nbsp;&middot;&nbsp;&nbsp;{% endif %}
+{% if 'threshold' in alert %}Threshold: <strong class="sk-ink" style="color:{{ brand.ink }};">{{ alert.threshold }}</strong>{% endif %}
+</div>
+{% endif %}
+</td>
+</tr></table>
+{%- endmacro %}
+
+{# Horizontal rule that respects dark mode. #}
+{% macro divider() -%}
+<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0"><tr>
+<td class="sk-hr" style="border-top:1px solid {{ brand.border }};font-size:0;line-height:0;height:1px;">&nbsp;</td>
+</tr></table>
+{%- endmacro %}

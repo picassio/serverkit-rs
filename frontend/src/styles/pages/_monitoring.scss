@@ -1,0 +1,450 @@
+// ============================================
+// MONITORING PAGE (redesign — infra console look)
+// ============================================
+
+.monitoring-page {
+
+    // ── shared bits ─────────────────────────────────────────
+    // Mono-uppercase eyebrow section headers
+    .mon-section-head h3,
+    .monitoring-panel__header h3 {
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    // Neutral icon tile (rule editors, channel tiles, host cards)
+    .mon-ico {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        background: var(--surface-3);
+        color: var(--text-dim);
+
+        &--sm {
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+        }
+    }
+
+    .monitoring-overview,
+    .monitoring-delivery-layout {
+        display: grid;
+        gap: $space-5;
+    }
+
+    // ── hero strip ──────────────────────────────────────────
+    .monitoring-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: $space-5;
+        padding: $space-5 $space-6;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface);
+
+        &.is-active {
+            border-color: rgba(61, 220, 151, 0.25);
+        }
+
+        h2 {
+            margin: $space-3 0 $space-1;
+            font-size: 19px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: -0.01em;
+            line-height: 1.15;
+        }
+
+        p {
+            margin: 0;
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--text-faint);
+        }
+
+        &__actions {
+            flex: 0 0 auto;
+            display: flex;
+            gap: $space-2;
+        }
+
+        @media (max-width: 760px) {
+            flex-direction: column;
+        }
+    }
+
+    // ── KPI strip ───────────────────────────────────────────
+    .mon-kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: $space-4;
+
+        @media (max-width: $breakpoint-lg) { grid-template-columns: repeat(2, 1fr); }
+        @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+    }
+
+    // ── section heads + panels ──────────────────────────────
+    .mon-section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: $space-3;
+        margin-bottom: $space-3;
+    }
+
+    .monitoring-panel {
+        min-width: 0;
+        padding: $space-5;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface);
+
+        &--warning {
+            border-color: rgba(251, 111, 111, 0.28);
+        }
+    }
+
+    .monitoring-panel__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: $space-3;
+        margin-bottom: $space-4;
+
+        > div {
+            display: flex;
+            flex-wrap: wrap;
+            gap: $space-2;
+        }
+
+        @media (max-width: 640px) {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+
+    .mon-firing-count {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--red);
+    }
+
+    // ── current-metrics host cards (prototype .host-card) ───
+    .mon-host-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 14px;
+    }
+
+    .mon-host-card {
+        min-width: 0;
+        padding: 15px 16px;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface);
+        transition: border-color $transition-fast;
+
+        &:hover {
+            border-color: var(--border-strong);
+        }
+
+        &.is-alerting {
+            border-color: rgba(245, 185, 69, 0.35);
+        }
+
+        &__head {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 12px;
+
+            .sk-pill { margin-left: auto; }
+        }
+
+        &__name {
+            flex: 1;
+            min-width: 0;
+            font-size: 13px;
+            font-weight: $font-weight-semibold;
+            @include truncate();
+        }
+
+        &__value {
+            margin-bottom: 10px;
+            font-family: var(--mono);
+            font-size: 23px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: -0.02em;
+            line-height: 1;
+        }
+
+        // mono footer stats (prototype .host-mini)
+        &__mini {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-faint);
+
+            span { white-space: nowrap; }
+
+            b {
+                color: var(--text-dim);
+                font-weight: 600;
+            }
+        }
+    }
+
+    // ── alert rows (active alerts + history; prototype .alert-row)
+    .mon-alert-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .mon-alert-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 0;
+        border-top: 1px solid var(--border-soft);
+
+        &:first-child {
+            border-top: none;
+            padding-top: 0;
+        }
+
+        &:last-child { padding-bottom: 0; }
+
+        &__body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        &__title {
+            font-size: 13.5px;
+            font-weight: 550;
+            color: var(--text);
+        }
+
+        &__sub {
+            margin-top: 2px;
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--text-faint);
+        }
+
+        &__end {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        &__time {
+            font-family: var(--mono);
+            font-size: 10.5px;
+            color: var(--text-faint);
+            white-space: nowrap;
+        }
+
+        @media (max-width: 640px) {
+            align-items: flex-start;
+
+            &__end { align-items: flex-start; }
+        }
+    }
+
+    // Severity dot (prototype .sev)
+    .mon-sev {
+        width: 9px;
+        height: 9px;
+        border-radius: 3px;
+        flex-shrink: 0;
+        background: var(--text-ghost);
+
+        &--critical { background: var(--red); }
+        &--warning { background: var(--amber); }
+        &--info { background: var(--cyan); }
+    }
+
+    // State chip (prototype .alert-state: st-firing / st-resolved) —
+    // shape from the shared %sk-state primitive (_design-system.scss)
+    .mon-state {
+        @extend %sk-state;
+
+        &--red { color: var(--red); background: var(--red-bg); }
+        &--amber { color: var(--amber); background: var(--amber-bg); }
+        &--cyan { color: var(--cyan); background: var(--cyan-bg); }
+        &--green { color: var(--green); background: var(--green-bg); }
+        &--gray { color: var(--text-faint); background: var(--surface-3); }
+    }
+
+    // ── alert-rule editors (thresholds tab) ─────────────────
+    .metric-rule-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: $space-3;
+
+        @media (max-width: 1024px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .metric-rule-editor {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 150px auto;
+        gap: $space-4;
+        align-items: center;
+        padding: 15px 16px;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+
+        &.is-alerting {
+            border-color: rgba(245, 185, 69, 0.35);
+        }
+
+        &__main {
+            display: flex;
+            gap: $space-3;
+            align-items: center;
+            min-width: 0;
+
+            h4 {
+                margin: 0 0 3px;
+                font-size: 13.5px;
+                font-weight: $font-weight-semibold;
+            }
+
+            span {
+                font-family: var(--mono);
+                font-size: 11.5px;
+                color: var(--text-faint);
+            }
+        }
+
+        &__threshold {
+            display: grid;
+            gap: $space-2;
+        }
+
+        > .sk-pill { justify-self: end; }
+
+        @media (max-width: 820px) {
+            grid-template-columns: 1fr;
+            align-items: start;
+
+            > .sk-pill { justify-self: start; }
+        }
+    }
+
+    // Eyebrow-style field labels inside the editor + delivery forms
+    .metric-rule-editor__threshold label,
+    .monitoring-delivery-layout .form-group label {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    // ── delivery tab ────────────────────────────────────────
+    .monitoring-delivery-layout {
+        grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+
+        @media (max-width: 1000px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .monitoring-switch-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: $space-4;
+        padding: $space-4;
+        margin-bottom: $space-4;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+
+        strong {
+            display: block;
+            font-size: 13px;
+            font-weight: $font-weight-semibold;
+        }
+
+        span {
+            display: block;
+            margin-top: 3px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-faint);
+        }
+    }
+
+    .notification-channel-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: $space-3;
+    }
+
+    .notification-channel-tile {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: $space-3;
+        align-items: center;
+        padding: 13px 14px;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+
+        &.is-ready {
+            border-color: rgba(61, 220, 151, 0.3);
+
+            .mon-ico {
+                background: var(--green-bg);
+                color: var(--green);
+            }
+        }
+
+        > div { min-width: 0; }
+
+        strong {
+            display: block;
+            font-size: 13px;
+            font-weight: $font-weight-semibold;
+            @include truncate();
+        }
+
+        span {
+            display: block;
+            margin-top: 2px;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            color: var(--text-faint);
+        }
+    }
+
+    .form-help {
+        display: block;
+        margin-top: $space-1;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+    }
+}

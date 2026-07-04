@@ -1,0 +1,13 @@
+[package]
+name = "sk-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sqlx.workspace = true
+chrono.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+fernet = { workspace = true }

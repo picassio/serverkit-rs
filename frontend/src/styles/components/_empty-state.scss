@@ -1,0 +1,81 @@
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-xl * 2;
+    text-align: center;
+    min-height: 200px;
+
+    &__icon {
+        color: $text-tertiary;
+        margin-bottom: $spacing-md;
+        opacity: 0.5;
+    }
+
+    &__title {
+        font-size: $font-size-lg;
+        font-weight: $font-weight-semibold;
+        color: $text-secondary;
+        margin: 0 0 $spacing-sm;
+    }
+
+    &__description {
+        font-size: $font-size-sm + 1;
+        color: $text-tertiary;
+        max-width: 400px;
+        margin: 0 0 $spacing-md;
+    }
+
+    &__action {
+        margin-top: $spacing-sm;
+    }
+
+    // Large variant — for full-page "not installed" / "unavailable" states
+    &--lg {
+        padding: $space-16 $space-8;
+        min-height: 400px;
+
+        .empty-state__icon {
+            opacity: 0.4;
+            margin-bottom: $space-6;
+        }
+
+        .empty-state__title {
+            font-size: $font-size-2xl;
+        }
+
+        .empty-state__description {
+            font-size: $font-size-base;
+            max-width: 480px;
+            margin-bottom: $space-6;
+        }
+
+        .empty-state__action {
+            margin-top: $space-4;
+        }
+    }
+
+    // Spinner inside empty state (loading variant)
+    .spinner {
+        margin-bottom: $spacing-md;
+    }
+}
+
+// Effective global overrides (moved verbatim from pages/_email.scss, where a
+// legacy unscoped `.empty-state` block used to win the cascade app-wide).
+// Top-level `.empty-state` copies still exist in pages/_security.scss and
+// pages/_servers.scss, which import AFTER this partial — at equal specificity
+// they would re-widen the padding and restore `<p>` bottom margins. The `html`
+// prefix (0,1,1) outranks those (0,1,0)/(0,1,1) blocks, while still losing to
+// the intentional higher-specificity rules (`.card .empty-state` padding from
+// _cards.scss, `--lg` child overrides, page-scoped copies). Fold this into the
+// base block above once the page-partial copies are consolidated here.
+html .empty-state {
+    padding: $space-8;
+    color: $text-secondary;
+
+    p {
+        margin: 0;
+    }
+}

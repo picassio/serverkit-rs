@@ -1,0 +1,226 @@
+// ============================================
+// BUILD PACK PREVIEW
+// Transparent zero-Dockerfile build planning. Rendered in the New Service
+// wizard (detection step) and the service Build tab.
+// ============================================
+
+.buildpack-preview {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+    padding: $space-4;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+
+    &--unknown {
+        border-color: fade($warning, 40%);
+    }
+
+    &--loading {
+        opacity: 0.8;
+    }
+
+    // ---- Header -------------------------------------------------------
+    &__head {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-3;
+    }
+
+    &__head-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+        border-radius: $radius-md;
+        background: fade($accent-primary-raw, 12%);
+        color: $accent-primary;
+    }
+
+    &__head-text {
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+        flex: 1;
+        min-width: 0;
+
+        strong {
+            font-size: $font-size-base;
+            font-weight: $font-weight-semibold;
+            color: $text-primary;
+        }
+
+        span {
+            font-size: $font-size-sm;
+            color: $text-secondary;
+            line-height: 1.5;
+        }
+    }
+
+    &__confidence {
+        flex-shrink: 0;
+        padding: $space-1 $space-2;
+        font-size: $font-size-xs;
+        font-weight: $font-weight-medium;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-radius: $radius-sm;
+        background: $bg-hover;
+        color: $text-tertiary;
+
+        &[data-level='high'] {
+            background: fade($success, 15%);
+            color: $success;
+        }
+
+        &[data-level='medium'] {
+            background: fade($warning, 15%);
+            color: $warning;
+        }
+
+        &[data-level='low'] {
+            background: fade($danger, 12%);
+            color: $danger;
+        }
+    }
+
+    // ---- Facts grid ---------------------------------------------------
+    &__facts {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: $space-3;
+    }
+
+    &__fact {
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+        padding: $space-3;
+        background: $bg-body;
+        border-radius: $radius-md;
+
+        span {
+            display: inline-flex;
+            align-items: center;
+            gap: $space-1;
+            font-size: $font-size-xs;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: $text-tertiary;
+        }
+
+        strong {
+            font-size: $font-size-sm;
+            font-weight: $font-weight-medium;
+            color: $text-primary;
+            text-transform: capitalize;
+        }
+    }
+
+    // ---- Notes --------------------------------------------------------
+    &__notes {
+        margin: 0;
+        padding-left: $space-4;
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+
+        li {
+            font-size: $font-size-sm;
+            color: $text-secondary;
+            line-height: 1.5;
+        }
+    }
+
+    // ---- Overrides ----------------------------------------------------
+    &__overrides {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: $space-3;
+    }
+
+    &__field {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+
+        &--wide {
+            grid-column: 1 / -1;
+        }
+    }
+
+    // ---- Dockerfile preview ------------------------------------------
+    &__dockerfile {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        overflow: hidden;
+    }
+
+    &__dockerfile-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: $space-3;
+        background: $bg-hover;
+        border: none;
+        cursor: pointer;
+        color: $text-primary;
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+        transition: background $transition-fast;
+
+        &:hover {
+            background: $bg-card;
+        }
+
+        span {
+            display: inline-flex;
+            align-items: center;
+            gap: $space-2;
+        }
+    }
+
+    &__chevron--open {
+        transform: rotate(180deg);
+    }
+
+    &__code {
+        margin: 0;
+        padding: $space-4;
+        background: $bg-body;
+        font-family: $font-mono;
+        font-size: $font-size-sm;
+        line-height: 1.6;
+        color: $text-primary;
+        max-height: 360px;
+        overflow: auto;
+        white-space: pre;
+
+        code {
+            font-family: inherit;
+        }
+    }
+
+    &__present-note {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+    }
+}
+
+@media (max-width: 640px) {
+    .buildpack-preview__facts {
+        grid-template-columns: 1fr;
+    }
+
+    .buildpack-preview__overrides {
+        grid-template-columns: 1fr;
+    }
+}

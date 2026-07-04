@@ -1,0 +1,433 @@
+"""
+Environment Variable Management Service
+
+Handles CRUD operations for application environment variables,
+including encryption, history tracking, and .env file operations.
+"""
+
+import logging
+import re
+from app import db
+from app.models import Application, EnvironmentVariable, EnvironmentVariableHistory
+
+logger = logging.getLogger(__name__)
+
+# Sentinel so callers can distinguish "leave target_service unchanged" (default)
+# from "clear it to all-services" (None) on update.
+_UNSET = object()
+
+
+class EnvService:
+    """Service for managing application environment variables."""
+
+    # Valid environment variable key pattern
+    KEY_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+
+    @staticmethod
+    def validate_key(key):
+        """Validate environment variable key format."""
+        if not key:
+            return False, "Key cannot be empty"
+        if len(key) > 255:
+            return False, "Key cannot exceed 255 characters"
+        if not EnvService.KEY_PATTERN.match(key):
+            return False, "Key must start with a letter or underscore and contain only letters, numbers, and underscores"
+        return True, None
+
+    @staticmethod
+    def get_env_vars(application_id, mask_secrets=False):
+        """Get all environment variables for an application."""
+        env_vars = EnvironmentVariable.query.filter_by(
+            application_id=application_id
+        ).order_by(EnvironmentVariable.key).all()
+
+        return [ev.to_dict(include_value=True, mask_secrets=mask_secrets) for ev in env_vars]
+
+    @staticmethod
+    def get_effective_env(application_id):
+        """Resolve the environment an app's container should actually receive.
+
+        Merges, lowest → highest precedence:
+
+            shared variable groups (workspace < project < environment < direct)
+                < the app's own local environment variables
+
+        So a key set both in a shared group and locally yields the LOCAL value
+        (matching the "Set locally — local value applies" hint in the UI), and
+        shared groups fill in everything the app doesn't define itself.
+
+        Returns a plain ``{key: value}`` dict with secrets DECRYPTED — this is
+        the value injected into the running container, so callers must treat it
+        as sensitive. Shared resolution is best-effort: if it fails, the app's
+        local env vars are still returned so a deploy is never blocked.
+        """
+        app = Application.query.get(application_id)
+        if not app:
+            return {}
+
+        merged = {}
+
+        # 1) Shared variable groups — the base layer (lowest precedence).
+        try:
+            from app.services.shared_resource_service import SharedResourceService
+            context = {
+                # scope_id is stored as a string when groups are created, so
+                # coerce the app's numeric ids to match on lookup.
+                'workspace_id': str(app.workspace_id) if app.workspace_id is not None else None,
+                'project_id': str(app.project_id) if app.project_id is not None else None,
+                'environment_id': str(app.environment_id) if app.environment_id is not None else None,
+            }
+            resolved = SharedResourceService.resolve_hierarchical(
+                'application', application_id, context=context,
+                mask_secrets=False, interpolate=True,
+            )
+            for entry in resolved or []:
+                key = entry.get('key')
+                if key:
+                    merged[key] = entry.get('value')
+        except Exception as e:  # best-effort — never block a deploy on shared vars
+            logger.warning('Shared variable resolution failed for app %s: %s', application_id, e)
+
+        # 2) Local env vars — the override layer (highest precedence wins).
+        for ev in EnvironmentVariable.query.filter_by(application_id=application_id).all():
+            merged[ev.key] = ev.value  # decrypted via the model's `value` property
+
+        return merged
+
+    @staticmethod
+    def get_effective_env_for_services(application_id, service_names):
+        """Per-service effective env for a compose app.
+
+        For each service in ``service_names`` returns the merged ``{key: value}``
+        it should receive: variables targeting all services (``target_service``
+        NULL) plus variables targeting that specific service, with the app's own
+        local env vars overriding shared variable groups. Variables targeted at a
+        *different* service are excluded for that service.
+
+        Returns ``{service_name: {key: value}}`` (decrypted). Best-effort — shared
+        resolution failures fall back to local vars and never block a deploy.
+        """
+        app = Application.query.get(application_id)
+        if not app or not service_names:
+            return {}
+
+        context = {
+            'workspace_id': str(app.workspace_id) if app.workspace_id is not None else None,
+            'project_id': str(app.project_id) if app.project_id is not None else None,
+            'environment_id': str(app.environment_id) if app.environment_id is not None else None,
+        }
+        local_vars = EnvironmentVariable.query.filter_by(application_id=application_id).all()
+
+        result = {}
+        for svc in service_names:
+            env = {}
+            # Shared groups applicable to this service (NULL-target + this svc).
+            try:
+                from app.services.shared_resource_service import SharedResourceService
+                resolved = SharedResourceService.resolve_hierarchical(
+                    'application', application_id, context=context,
+                    mask_secrets=False, interpolate=True, service=svc,
+                )
+                for entry in resolved or []:
+                    key = entry.get('key')
+                    if key:
+                        env[key] = entry.get('value')
+            except Exception as e:  # best-effort
+                logger.warning('Shared resolution failed for app %s svc %s: %s',
+                               application_id, svc, e)
+            # Local vars override; include all-services + this-service targets.
+            for ev in local_vars:
+                tgt = ev.target_service
+                if tgt in (None, '') or tgt == svc:
+                    env[ev.key] = ev.value
+            result[svc] = env
+        return result
+
+    @staticmethod
+    def get_env_var(application_id, key):
+        """Get a single environment variable by key."""
+        return EnvironmentVariable.query.filter_by(
+            application_id=application_id,
+            key=key
+        ).first()
+
+    @staticmethod
+    def get_env_var_by_id(env_var_id):
+        """Get a single environment variable by ID."""
+        return EnvironmentVariable.query.get(env_var_id)
+
+    @staticmethod
+    def set_env_var(application_id, key, value, is_secret=False, description=None,
+                    user_id=None, target_service=_UNSET):
+        """
+        Set an environment variable (create or update).
+        Returns (env_var, created, error)
+
+        ``target_service`` scopes the var to one compose service (None = all
+        services). Left unset on update, the existing target is preserved.
+        """
+        # Validate key
+        valid, error = EnvService.validate_key(key)
+        if not valid:
+            return None, False, error
+
+        # Normalize an empty target to "all services" (None).
+        norm_target = None if target_service in ('', _UNSET) else target_service
+
+        # Check if application exists
+        app = Application.query.get(application_id)
+        if not app:
+            return None, False, "Application not found"
+
+        # Check if key already exists
+        existing = EnvService.get_env_var(application_id, key)
+
+        if existing:
+            # Update existing
+            old_value = existing.value
+            existing.value = value
+            existing.is_secret = is_secret
+            if description is not None:
+                existing.description = description
+            if target_service is not _UNSET:
+                existing.target_service = norm_target
+
+            # Record history
+            EnvironmentVariableHistory.record_change(
+                existing, 'updated', old_value=old_value, new_value=value, user_id=user_id
+            )
+
+            db.session.commit()
+            return existing, False, None
+        else:
+            # Create new
+            env_var = EnvironmentVariable(
+                application_id=application_id,
+                key=key,
+                is_secret=is_secret,
+                description=description,
+                target_service=norm_target,
+                created_by=user_id
+            )
+            env_var.value = value
+
+            db.session.add(env_var)
+            db.session.flush()  # Get ID before commit
+
+            # Record history
+            EnvironmentVariableHistory.record_change(
+                env_var, 'created', new_value=value, user_id=user_id
+            )
+
+            db.session.commit()
+            return env_var, True, None
+
+    @staticmethod
+    def delete_env_var(application_id, key, user_id=None):
+        """Delete an environment variable. Returns (success, error)."""
+        env_var = EnvService.get_env_var(application_id, key)
+
+        if not env_var:
+            return False, "Environment variable not found"
+
+        old_value = env_var.value
+
+        # Record history before deletion
+        EnvironmentVariableHistory.record_change(
+            env_var, 'deleted', old_value=old_value, user_id=user_id
+        )
+
+        db.session.delete(env_var)
+        db.session.commit()
+
+        return True, None
+
+    @staticmethod
+    def delete_env_var_by_id(env_var_id, user_id=None):
+        """Delete an environment variable by ID. Returns (success, error)."""
+        env_var = EnvironmentVariable.query.get(env_var_id)
+
+        if not env_var:
+            return False, "Environment variable not found"
+
+        old_value = env_var.value
+
+        # Record history before deletion
+        EnvironmentVariableHistory.record_change(
+            env_var, 'deleted', old_value=old_value, user_id=user_id
+        )
+
+        db.session.delete(env_var)
+        db.session.commit()
+
+        return True, None
+
+    @staticmethod
+    def bulk_set_env_vars(application_id, env_vars_dict, user_id=None):
+        """
+        Set multiple environment variables at once.
+        env_vars_dict: {key: value} or {key: {value, is_secret, description}}
+        Returns (count, errors)
+        """
+        count = 0
+        errors = []
+
+        for key, val in env_vars_dict.items():
+            if isinstance(val, dict):
+                value = val.get('value', '')
+                is_secret = val.get('is_secret', False)
+                description = val.get('description')
+            else:
+                value = val
+                is_secret = False
+                description = None
+
+            env_var, created, error = EnvService.set_env_var(
+                application_id, key, value, is_secret, description, user_id
+            )
+
+            if error:
+                errors.append(f"{key}: {error}")
+            else:
+                count += 1
+
+        return count, errors
+
+    @staticmethod
+    def parse_env_file(content):
+        """
+        Parse .env file content into a dictionary.
+        Handles comments, quotes, and multiline values.
+        Returns (dict, errors)
+        """
+        env_vars = {}
+        errors = []
+        lines = content.split('\n')
+        current_key = None
+        current_value = None
+        in_multiline = False
+
+        for line_num, line in enumerate(lines, 1):
+            # Skip empty lines and comments (unless in multiline)
+            if not in_multiline:
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#'):
+                    continue
+
+                # Check for key=value
+                if '=' not in line:
+                    errors.append(f"Line {line_num}: Invalid format (missing '=')")
+                    continue
+
+                # Split on first =
+                key, value = line.split('=', 1)
+                key = key.strip()
+                value = value.strip()
+
+                # Validate key
+                valid, error = EnvService.validate_key(key)
+                if not valid:
+                    errors.append(f"Line {line_num}: {error}")
+                    continue
+
+                # Check for quoted values
+                if value.startswith('"') and not value.endswith('"'):
+                    # Start of multiline
+                    in_multiline = True
+                    current_key = key
+                    current_value = value[1:]  # Remove opening quote
+                elif value.startswith('"') and value.endswith('"') and len(value) > 1:
+                    # Quoted value (single line)
+                    env_vars[key] = value[1:-1]
+                elif value.startswith("'") and value.endswith("'") and len(value) > 1:
+                    # Single-quoted value
+                    env_vars[key] = value[1:-1]
+                else:
+                    # Unquoted value
+                    env_vars[key] = value
+            else:
+                # Continue multiline value
+                if line.rstrip().endswith('"'):
+                    # End of multiline
+                    current_value += '\n' + line.rstrip()[:-1]
+                    env_vars[current_key] = current_value
+                    in_multiline = False
+                    current_key = None
+                    current_value = None
+                else:
+                    current_value += '\n' + line
+
+        if in_multiline:
+            errors.append("Unterminated quoted value")
+
+        return env_vars, errors
+
+    @staticmethod
+    def export_to_env_format(application_id, include_secrets=True):
+        """
+        Export environment variables to .env file format.
+        Returns string content.
+        """
+        env_vars = EnvironmentVariable.query.filter_by(
+            application_id=application_id
+        ).order_by(EnvironmentVariable.key).all()
+
+        lines = []
+        lines.append("# Environment variables")
+        lines.append(f"# Exported from ServerKit")
+        lines.append("")
+
+        for ev in env_vars:
+            if ev.is_secret and not include_secrets:
+                lines.append(f"# {ev.key}=<secret>")
+            else:
+                value = ev.value
+                # Quote values that contain special characters
+                if any(c in value for c in [' ', '"', "'", '\n', '#', '$']):
+                    # Escape existing quotes and wrap in quotes
+                    value = value.replace('\\', '\\\\').replace('"', '\\"')
+                    lines.append(f'{ev.key}="{value}"')
+                else:
+                    lines.append(f"{ev.key}={value}")
+
+            # Add description as comment if present
+            if ev.description:
+                lines[-1] = f"# {ev.description}\n" + lines[-1]
+
+        return '\n'.join(lines)
+
+    @staticmethod
+    def get_history(application_id, limit=50):
+        """Get change history for an application's environment variables."""
+        history = EnvironmentVariableHistory.query.filter_by(
+            application_id=application_id
+        ).order_by(EnvironmentVariableHistory.changed_at.desc()).limit(limit).all()
+
+        return [h.to_dict() for h in history]
+
+    @staticmethod
+    def get_env_dict(application_id):
+        """Get environment variables as a simple key:value dictionary."""
+        env_vars = EnvironmentVariable.query.filter_by(
+            application_id=application_id
+        ).all()
+
+        return {ev.key: ev.value for ev in env_vars}
+
+    @staticmethod
+    def clear_all(application_id, user_id=None):
+        """Delete all environment variables for an application."""
+        env_vars = EnvironmentVariable.query.filter_by(
+            application_id=application_id
+        ).all()
+
+        count = 0
+        for ev in env_vars:
+            EnvironmentVariableHistory.record_change(
+                ev, 'deleted', old_value=ev.value, user_id=user_id
+            )
+            db.session.delete(ev)
+            count += 1
+
+        db.session.commit()
+        return count

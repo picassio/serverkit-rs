@@ -1,0 +1,219 @@
+// ============================================
+// SERVERKIT DESIGN SYSTEM - THEME VARIABLES
+// ============================================
+// CSS Custom Properties that enable runtime theme switching.
+// Must be imported FIRST before _variables.scss
+//
+// REDESIGN NOTE (see docs/REDESIGN_MAP.md §1.1):
+// The new "infra console" palette is applied by REMAPPING existing token
+// *values* (so every page reads the new tone through its current
+// $bg-*/$text-*/$accent-* names) and by ADDING the prototype's token names
+// (--surface*, --text-dim/-faint/-ghost, --accent-bright/-dim/-bg, --green,
+// --cyan, --violet, …) so new design-system primitives can use them directly.
+// Tokens are NEVER renamed — that would break the whole stylesheet.
+// ============================================
+
+// --------------------------------------------
+// DARK THEME (Default)
+// --------------------------------------------
+:root {
+    // ---- Backgrounds (existing names, remapped values) ----
+    --bg-body: #0a0b0e;
+    --bg-sidebar: #0d0f15;
+    --bg-card: #101218;        // = --surface
+    --bg-hover: #1a1e27;       // = --surface-hover
+    --bg-elevated: #161922;    // = --surface-2
+    --bg-secondary: #161922;   // = --surface-2
+    --bg-tertiary: #1c2029;    // = --surface-3
+
+    // ---- Backgrounds (new prototype names) ----
+    --surface: #101218;
+    --surface-2: #161922;
+    --surface-3: #1c2029;
+    --surface-hover: #1a1e27;
+
+    // ---- Borders (existing names, remapped values) ----
+    --border-default: #23272f;   // = --border
+    --border-subtle: #191c23;    // = --border-soft
+    --border-active: #2c313b;    // = --border-strong
+    --border-hover: #2c313b;
+
+    // ---- Borders (new prototype names) ----
+    --border: #23272f;
+    --border-soft: #191c23;
+    --border-strong: #2c313b;
+
+    // ---- Text (existing names, remapped to the new 4-tier ramp) ----
+    --text-primary: #e9ebf0;     // = --text
+    --text-secondary: #9aa1af;   // = --text-dim
+    --text-tertiary: #646b7a;    // = --text-faint
+
+    // ---- Text (new prototype names) ----
+    --text: #e9ebf0;
+    --text-dim: #9aa1af;
+    --text-faint: #646b7a;
+    --text-ghost: #444b58;
+
+    // ---- Accent (existing names; defaults match the new periwinkle.
+    //      --accent-primary/-hover/-bright/-dim/-bg* are overridden at runtime
+    //      by ThemeContext so custom/workspace accents stay consistent) ----
+    --accent-primary: #6d7cff;
+    --accent-hover: #5a67e8;
+    --accent-glow: rgba(109, 124, 255, 0.35);
+    --accent-shadow: rgba(109, 124, 255, 0.3);
+
+    // ---- Accent (new prototype names) ----
+    --accent: #6d7cff;
+    --accent-bright: #8b93ff;
+    --accent-dim: #4954cc;
+    --accent-bg: rgba(109, 124, 255, 0.13);
+    --accent-bg-soft: rgba(109, 124, 255, 0.07);
+
+    // ---- Semantic colors (theme-independent; new prototype palette) ----
+    --green: #3ddc97;
+    --green-bg: rgba(61, 220, 151, 0.12);
+    --amber: #f5b945;
+    --amber-bg: rgba(245, 185, 69, 0.12);
+    --red: #fb6f6f;
+    --red-bg: rgba(251, 111, 111, 0.12);
+    --cyan: #49c7f0;
+    --cyan-bg: rgba(73, 199, 240, 0.12);
+    --violet: #b07bf5;
+    --violet-bg: rgba(176, 123, 245, 0.12);
+
+    // ---- Radius scale (new) ----
+    --radius: 10px;
+    --radius-sm: 7px;
+    --radius-lg: 14px;
+
+    // ---- Fonts (new; IBM Plex) ----
+    --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    // ---- Shadows ----
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 20px 48px -12px rgba(0, 0, 0, 0.65);
+
+    // ---- Scrollbar ----
+    --scrollbar-track: #101218;
+    --scrollbar-thumb: #2a2f3a;
+    --scrollbar-thumb-hover: #363c49;
+
+    // ---- Code / terminal ----
+    --bg-code: #0d1017;
+    --text-code: #e2e8f0;
+
+    // ---- Grid pattern ----
+    --grid-color: rgba(255, 255, 255, 0.02);
+}
+
+// --------------------------------------------
+// LIGHT THEME
+// --------------------------------------------
+[data-theme="light"] {
+    // ---- Backgrounds ----
+    --bg-body: #f6f7fb;
+    --bg-sidebar: #f1f3f9;
+    --bg-card: #ffffff;
+    --bg-hover: #eef1f7;
+    --bg-elevated: #ffffff;
+    --bg-secondary: #f1f3f9;
+    --bg-tertiary: #e6e9f2;
+    --surface: #ffffff;
+    --surface-2: #f6f7fb;
+    --surface-3: #eef1f7;
+    --surface-hover: #eef1f7;
+
+    // ---- Borders ----
+    --border-default: #e2e6ef;
+    --border-subtle: #eef1f7;
+    --border-active: #cdd3e0;
+    --border-hover: #cdd3e0;
+    --border: #e2e6ef;
+    --border-soft: #eef1f7;
+    --border-strong: #cdd3e0;
+
+    // ---- Text ----
+    --text-primary: #161a23;
+    --text-secondary: #515a6b;
+    --text-tertiary: #79818f;
+    --text: #161a23;
+    --text-dim: #515a6b;
+    --text-faint: #79818f;
+    --text-ghost: #a6adba;
+
+    // ---- Accent washes (lighter on light surfaces) ----
+    --accent-bg: rgba(109, 124, 255, 0.10);
+    --accent-bg-soft: rgba(109, 124, 255, 0.05);
+    --accent-glow: rgba(109, 124, 255, 0.22);
+
+    // ---- Shadows (lighter for light theme) ----
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+    --shadow-md: 0 6px 16px -6px rgba(16, 24, 40, 0.12);
+    --shadow-lg: 0 16px 40px -12px rgba(16, 24, 40, 0.18);
+
+    // ---- Scrollbar ----
+    --scrollbar-track: #f1f3f9;
+    --scrollbar-thumb: #cdd3e0;
+    --scrollbar-thumb-hover: #aab2c2;
+
+    // ---- Code / terminal ----
+    --bg-code: #f1f3f9;
+    --text-code: #334155;
+
+    // ---- Grid pattern ----
+    --grid-color: rgba(109, 124, 255, 0.06);
+}
+
+// --------------------------------------------
+// SYSTEM THEME (follows OS preference → light overrides only)
+// --------------------------------------------
+@media (prefers-color-scheme: light) {
+    [data-theme="system"] {
+        --bg-body: #f6f7fb;
+        --bg-sidebar: #f1f3f9;
+        --bg-card: #ffffff;
+        --bg-hover: #eef1f7;
+        --bg-elevated: #ffffff;
+        --bg-secondary: #f1f3f9;
+        --bg-tertiary: #e6e9f2;
+        --surface: #ffffff;
+        --surface-2: #f6f7fb;
+        --surface-3: #eef1f7;
+        --surface-hover: #eef1f7;
+
+        --border-default: #e2e6ef;
+        --border-subtle: #eef1f7;
+        --border-active: #cdd3e0;
+        --border-hover: #cdd3e0;
+        --border: #e2e6ef;
+        --border-soft: #eef1f7;
+        --border-strong: #cdd3e0;
+
+        --text-primary: #161a23;
+        --text-secondary: #515a6b;
+        --text-tertiary: #79818f;
+        --text: #161a23;
+        --text-dim: #515a6b;
+        --text-faint: #79818f;
+        --text-ghost: #a6adba;
+
+        --accent-bg: rgba(109, 124, 255, 0.10);
+        --accent-bg-soft: rgba(109, 124, 255, 0.05);
+        --accent-glow: rgba(109, 124, 255, 0.22);
+
+        --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+        --shadow-md: 0 6px 16px -6px rgba(16, 24, 40, 0.12);
+        --shadow-lg: 0 16px 40px -12px rgba(16, 24, 40, 0.18);
+
+        --scrollbar-track: #f1f3f9;
+        --scrollbar-thumb: #cdd3e0;
+        --scrollbar-thumb-hover: #aab2c2;
+
+        --bg-code: #f1f3f9;
+        --text-code: #334155;
+
+        --grid-color: rgba(109, 124, 255, 0.06);
+    }
+}

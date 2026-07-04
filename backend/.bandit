@@ -1,0 +1,19 @@
+[bandit]
+# Exclude test files from scanning
+exclude_dirs = tests,venv,.venv
+
+# Skip checks that are expected noise for a server management tool:
+#   B108: hardcoded_tmp_directory — intentional temp dirs for sync operations
+#   B110: try_except_pass — cleanup/daemon patterns throughout codebase
+#   B310: urllib_urlopen — internal diagnostic and update-check calls
+#   B321: ftplib — FTP service exists by design
+#   B402: import_ftplib — same as above
+#   B404: import_subprocess — we intentionally use subprocess throughout
+#   B602: subprocess_popen_with_shell_equals_true — build/cron/deploy hooks require shell
+#   B603: subprocess_without_shell_check — we use subprocess.run deliberately
+#   B607: start_process_with_partial_path — expected for system commands
+#   B608: hardcoded_sql_expressions — admin-only DB service with internal calls, not user input
+#   B105: hardcoded_password_string — false positives on empty-string defaults and mask values
+#   B112: try_except_continue — same pattern as B110, used in iteration/cleanup loops
+#   B311: random — used for non-security port selection, not crypto
+skips = B105,B108,B110,B112,B310,B311,B321,B402,B404,B602,B603,B607,B608

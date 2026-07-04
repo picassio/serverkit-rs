@@ -1,0 +1,265 @@
+// ============================================
+// LOGS & COMMAND OUTPUT COMPONENTS
+// ============================================
+
+// Log viewer
+.log-viewer {
+    @include code-block();
+    max-height: 500px;
+    overflow-y: auto;
+    line-height: $line-height-normal;
+}
+
+// Log controls
+.log-controls {
+    @include flex-start();
+    gap: $space-3;
+
+    select {
+        padding: $space-2 $space-3;
+        background: $bg-body;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        color: $text-primary;
+        font-size: $font-size-sm + 1;
+    }
+}
+
+// Split log viewer used by the reusable LogViewer component.
+.logs-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    height: 100%;
+    min-height: 320px;
+    overflow: hidden;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-xl;
+}
+
+.logs-sidebar {
+    min-width: 0;
+    border-right: 1px solid $border-subtle;
+    background: rgba($bg-body-raw, 0.35);
+    display: flex;
+    flex-direction: column;
+
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+        padding: $space-3;
+        border-bottom: 1px solid $border-subtle;
+
+        h3 {
+            margin: 0;
+            color: $text-primary;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-semibold;
+        }
+    }
+}
+
+.log-files-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: $space-2;
+    @include custom-scrollbar();
+}
+
+.log-file-item {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2;
+    border: 1px solid transparent;
+    border-radius: $radius-lg;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: background $transition-fast, border-color $transition-fast, color $transition-fast;
+
+    &:hover {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+
+    &.active {
+        background: $accent-glow;
+        border-color: rgba($accent-primary-raw, 0.35);
+        color: $text-primary;
+    }
+}
+
+.log-icon {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: $radius-md;
+    background: $bg-elevated;
+    color: $text-tertiary;
+
+    &.error { color: $danger; background: $danger-bg; }
+    &.access { color: $info; background: $info-bg; }
+}
+
+.log-file-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.log-file-name {
+    color: inherit;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.log-file-path,
+.log-file-size {
+    color: $text-tertiary;
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+}
+
+.logs-viewer {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: $bg-card;
+}
+
+.viewer-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-3;
+    padding: $space-3;
+    border-bottom: 1px solid $border-subtle;
+    flex-wrap: wrap;
+
+    .toolbar-left,
+    .toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        flex-wrap: wrap;
+    }
+
+    .search-input {
+        position: relative;
+        min-width: 220px;
+
+        svg {
+            position: absolute;
+            left: $space-3;
+            top: 50%;
+            transform: translateY(-50%);
+            color: $text-tertiary;
+            pointer-events: none;
+        }
+
+        input {
+            padding-left: $space-8;
+        }
+    }
+
+    .lines-select {
+        height: 36px;
+        min-width: 120px;
+        padding: 0 $space-3;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        background: $bg-body;
+        color: $text-primary;
+        font-size: $font-size-sm;
+    }
+}
+
+.auto-refresh-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    color: $text-secondary;
+    font-size: $font-size-xs;
+    white-space: nowrap;
+}
+
+.log-content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    background: var(--bg-code);
+    padding: $space-4;
+    @include custom-scrollbar();
+
+    pre {
+        margin: 0;
+        color: var(--text-code);
+        font-family: $font-mono;
+        font-size: $font-size-xs;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+}
+
+.logs-viewer__loading,
+.logs-viewer__empty,
+.empty-hint {
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+    padding: $space-4;
+}
+
+@media (max-width: $breakpoint-md) {
+    .logs-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .logs-sidebar {
+        max-height: 180px;
+        border-right: 0;
+        border-bottom: 1px solid $border-subtle;
+    }
+}
+
+// Command output
+.command-output {
+    background: $bg-body;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    padding: $space-4;
+    margin-top: $space-5;
+
+    pre {
+        @include mono-text();
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: $text-primary;
+    }
+
+    &.error {
+        border-color: $danger;
+    }
+
+    .stderr {
+        color: $danger;
+    }
+}
+
+// Quick commands
+.quick-commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+    margin-bottom: $space-5;
+}

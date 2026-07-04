@@ -1,0 +1,190 @@
+from datetime import datetime
+from app import db
+
+# Application carries FKs to projects.id / environments.id (opt-in Project /
+# Environment hierarchy). Import those modules here so their tables are always
+# registered on db.Model's metadata whenever Application is loaded, keeping the
+# FK targets resolvable regardless of import order.
+from app.models import project as _project  # noqa: F401
+from app.models import environment as _environment  # noqa: F401
+from app.utils.ingress import (
+    default_ingress_plane as _default_ingress_plane,
+    proxy_eligible as _proxy_eligible,
+)
+
+
+class Application(db.Model):
+    __tablename__ = 'applications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    app_type = db.Column(db.String(50), nullable=False)  # 'php', 'wordpress', 'flask', 'django', 'docker', 'static'
+    status = db.Column(db.String(20), default='stopped')  # 'running', 'stopped', 'error', 'deploying'
+
+    # Configuration
+    php_version = db.Column(db.String(10), nullable=True)  # '8.0', '8.1', '8.2', '8.3'
+    python_version = db.Column(db.String(10), nullable=True)  # '3.9', '3.10', '3.11', '3.12'
+    port = db.Column(db.Integer, nullable=True)
+    root_path = db.Column(db.String(500), nullable=True)
+
+    # Docker specific
+    docker_image = db.Column(db.String(200), nullable=True)
+    container_id = db.Column(db.String(100), nullable=True)
+    # Optional private-registry binding. Set => authenticate (docker login) with
+    # the stored credentials before pulling docker_image. NULL => anonymous pull
+    # (today's behavior). See app/services/container_registry_service.py.
+    registry_id = db.Column(db.Integer, db.ForeignKey('container_registries.id'), nullable=True, index=True)
+
+    # Build packs (zero-Dockerfile deploys). When the build method routes through
+    # the build-pack layer, the detected plan and any user overrides are persisted
+    # here so the generated Dockerfile is reproducible and the UI can show it.
+    buildpack_type = db.Column(db.String(20), nullable=True)   # 'nixpacks' | 'static' | 'dockerfile-present' | 'unknown'
+    buildpack_plan = db.Column(db.Text, nullable=True)         # JSON: the detected build plan
+    buildpack_overrides = db.Column(db.Text, nullable=True)    # JSON: user overrides applied to the plan
+
+    # Source / lifecycle: github (repo clone), template (built-in template),
+    # manual (local path already on server), upload (zip upload managed by ServerKit)
+    source = db.Column(db.String(20), default='github', nullable=False)
+
+    # Manual / local service configuration
+    compose_file = db.Column(db.String(200), nullable=True)
+    systemd_unit = db.Column(db.String(100), nullable=True)
+    managed_by = db.Column(db.String(20), nullable=True)  # 'docker_compose', 'systemd'
+
+    # Ingress plane: which reverse proxy is expected to serve this app —
+    # 'nginx' (host Nginx, the default) or 'proxy_stack' (Dockerized
+    # Traefik/Caddy). NULL is treated as the default. See app/utils/ingress.py.
+    ingress_plane = db.Column(db.String(20), nullable=True)
+
+    # Upload versioning
+    version = db.Column(db.Integer, default=0, nullable=False)
+    upload_path = db.Column(db.String(500), nullable=True)
+
+    # Private URL feature
+    private_slug = db.Column(db.String(50), unique=True, nullable=True, index=True)
+    private_url_enabled = db.Column(db.Boolean, default=False)
+
+    # Environment linking
+    environment_type = db.Column(db.String(20), default='standalone')  # 'production', 'development', 'staging', 'standalone'
+    linked_app_id = db.Column(db.Integer, db.ForeignKey('applications.id'), nullable=True)
+    shared_config = db.Column(db.Text, nullable=True)  # JSON string for shared resources
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_deployed_at = db.Column(db.DateTime, nullable=True)
+
+    # Foreign keys
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    server_id = db.Column(db.String(36), db.ForeignKey('servers.id'), nullable=True, index=True)
+    # Workspace scoping (#33). Nullable: existing rows are backfilled to a default
+    # workspace by migration 015; new rows are stamped on create.
+    workspace_id = db.Column(db.Integer, db.ForeignKey('workspaces.id'), nullable=True, index=True)
+    # Project / Environment hierarchy (opt-in). Nullable: existing apps stay
+    # "unassigned" and keep working; stamped on create when provided.
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=True, index=True)
+    environment_id = db.Column(db.Integer, db.ForeignKey('environments.id'), nullable=True, index=True)
+
+    # Relationships
+    # Use 'subquery' to eagerly load domains in a single query, avoiding N+1
+    domains = db.relationship('Domain', backref='application', lazy='subquery', cascade='all, delete-orphan')
+    linked_app = db.relationship('Application', remote_side=[id], backref='linked_from', foreign_keys=[linked_app_id])
+    server = db.relationship('Server', backref=db.backref('applications', lazy='dynamic'))
+    # Lightweight, read-only relationships to resolve the project/environment
+    # names in to_dict() (the FK columns above are the source of truth). No
+    # backref/cascade — these only exist so an app row can show where it lives.
+    project = db.relationship('Project', foreign_keys=[project_id], viewonly=True)
+    environment = db.relationship('Environment', foreign_keys=[environment_id], viewonly=True)
+
+    def to_dict(self, include_linked=False):
+        import json
+        result = {
+            'id': self.id,
+            'name': self.name,
+            'app_type': self.app_type,
+            'status': self.status,
+            'php_version': self.php_version,
+            'python_version': self.python_version,
+            'port': self.port,
+            'root_path': self.root_path,
+            'docker_image': self.docker_image,
+            'container_id': self.container_id,
+            'registry_id': self.registry_id,
+            'buildpack_type': self.buildpack_type,
+            'buildpack_plan': json.loads(self.buildpack_plan) if self.buildpack_plan else None,
+            'buildpack_overrides': json.loads(self.buildpack_overrides) if self.buildpack_overrides else None,
+            'source': self.source,
+            'compose_file': self.compose_file,
+            'systemd_unit': self.systemd_unit,
+            'managed_by': self.managed_by,
+            'ingress_plane': self.ingress_plane or _default_ingress_plane(self.app_type, self.managed_by),
+            'ingress_proxy_eligible': _proxy_eligible(self.app_type, self.managed_by),
+            'version': self.version,
+            'upload_path': self.upload_path,
+            'private_slug': self.private_slug,
+            'private_url_enabled': self.private_url_enabled,
+            'environment_type': self.environment_type,
+            'linked_app_id': self.linked_app_id,
+            'shared_config': json.loads(self.shared_config) if self.shared_config else None,
+            'has_linked_app': self.linked_app_id is not None,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat(),
+            'last_deployed_at': self.last_deployed_at.isoformat() if self.last_deployed_at else None,
+            'user_id': self.user_id,
+            'server_id': self.server_id,
+            'workspace_id': self.workspace_id,
+            'project_id': self.project_id,
+            'environment_id': self.environment_id,
+            # Derived display names for the project/environment this app lives in
+            # (null when unassigned). Resolved via the viewonly relationships above
+            # and guarded for None so unassigned apps keep working.
+            'project_name': self.project.name if self.project else None,
+            'environment_name': self.environment.name if self.environment else None,
+            'server_name': self.server.name if self.server else 'Local server',
+            'domains': [d.to_dict() for d in self.domains]
+        }
+
+        # Lightweight image-scan badge (latest scan only)
+        latest_scan = self.image_scans.first()
+        if latest_scan:
+            result['image_scan'] = {
+                'status': latest_scan.status,
+                'highest_severity': latest_scan.highest_severity,
+                'severity_counts': latest_scan.get_counts(),
+                'scanned_at': latest_scan.completed_at.isoformat() if latest_scan.completed_at else None,
+            }
+        else:
+            result['image_scan'] = None
+
+        # Lightweight image-update badge (latest digest check only)
+        latest_update = self.image_update_checks.first()
+        if latest_update:
+            result['image_update'] = {
+                'status': latest_update.status,
+                'update_available': latest_update.update_available,
+                'checked_at': latest_update.checked_at.isoformat() if latest_update.checked_at else None,
+            }
+        else:
+            result['image_update'] = None
+
+        # Lightweight auto-sleep badge
+        sleep_policy = self.sleep_policy
+        if sleep_policy:
+            result['sleep'] = {
+                'enabled': sleep_policy.enabled,
+                'asleep': sleep_policy.asleep,
+                'idle_timeout_minutes': sleep_policy.idle_timeout_minutes,
+            }
+        else:
+            result['sleep'] = None
+        if include_linked and self.linked_app:
+            result['linked_app'] = {
+                'id': self.linked_app.id,
+                'name': self.linked_app.name,
+                'environment_type': self.linked_app.environment_type,
+                'status': self.linked_app.status
+            }
+        return result
+
+    def __repr__(self):
+        return f'<Application {self.name}>'

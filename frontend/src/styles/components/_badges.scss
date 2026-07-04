@@ -1,0 +1,270 @@
+// ============================================
+// BADGE COMPONENTS
+// ============================================
+
+// Status badge
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-1;
+    min-height: 24px;
+    padding: 4px $space-3;
+    border-radius: $radius-full;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    line-height: 1;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.status-dot {
+    @include status-dot(currentColor);
+}
+
+// Status variants
+.status-active {
+    background: $success-bg;
+    color: $success;
+    border-color: $success-border;
+}
+
+.status-warning {
+    background: $warning-bg;
+    color: $warning;
+    border-color: $warning-border;
+}
+
+.status-stopped {
+    background: fade($text-tertiary-raw, 10%);
+    color: $text-tertiary;
+    border-color: fade($text-tertiary-raw, 20%);
+}
+
+.status-error {
+    background: $danger-bg;
+    color: $danger;
+    border-color: $danger-border;
+}
+
+// App type badge
+.app-type {
+    background: $bg-hover;
+    padding: 5px $space-3;
+    border-radius: $radius-md;
+    font-weight: $font-weight-semibold;
+    font-size: $font-size-xs;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+// SSL badge
+.ssl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    background: $success-bg;
+    color: $success;
+    padding: 6px $space-3;
+    border-radius: $radius-md;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+}
+
+// Active badge (for themes/plugins)
+.active-badge {
+    background: $success-bg;
+    color: $success;
+    padding: $space-1 $space-3;
+    border-radius: $radius-full;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+}
+
+// Database type badge
+.db-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    background: $bg-hover;
+    padding: 5px $space-3;
+    border-radius: $radius-md;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+
+    &.mysql {
+        color: $color-mysql;
+    }
+
+    &.postgresql {
+        color: $color-postgresql;
+    }
+}
+
+// Privilege tag
+.privilege-tag {
+    background: $accent-glow;
+    color: $accent-primary;
+    padding: $space-1 - 2 $space-2;
+    border-radius: $radius-sm;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+// Table name tag
+.table-tag {
+    background: $bg-hover;
+    border: 1px solid $border-subtle;
+    padding: $space-2 - 2 $space-3;
+    border-radius: $radius-md;
+    @include mono-text();
+    color: $text-secondary;
+}
+
+// Environment badge
+.env-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    padding: 5px $space-3;
+    border-radius: $radius-md;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border: 1px solid transparent;
+
+    &.env-production {
+        background: fade($success, 15%);
+        color: $success;
+        border-color: fade($success, 30%);
+    }
+
+    &.env-development {
+        background: fade($accent-primary-raw, 15%);
+        color: $accent-primary;
+        border-color: fade($accent-primary-raw, 30%);
+    }
+
+    &.env-staging {
+        background: fade($warning, 15%);
+        color: $warning;
+        border-color: fade($warning, 30%);
+    }
+
+    .env-linked-icon {
+        opacity: 0.7;
+    }
+}
+
+// Global Badge Base
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.5rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: 9999px;
+    white-space: nowrap;
+}
+
+.badge-info {
+    background-color: fade($info, 15%);
+    color: $info;
+}
+
+.badge-success {
+    background-color: fade($success, 15%);
+    color: $success;
+}
+
+.badge-error {
+    background-color: fade($danger, 15%);
+    color: $danger;
+}
+
+.badge-warning {
+    background-color: fade($warning, 15%);
+    color: $warning;
+}
+
+.badge-default {
+    background-color: fade($text-tertiary-raw, 15%);
+    color: $text-tertiary;
+}
+
+[data-slot="badge"] {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-1;
+    min-height: 22px;
+    padding: 4px $space-2;
+    border: 1px solid transparent;
+    border-radius: $radius-md;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: visible;
+    text-shadow: none;
+    box-shadow: none;
+
+    &[data-variant="default"] {
+        background: $accent-primary;
+        color: white;
+        border-color: transparent;
+    }
+
+    &[data-variant="secondary"] {
+        background: $bg-hover;
+        color: $text-primary;
+        border-color: $border-active;
+    }
+
+    &[data-variant="destructive"] {
+        background: $danger;
+        color: white;
+        border-color: transparent;
+    }
+
+    &[data-variant="outline"] {
+        background: transparent;
+        color: $text-primary;
+        border-color: $border-active;
+    }
+
+    &[data-variant="success"] {
+        background: $success-bg;
+        color: $success;
+        border-color: $success-border;
+    }
+
+    &[data-variant="warning"] {
+        background: $warning-bg;
+        color: $warning;
+        border-color: $warning-border;
+    }
+
+    &[data-variant="info"] {
+        background: $info-bg;
+        color: $info;
+        border-color: $info-border;
+    }
+
+    &.status-badge-token {
+        min-height: 24px;
+        padding: 4px 9px;
+        border-radius: $radius-full;
+        gap: 6px;
+    }
+}

@@ -1,0 +1,373 @@
+// ============================================
+// METRICS GRAPH COMPONENT
+// ============================================
+
+.metrics-graph-card {
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-xl;
+    padding: $space-6;
+    margin-bottom: $space-6;
+
+    &.loading,
+    &.error,
+    &.empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: $space-3;
+        min-height: 200px;
+        color: $text-tertiary;
+
+        .muted {
+            font-size: $font-size-sm;
+        }
+    }
+
+    &.error {
+        color: $danger;
+    }
+}
+
+.metrics-graph-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: $space-5;
+}
+
+.graph-title {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    color: $text-primary;
+}
+
+// Summary Row
+.metrics-summary-row {
+    display: flex;
+    gap: $space-6;
+    padding: $space-4;
+    background: $bg-hover;
+    border-radius: $radius-lg;
+    margin-bottom: $space-5;
+}
+
+.summary-stat {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+
+    svg {
+        color: $text-tertiary;
+    }
+
+    .stat-label {
+        display: block;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+        display: block;
+        font-size: $font-size-lg;
+        font-weight: $font-weight-bold;
+        font-family: $font-mono;
+        color: $text-primary;
+    }
+}
+
+// Chart Container
+.metrics-chart-container {
+    margin-bottom: $space-4;
+    background: linear-gradient(180deg, var(--bg-hover) 0%, transparent 100%);
+    border-radius: $radius-lg;
+    padding: $space-2 0;
+
+    &.compact {
+        margin-bottom: $space-3;
+        background: transparent;
+        padding: 0;
+    }
+
+    // Recharts path animation
+    .recharts-area-area {
+        animation: fadeIn 0.6s ease-out;
+    }
+
+    .recharts-area-curve {
+        animation: drawLine 1s ease-out;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes drawLine {
+    from {
+        stroke-dasharray: 1000;
+        stroke-dashoffset: 1000;
+    }
+    to {
+        stroke-dasharray: 1000;
+        stroke-dashoffset: 0;
+    }
+}
+
+// Tooltip
+.metrics-tooltip {
+    background: var(--surface-2);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-strong);
+    border-radius: $radius-lg;
+    padding: $space-3 $space-4;
+    box-shadow: var(--shadow-lg);
+    min-width: 140px;
+
+    .tooltip-time {
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        margin-bottom: $space-2;
+        padding-bottom: $space-2;
+        border-bottom: 1px solid $border-subtle;
+        text-align: center;
+    }
+
+    .tooltip-row {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-sm;
+        padding: $space-1 0;
+    }
+
+    .tooltip-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .tooltip-label {
+        color: $text-secondary;
+        flex: 1;
+    }
+
+    .tooltip-value {
+        font-family: $font-mono;
+        font-weight: $font-weight-bold;
+        min-width: 48px;
+        text-align: right;
+    }
+}
+
+// Filter Legend (clickable) - new_dashboard_3 style
+.metrics-filter-legend {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    background: $bg-hover;
+    padding: 4px;
+    border-radius: $radius-md;
+    border: 1px solid $border-subtle;
+}
+
+.filter-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: $text-tertiary;
+    padding: 6px 12px;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    transition: all $transition-fast;
+    text-transform: uppercase;
+
+    &:hover {
+        color: $text-primary;
+    }
+
+    &.active {
+        opacity: 1;
+    }
+
+    // CPU - periwinkle accent
+    &.cpu.active {
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+        border-color: var(--accent-dim);
+    }
+
+    // Memory - green
+    &.memory.active {
+        background: var(--green-bg);
+        color: var(--green);
+        border-color: rgba(61, 220, 151, 0.3);
+    }
+
+    // Disk - amber
+    &.disk.active {
+        background: var(--amber-bg);
+        color: var(--amber);
+        border-color: rgba(245, 185, 69, 0.3);
+    }
+}
+
+// Legacy Legend (static, kept for compact view)
+.metrics-legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-8;
+    padding-top: $space-4;
+    margin-top: $space-2;
+    border-top: 1px solid $border-subtle;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+    padding: $space-1 $space-3;
+    border-radius: $radius-full;
+    transition: $transition-fast;
+
+    &:hover {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+}
+
+.legend-line {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+    position: relative;
+
+    &::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: inherit;
+    }
+
+    &.cpu {
+        background: var(--accent-bright);
+        box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    &.memory {
+        background: var(--green);
+        box-shadow: 0 0 8px rgba(61, 220, 151, 0.5);
+    }
+
+    &.disk {
+        background: var(--amber);
+        box-shadow: 0 0 8px rgba(245, 185, 69, 0.5);
+    }
+}
+
+// Compact Version
+.metrics-graph-compact {
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-xl;
+    padding: $space-4;
+    margin-bottom: $space-6;
+
+    .metrics-graph-header {
+        margin-bottom: $space-3;
+
+        .graph-title {
+            font-size: $font-size-sm;
+        }
+    }
+}
+
+.metrics-summary-compact {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-5;
+    padding-top: $space-3;
+    border-top: 1px solid $border-subtle;
+
+    .summary-item {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+
+        svg {
+            color: $text-tertiary;
+        }
+
+        span {
+            font-family: $font-mono;
+            font-weight: $font-weight-medium;
+        }
+    }
+}
+
+// Recharts Overrides
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+    stroke: $border-subtle;
+    opacity: 0.5;
+}
+
+.recharts-text {
+    fill: $text-secondary;
+}
+
+
+.recharts-tooltip-cursor {
+    stroke: $text-tertiary;
+    stroke-dasharray: 4 4;
+}
+
+// Responsive
+@media (max-width: $breakpoint-md) {
+    .metrics-summary-row {
+        flex-wrap: wrap;
+        gap: $space-4;
+    }
+
+    .summary-stat {
+        flex: 1 1 calc(50% - $space-2);
+        min-width: 140px;
+    }
+
+    .metrics-legend {
+        flex-wrap: wrap;
+        gap: $space-3;
+    }
+}
+
+@media (max-width: $breakpoint-sm) {
+    .metrics-graph-header {
+        flex-direction: column;
+        gap: $space-3;
+        align-items: flex-start;
+    }
+
+    .summary-stat {
+        flex: 1 1 100%;
+    }
+}

@@ -1,0 +1,14 @@
+{% extends 'email/base.html' %}
+{% from 'email/partials/_macros.html' import button, metrics with context %}
+{% block content %}
+  <p style="margin:0 0 18px;">Your scheduled backup finished successfully{% if data.app %} for <strong class="sk-ink" style="color:{{ brand.ink }};">{{ data.app }}</strong>{% endif %}.</p>
+  {% set facts = [] %}
+  {% if data.size %}{% set _ = facts.append({'label': 'Size', 'value': data.size, 'mono': true}) %}{% endif %}
+  {% if data.duration %}{% set _ = facts.append({'label': 'Duration', 'value': data.duration, 'mono': true}) %}{% endif %}
+  {% if data.destination %}{% set _ = facts.append({'label': 'Destination', 'value': data.destination}) %}{% endif %}
+  {% if data.completed_at %}{% set _ = facts.append({'label': 'Completed', 'value': data.completed_at}) %}{% endif %}
+  {% if facts %}{{ metrics(facts) }}{% endif %}
+  {% if action_url %}
+  <div style="margin-top:26px;">{{ button(action_url, action_label) }}</div>
+  {% endif %}
+{% endblock %}

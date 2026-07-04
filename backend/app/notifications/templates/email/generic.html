@@ -1,0 +1,13 @@
+{% extends 'email/base.html' %}
+{% from 'email/partials/_macros.html' import button, metrics with context %}
+{% block content %}
+  {% if data.summary or data.message %}
+  <p style="margin:0 0 18px;">{{ data.summary or data.message }}</p>
+  {% endif %}
+  {% if data.facts %}
+  {{ metrics(data.facts) }}
+  {% endif %}
+  {% if action_url %}
+  <div style="margin-top:26px;">{{ button(action_url, action_label) }}</div>
+  {% endif %}
+{% endblock %}

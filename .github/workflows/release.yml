@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      # ---- frontend ----
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # ---- backend ----
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend-rs/target
+          key: cargo-release-${{ hashFiles('backend-rs/Cargo.lock') }}
+      - name: Build sk-server (release)
+        working-directory: backend-rs
+        run: cargo build --release --bin sk-server
+
+      # ---- assemble tarball ----
+      - name: Assemble artifact
+        id: pkg
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          NAME="serverkit-rs-${TAG}-linux-x86_64"
+          mkdir -p "dist/$NAME"
+          cp backend-rs/target/release/sk-server "dist/$NAME/"
+          mkdir -p "dist/$NAME/frontend"
+          cp -r frontend/dist "dist/$NAME/frontend/dist"
+          # sidecar without node_modules (start.sh installs on first boot)
+          mkdir -p "dist/$NAME/ai-sidecar/extensions"
+          cp backend-rs/ai-sidecar/{server.mjs,tools.mjs,package.json,package-lock.json,start.sh} "dist/$NAME/ai-sidecar/"
+          cp backend-rs/ai-sidecar/extensions/*.mjs "dist/$NAME/ai-sidecar/extensions/"
+          cp -r backend/templates "dist/$NAME/templates"
+          cp install.sh serverkit.env.example README.md "dist/$NAME/"
+          tar -C dist -czf "dist/$NAME.tar.gz" "$NAME"
+          ( cd dist && sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256" )
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ServerKit-RS ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/${{ steps.pkg.outputs.name }}.tar.gz
+            dist/${{ steps.pkg.outputs.name }}.tar.gz.sha256

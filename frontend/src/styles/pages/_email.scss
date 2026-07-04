@@ -1,0 +1,559 @@
+// ============================================
+// EMAIL SERVER PAGE (redesign — infra console look, REDESIGN_MAP #18):
+// status Pills on per-service cards, MetricCard KPI strip (Domains tab),
+// dense .sk-dtable lists (domains / accounts / aliases / forwarding / queue),
+// mono-uppercase eyebrow section headers, token surfaces, --bg-code logs.
+// Mail-volume chart, reputation/RBL ring, structured activity feed,
+// per-mailbox storage gauges and per-message retry are intentionally
+// absent — no backend yet (REDESIGN_MAP §5).
+// ============================================
+
+.email-page {
+
+    // Page header (global base in layout/_main-content) — mono meta line
+    .page-header .page-description {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-faint);
+    }
+
+    .page-loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 400px;
+    }
+
+    // ── In-page tab strip (shadcn Tabs → .tabs/.tab) ────────
+    // Demo `.bk-tab` accent-wash pills. Tab ids/keys + ?tab= deep-links
+    // are untouched (JSX keeps the same VALID_TABS values).
+    .tabs {
+        gap: 4px;
+        padding-bottom: $space-2;
+        margin-bottom: $space-5;
+        border-bottom: 1px solid var(--border-soft);
+    }
+
+    .tab {
+        padding: 7px 14px;
+        border-bottom: none;
+        margin-bottom: 0;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: $font-weight-medium;
+        color: var(--text-faint);
+
+        &:hover {
+            color: var(--text);
+            background: var(--surface-2);
+        }
+
+        &.active,
+        &[data-state='active'] {
+            color: var(--accent-bright);
+            background: var(--accent-bg);
+        }
+    }
+
+    // ── Section headers → mono-uppercase eyebrows ───────────
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: $space-3;
+        margin-bottom: $space-3;
+
+        h2 {
+            margin: 0;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        .section-actions {
+            display: flex;
+            gap: $space-2;
+        }
+    }
+
+    // Eyebrow field labels (forms + selectors); checkbox rows keep sentence case
+    .form-group:not(.checkbox-field) > label:not(.email-check) {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    .domain-selector {
+        max-width: 340px;
+        margin-bottom: $space-4;
+    }
+
+    // ── Not-installed install flow (method-card look) ───────
+    .not-installed {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        max-width: 520px;
+        margin: $space-8 auto 0;
+        padding: 48px 40px;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-lg);
+        text-align: center;
+
+        &__icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            background: var(--accent-bg);
+            color: var(--accent-bright);
+            margin-bottom: $space-4;
+        }
+
+        h2 {
+            margin: 0 0 $space-2;
+            font-size: 17px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: -0.01em;
+        }
+
+        p {
+            margin: 0 0 $space-6;
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--text-dim);
+        }
+
+        .install-form {
+            display: flex;
+            flex-direction: column;
+            gap: $space-4;
+            align-items: center;
+            width: 100%;
+            max-width: 380px;
+
+            .form-group {
+                margin-bottom: 0;
+                text-align: left;
+            }
+        }
+    }
+
+    // ── KPI strip (Domains tab — real counts only) ──────────
+    .email-kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: $space-4;
+        margin-bottom: $space-5;
+
+        @media (max-width: $breakpoint-lg) { grid-template-columns: repeat(2, 1fr); }
+        @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+    }
+
+    // ── Card-wrapped dense tables (.sk-dtable spec) ─────────
+    .email-table-card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        overflow-x: auto;
+    }
+
+    // Tinted icon tile for name cells (domains / mailboxes / providers)
+    .email-fav {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+
+        &--cyan { background: var(--cyan-bg); color: var(--cyan); }
+        &--violet { background: var(--violet-bg); color: var(--violet); }
+    }
+
+    .email-addr {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: var(--text);
+    }
+
+    .email-arrow {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-ghost);
+    }
+
+    .email-row-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    // ── Status tab: per-service cards ───────────────────────
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: $space-4;
+    }
+
+    .email-service-card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        padding: 15px 16px;
+        transition: border-color $transition-fast;
+
+        &:hover { border-color: var(--border-strong); }
+    }
+
+    .email-service-ico {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        background: var(--surface-2);
+        color: var(--text-dim);
+    }
+
+    .email-service-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        .email-service-id {
+            flex: 1;
+            min-width: 0;
+        }
+
+        h3 {
+            margin: 0;
+            font-size: 13.5px;
+            font-weight: $font-weight-semibold;
+        }
+
+        .version {
+            display: block;
+            margin-top: 2px;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            color: var(--text-faint);
+        }
+
+        .sk-pill { flex-shrink: 0; }
+    }
+
+    .email-service-actions {
+        display: flex;
+        gap: $space-2;
+        margin-top: 14px;
+        padding-top: 13px;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    // ── Inline create/edit forms ────────────────────────────
+    .email-form {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        padding: $space-5;
+        margin-bottom: $space-4;
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: $space-4;
+            margin-bottom: $space-4;
+            align-items: end;
+
+            .form-group { margin-bottom: 0; }
+        }
+
+        .form-actions {
+            display: flex;
+            gap: $space-2;
+            justify-content: flex-end;
+        }
+    }
+
+    // Checkbox row label (forwarding keep-copy)
+    .email-check {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: 13px;
+        color: var(--text-dim);
+        cursor: pointer;
+
+        input[type='checkbox'] {
+            width: 15px;
+            height: 15px;
+            accent-color: var(--accent);
+        }
+    }
+
+    // ── Queue error sub-line + queue id emphasis ────────────
+    .email-qid { color: var(--text); }
+
+    .email-qerr {
+        margin-top: 3px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--red);
+    }
+
+    .email-queue { margin-bottom: $space-6; }
+
+    // ── DNS providers ───────────────────────────────────────
+    .provider-list {
+        display: flex;
+        flex-direction: column;
+        gap: $space-3;
+    }
+
+    .provider-card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        padding: 15px 16px;
+        transition: border-color $transition-fast;
+
+        &:hover { border-color: var(--border-strong); }
+
+        .provider-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            h3 {
+                margin: 0;
+                font-size: 13.5px;
+                font-weight: $font-weight-semibold;
+            }
+        }
+
+        .provider-type {
+            padding: 2px 7px;
+            border: 1px solid var(--border-strong);
+            border-radius: 5px;
+            background: var(--surface-2);
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .provider-meta {
+            margin-top: 12px;
+
+            .meta-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: $space-4;
+
+                .k {
+                    font-family: var(--mono);
+                    font-size: 12px;
+                    color: var(--text-faint);
+                }
+
+                .v {
+                    font-family: var(--mono);
+                    font-size: 12.5px;
+                    color: var(--text);
+                    overflow-wrap: anywhere;
+                }
+            }
+        }
+
+        .provider-actions {
+            display: flex;
+            gap: $space-2;
+            margin-top: 13px;
+            padding-top: 13px;
+            border-top: 1px solid var(--border-soft);
+        }
+
+        .zones-list {
+            margin-top: $space-3;
+            padding: $space-2 $space-3;
+            background: var(--surface-2);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-sm);
+
+            .zone-item {
+                display: flex;
+                justify-content: space-between;
+                gap: $space-4;
+                padding: 7px 0;
+                font-family: var(--mono);
+                font-size: 11.5px;
+
+                span:first-child { color: var(--text-dim); }
+                span:last-child { color: var(--text-faint); }
+
+                &:not(:last-child) { border-bottom: 1px solid var(--border-soft); }
+            }
+        }
+    }
+
+    // ── SpamAssassin config ─────────────────────────────────
+    .spam-config {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        padding: $space-5;
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: $space-4;
+            align-items: center;
+
+            .form-group { margin-bottom: 0; }
+        }
+
+        .checkbox-field {
+            display: flex;
+            align-items: center;
+            gap: $space-2;
+
+            input[type='checkbox'] {
+                width: 15px;
+                height: 15px;
+                accent-color: var(--accent);
+            }
+
+            label {
+                margin: 0;
+                font-size: 13px;
+                color: var(--text-dim);
+            }
+        }
+    }
+
+    // ── Webmail ─────────────────────────────────────────────
+    .webmail-card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        padding: $space-5;
+
+        .webmail-status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: $space-3;
+            margin-bottom: $space-4;
+        }
+
+        .webmail-port {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--text-faint);
+        }
+
+        .webmail-actions {
+            display: flex;
+            gap: $space-2;
+            flex-wrap: wrap;
+        }
+
+        .proxy-form {
+            display: flex;
+            align-items: flex-end;
+            gap: $space-3;
+            flex-wrap: wrap;
+            margin-top: $space-4;
+            padding-top: $space-4;
+            border-top: 1px solid var(--border-soft);
+
+            .form-group {
+                flex: 1;
+                min-width: 240px;
+                max-width: 360px;
+                margin-bottom: 0;
+            }
+        }
+    }
+
+    // ── Mail logs ───────────────────────────────────────────
+    .email-logs {
+        .log-controls {
+            display: flex;
+            align-items: center;
+            gap: $space-2;
+
+            select {
+                padding: 5px 10px;
+                background: var(--surface-2);
+                border: 1px solid var(--border);
+                border-radius: $radius-md;
+                color: var(--text);
+                font-size: $font-size-sm;
+                cursor: pointer;
+
+                &:focus {
+                    outline: none;
+                    border-color: var(--accent);
+                }
+            }
+        }
+
+        .log-output {
+            margin: 0;
+            padding: $space-4;
+            background: var(--bg-code);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius);
+            font-family: var(--mono);
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-dim);
+            max-height: 600px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    }
+
+    // ── Change-password modal (overlay is global _modals.scss;
+    //    .modal-content has no global styles — surface card here)
+    .modal-content {
+        width: 100%;
+        max-width: 420px;
+        padding: $space-5 $space-6 $space-6;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
+
+        h3 {
+            margin: 0 0 $space-4;
+            font-size: 15px;
+            font-weight: $font-weight-semibold;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: $space-2;
+            margin-top: $space-4;
+        }
+    }
+}

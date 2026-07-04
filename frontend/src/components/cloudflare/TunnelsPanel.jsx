@@ -1,0 +1,369 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Network } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import EmptyState from '../EmptyState';
+import { useToast } from '../../contexts/ToastContext';
+import api from '../../services/api';
+
+function InstallBox({ command }) {
+    const toast = useToast();
+
+    if (!command) {
+        return <p className="cf-tunnels__hint">No install command available.</p>;
+    }
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard?.writeText(command);
+            toast.success('Copied');
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    return (
+        <div className="cf-tunnels__install">
+            <code className="cf-tunnels__cmd">{command}</code>
+            <Button size="sm" variant="outline" onClick={handleCopy}>
+                Copy
+            </Button>
+        </div>
+    );
+}
+
+function TunnelRow({ zoneId, tunnel, isAdmin, onChanged }) {
+    const toast = useToast();
+
+    const [install, setInstall] = useState(null);
+    const [expanded, setExpanded] = useState(false);
+    const [hostnames, setHostnames] = useState([]);
+    const [hostname, setHostname] = useState('');
+    const [service, setService] = useState('');
+    const [working, setWorking] = useState(false);
+
+    const loadHostnames = useCallback(async () => {
+        try {
+            const res = await api.getCloudflareTunnelHostnames(zoneId, tunnel.id);
+            setHostnames(res.hostnames || []);
+        } catch (err) {
+            toast.error(err.message);
+        }
+    }, [zoneId, tunnel.id, toast]);
+
+    const handleToggleInstall = async () => {
+        if (install) {
+            setInstall(null);
+            return;
+        }
+        setWorking(true);
+        try {
+            const res = await api.getCloudflareTunnelInstall(zoneId, tunnel.id);
+            setInstall(res.install || null);
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const handleToggleHostnames = async () => {
+        const next = !expanded;
+        setExpanded(next);
+        if (next && hostnames.length === 0) {
+            await loadHostnames();
+        }
+    };
+
+    const handleDelete = async () => {
+        setWorking(true);
+        try {
+            await api.deleteCloudflareTunnel(zoneId, tunnel.id);
+            toast.success(`Deleted Cloudflare Tunnel "${tunnel.name}"`);
+            onChanged();
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const handleRemoveHostname = async (h) => {
+        setWorking(true);
+        try {
+            await api.removeCloudflareTunnelHostname(zoneId, tunnel.id, h.hostname);
+            toast.success('Hostname removed');
+            await loadHostnames();
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const handleAddHostname = async () => {
+        setWorking(true);
+        try {
+            const res = await api.addCloudflareTunnelHostname(
+                zoneId,
+                tunnel.id,
+                hostname,
+                service,
+            );
+            toast.success('Hostname routed');
+            if (res.dns && !res.dns.created) {
+                toast.error('Route set, but the DNS record failed: ' + res.dns.error);
+            }
+            setHostname('');
+            setService('');
+            await loadHostnames();
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const writeDisabled = !isAdmin || working;
+
+    return (
+        <li className="cf-tunnels__item">
+            <div className="cf-tunnels__item-head">
+                <span className="cf-tunnels__name">{tunnel.name}</span>
+                <code className="cf-tunnels__meta">{tunnel.id.slice(0, 12)}…</code>
+                {tunnel.status && (
+                    <span className="cf-tunnels__meta">{tunnel.status}</span>
+                )}
+                {tunnel.connections != null && (
+                    <span className="cf-tunnels__meta">{tunnel.connections}</span>
+                )}
+                {tunnel.managed && <Badge variant="secondary">ServerKit</Badge>}
+            </div>
+
+            <div className="cf-tunnels__item-actions">
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleToggleInstall}
+                    disabled={!isAdmin || working}
+                >
+                    Install command
+                </Button>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleToggleHostnames}
+                    disabled={working}
+                >
+                    Hostnames
+                </Button>
+                <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={writeDisabled}
+                >
+                    Delete
+                </Button>
+            </div>
+
+            {install && <InstallBox command={install} />}
+
+            {expanded && (
+                <div className="cf-tunnels__hostnames">
+                    {hostnames.length === 0 ? (
+                        <p className="cf-tunnels__hint">No public hostnames routed yet.</p>
+                    ) : (
+                        hostnames.map((h) => (
+                            <div className="cf-tunnels__host" key={h.hostname}>
+                                <span>
+                                    <code>{h.hostname}</code> &rarr; <code>{h.service}</code>
+                                </span>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleRemoveHostname(h)}
+                                    disabled={writeDisabled}
+                                >
+                                    Remove
+                                </Button>
+                            </div>
+                        ))
+                    )}
+
+                    <div className="cf-tunnels__host-add">
+                        <Input
+                            value={hostname}
+                            placeholder="app.example.com"
+                            onChange={(e) => setHostname(e.target.value)}
+                            disabled={writeDisabled}
+                        />
+                        <Input
+                            value={service}
+                            placeholder="http://localhost:8080"
+                            onChange={(e) => setService(e.target.value)}
+                            disabled={writeDisabled}
+                        />
+                        <Button
+                            size="sm"
+                            onClick={handleAddHostname}
+                            disabled={writeDisabled || !hostname.trim() || !service.trim()}
+                        >
+                            Add
+                        </Button>
+                    </div>
+                    <p className="cf-tunnels__hint">
+                        The hostname should be inside this zone&apos;s domain; a proxied DNS
+                        record is created automatically.
+                    </p>
+                </div>
+            )}
+        </li>
+    );
+}
+
+export default function TunnelsPanel({ zoneId, isAdmin }) {
+    const toast = useToast();
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [tunnels, setTunnels] = useState([]);
+
+    // Create form state
+    const [name, setName] = useState('');
+    const [creating, setCreating] = useState(false);
+    const [lastInstall, setLastInstall] = useState(null);
+
+    const loadData = useCallback(async () => {
+        try {
+            const data = await api.getCloudflareTunnels(zoneId);
+            setTunnels(data.tunnels || []);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+        }
+    }, [zoneId]);
+
+    useEffect(() => {
+        let active = true;
+        setLoading(true);
+        (async () => {
+            try {
+                const data = await api.getCloudflareTunnels(zoneId);
+                if (!active) return;
+                setTunnels(data.tunnels || []);
+                setError(null);
+            } catch (err) {
+                if (active) setError(err.message);
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => {
+            active = false;
+        };
+    }, [zoneId]);
+
+    const handleCreate = async () => {
+        setCreating(true);
+        try {
+            const res = await api.createCloudflareTunnel(zoneId, name);
+            toast.success(`Created tunnel "${name}"`);
+            setLastInstall({ name, install: res.install, token: res.token });
+            setName('');
+            await loadData();
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    if (loading) {
+        return <div className="cf-tunnels__loading">Loading Cloudflare Tunnels…</div>;
+    }
+
+    if (error) {
+        return (
+            <EmptyState
+                icon={Network}
+                title="Cloudflare Tunnels unavailable"
+                description={error}
+            />
+        );
+    }
+
+    const createDisabled = !isAdmin || creating || !name.trim();
+
+    return (
+        <div className="cf-tunnels">
+            {/* Create a Cloudflare Tunnel */}
+            <section className="cf-tunnels__section">
+                <h3 className="cf-tunnels__heading">Create a Cloudflare Tunnel</h3>
+                <p className="cf-tunnels__hint">
+                    A Cloudflare Tunnel exposes a local or private service through
+                    Cloudflare&apos;s edge — no public IP or open ports required.
+                </p>
+
+                <div className="cf-tunnels__field">
+                    <label className="cf-tunnels__label">Name</label>
+                    <Input
+                        value={name}
+                        placeholder="home-jellyfin"
+                        onChange={(e) => setName(e.target.value)}
+                        disabled={!isAdmin || creating}
+                    />
+                </div>
+
+                <div className="cf-tunnels__actions">
+                    <Button onClick={handleCreate} disabled={createDisabled}>
+                        Create
+                    </Button>
+                </div>
+
+                {lastInstall && (
+                    <div className="cf-tunnels__install">
+                        <p className="cf-tunnels__hint">
+                            Run this once on the machine hosting your local service. The
+                            connector token is shown only now.
+                        </p>
+                        <InstallBox command={lastInstall.install} />
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setLastInstall(null)}
+                        >
+                            Dismiss
+                        </Button>
+                    </div>
+                )}
+            </section>
+
+            {/* Cloudflare Tunnels list */}
+            <section className="cf-tunnels__section">
+                <h3 className="cf-tunnels__heading">Cloudflare Tunnels ({tunnels.length})</h3>
+
+                {tunnels.length === 0 ? (
+                    <EmptyState
+                        icon={Network}
+                        title="No Cloudflare Tunnels"
+                        description="Create one above to expose a local service without a public IP."
+                    />
+                ) : (
+                    <ul className="cf-tunnels__list">
+                        {tunnels.map((tunnel) => (
+                            <TunnelRow
+                                key={tunnel.id}
+                                zoneId={zoneId}
+                                tunnel={tunnel}
+                                isAdmin={isAdmin}
+                                onChanged={loadData}
+                            />
+                        ))}
+                    </ul>
+                )}
+            </section>
+        </div>
+    );
+}

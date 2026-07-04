@@ -1,0 +1,134 @@
+// ============================================
+// SYSTEM NOTICES
+// Dismissible admin-only banners that surface common misconfigurations
+// with one-click links to the relevant settings page.
+// ============================================
+
+.system-notices {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    margin-bottom: $space-6;
+}
+
+.system-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    border-radius: $radius-md;
+    border: 1px solid transparent;
+    font-size: $font-size-sm;
+    line-height: 1.5;
+    background: $bg-card;
+
+    &__icon {
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+
+    &__body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &__title {
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+
+    &__message {
+        color: $text-secondary;
+        margin-top: 2px;
+    }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        flex-shrink: 0;
+    }
+
+    &__action {
+        height: auto;
+        min-width: 0;
+        padding: $space-1 $space-2;
+        font-size: $font-size-sm;
+        gap: $space-1;
+    }
+
+    &__dismiss {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: transparent;
+        color: inherit;
+        opacity: 0.6;
+        cursor: pointer;
+        border-radius: $radius-sm;
+        transition: opacity $transition-fast, background $transition-fast;
+
+        &:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.08);
+        }
+    }
+
+    &--warning {
+        background: $warning-bg;
+        border-color: $warning-border;
+        color: $warning;
+
+        .system-notice__title,
+        .system-notice__message {
+            color: $warning;
+        }
+
+        .system-notice__icon {
+            color: $warning;
+        }
+    }
+
+    &--info {
+        background: $info-bg;
+        border-color: $info-border;
+        color: $info;
+
+        .system-notice__title,
+        .system-notice__message {
+            color: $info;
+        }
+
+        .system-notice__icon {
+            color: $info;
+        }
+    }
+
+    &--error {
+        background: $danger-bg;
+        border-color: $danger-border;
+        color: $danger;
+
+        .system-notice__title,
+        .system-notice__message {
+            color: $danger;
+        }
+
+        .system-notice__icon {
+            color: $danger;
+        }
+    }
+
+    @media (max-width: $breakpoint-md) {
+        flex-wrap: wrap;
+
+        &__actions {
+            width: 100%;
+            justify-content: flex-end;
+            margin-top: $space-2;
+        }
+    }
+}

@@ -1,0 +1,157 @@
+// GPU Monitor page styles
+
+.gpu-page {
+    &__loading {
+        display: flex;
+        justify-content: center;
+        padding: $spacing-xl 0;
+    }
+
+    .gpu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: $spacing-lg;
+        margin-top: $spacing-lg;
+
+        @media (max-width: $breakpoint-sm) {
+            grid-template-columns: 1fr;
+        }
+    }
+}
+
+.gpu-card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: $spacing-lg;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    &__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $spacing-sm;
+    }
+
+    &__title {
+        display: inline-flex;
+        align-items: center;
+        gap: $spacing-sm;
+        min-width: 0;
+
+        svg { color: var(--accent-bright); flex-shrink: 0; }
+    }
+
+    &__name {
+        font-weight: $font-weight-semibold;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__index {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-faint);
+    }
+
+    &__bars {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-md;
+    }
+}
+
+.gpu-bar {
+    &__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+    }
+
+    &__label {
+        font-size: 12.5px;
+        color: var(--text-dim);
+    }
+
+    &__value {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text);
+    }
+
+    &__track {
+        height: 6px;
+        background: var(--surface-3);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    &__fill {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        background: var(--accent-bright);
+
+        &.is-green { background: var(--green); }
+        &.is-amber { background: var(--amber); }
+        &.is-red { background: var(--red); }
+    }
+}
+
+.gpu-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $spacing-sm;
+    padding-top: $spacing-md;
+    border-top: 1px solid var(--border-soft);
+}
+
+.gpu-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+
+    svg { color: var(--text-faint); flex-shrink: 0; }
+
+    &__label {
+        color: var(--text-faint);
+        margin-right: auto;
+    }
+
+    &__value {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: var(--text);
+    }
+
+    &__sub {
+        color: var(--text-faint);
+    }
+}
+
+.gpu-procs {
+    margin-top: $spacing-lg;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: $spacing-lg;
+
+    &__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: $spacing-md;
+
+        h2 { margin: 0; font-size: 1rem; }
+    }
+
+    &__table {
+        width: 100%;
+    }
+}

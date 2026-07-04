@@ -1,0 +1,227 @@
+// ============================================
+// SERVERKIT DESIGN SYSTEM - MIXINS
+// ============================================
+
+// --------------------------------------------
+// COMPATIBILITY FUNCTION: fade()
+// Compatibility: LESS fade(color, N%) = color at N% opacity
+// --------------------------------------------
+@function fade($color, $amount) {
+    // Strip the % unit and convert to 0-1 range for rgba alpha
+    @if unit($amount) == '%' {
+        @return rgba($color, $amount / 100%);
+    } @else {
+        @return rgba($color, $amount / 100);
+    }
+}
+
+// --------------------------------------------
+// FLEXBOX
+// --------------------------------------------
+@mixin flex-center() {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@mixin flex-between() {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+@mixin flex-start() {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+@mixin flex-column() {
+    display: flex;
+    flex-direction: column;
+}
+
+@mixin flex-column-gap($gap) {
+    display: flex;
+    flex-direction: column;
+    gap: $gap;
+}
+
+// --------------------------------------------
+// TRUNCATE
+// --------------------------------------------
+@mixin truncate() {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+// --------------------------------------------
+// TRANSITIONS
+// --------------------------------------------
+@mixin transition($property: all) {
+    transition: $property $transition-base;
+}
+
+@mixin transition-fast($property: all) {
+    transition: $property $transition-fast;
+}
+
+// --------------------------------------------
+// CARDS & CONTAINERS
+// --------------------------------------------
+@mixin card-base() {
+    background-color: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-xl;
+    @include transition(border-color);
+
+    &:hover {
+        border-color: $border-active;
+    }
+}
+
+@mixin card-interactive() {
+    @include card-base();
+    cursor: pointer;
+
+    &:hover {
+        transform: translateY(-2px);
+    }
+}
+
+// --------------------------------------------
+// INPUTS
+// --------------------------------------------
+@mixin input-base() {
+    width: 100%;
+    padding: $space-3 $space-4;
+    background: $bg-body;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    color: $text-primary;
+    font-size: $font-size-base;
+    @include transition(border-color);
+
+    &:focus {
+        border-color: $accent-primary;
+        outline: none;
+    }
+
+    &::placeholder {
+        color: $text-tertiary;
+    }
+}
+
+// --------------------------------------------
+// BUTTONS
+// --------------------------------------------
+@mixin button-base() {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-5;
+    border-radius: $radius-lg;
+    border: 1px solid transparent;
+    font-size: $font-size-sm + 1;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    @include transition();
+    background: none;
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+}
+
+// --------------------------------------------
+// ICON CONTAINERS
+// --------------------------------------------
+@mixin icon-box($size: 40px) {
+    width: $size;
+    height: $size;
+    border-radius: $radius-lg;
+    @include flex-center();
+    flex-shrink: 0;
+}
+
+// --------------------------------------------
+// STATUS INDICATORS
+// --------------------------------------------
+@mixin status-dot($color) {
+    width: 6px;
+    height: 6px;
+    background: $color;
+    border-radius: $radius-full;
+}
+
+// --------------------------------------------
+// LIST ITEMS
+// --------------------------------------------
+@mixin list-item-base() {
+    display: flex;
+    align-items: center;
+    gap: $space-5;
+    padding: $space-4 $space-5;
+    @include card-base();
+}
+
+// --------------------------------------------
+// RESPONSIVE
+// --------------------------------------------
+@mixin respond-to($breakpoint) {
+    @media (max-width: $breakpoint) {
+        @content;
+    }
+}
+
+// --------------------------------------------
+// SCROLLBAR
+// --------------------------------------------
+@mixin custom-scrollbar() {
+    &::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: $bg-body;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: $border-active;
+        border-radius: $radius-sm;
+
+        &:hover {
+            background: $text-tertiary;
+        }
+    }
+}
+
+// --------------------------------------------
+// FOCUS RING
+// --------------------------------------------
+@mixin focus-ring() {
+    &:focus-visible {
+        outline: 2px solid $accent-primary;
+        outline-offset: 2px;
+    }
+}
+
+// --------------------------------------------
+// CODE/MONO
+// --------------------------------------------
+@mixin mono-text() {
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+}
+
+@mixin code-block() {
+    background: $bg-body;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    padding: $space-4;
+    @include mono-text();
+    @include custom-scrollbar();
+}

@@ -1,0 +1,128 @@
+// ============================================
+// API Key Scope Picker
+// ============================================
+
+.api-key-scopes {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+}
+
+// ─── Full-access master toggle ─────────────────────────
+.api-key-scopes__master {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-3;
+    padding: $space-3;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    background: $bg-secondary;
+}
+
+.api-key-scopes__master-label {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-2;
+    color: $text-primary;
+
+    svg {
+        margin-top: 2px;
+        color: $color-primary;
+        flex-shrink: 0;
+    }
+
+    > div {
+        display: flex;
+        flex-direction: column;
+    }
+}
+
+.api-key-scopes__master-title {
+    font-weight: 600;
+    font-size: $font-size-sm;
+}
+
+.api-key-scopes__master-desc {
+    font-size: $font-size-xs;
+    color: $text-secondary;
+}
+
+.api-key-scopes__loading {
+    font-size: $font-size-sm;
+    color: $text-secondary;
+    margin: 0;
+}
+
+// ─── Grouped scope checkboxes ──────────────────────────
+.api-key-scopes__groups {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+    transition: opacity 0.15s ease;
+
+    &.is-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+}
+
+.api-key-scopes__group {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+}
+
+.api-key-scopes__group-title {
+    margin: 0;
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: $text-secondary;
+    font-weight: 600;
+}
+
+.api-key-scopes__item {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-2;
+    padding: $space-2;
+    border-radius: $radius-sm;
+    cursor: pointer;
+
+    &:hover {
+        background: $bg-secondary;
+    }
+}
+
+.api-key-scopes__item-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.api-key-scopes__item-label {
+    font-size: $font-size-sm;
+    color: $text-primary;
+    font-weight: 500;
+}
+
+.api-key-scopes__item-key {
+    font-size: $font-size-xs;
+    color: $text-secondary;
+    font-family: $font-mono;
+}
+
+.api-key-scopes__item-desc {
+    font-size: $font-size-xs;
+    color: $text-secondary;
+}
+
+// ─── Scope pills in the key list ───────────────────────
+.api-settings__scopes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1;
+    max-width: 240px;
+}

@@ -1,0 +1,870 @@
+// ============================================
+// SIDEBAR LAYOUT - Pro Style
+// ============================================
+
+.sidebar {
+    width: $sidebar-width;
+    // Subtle top→bottom gradient (theme-aware: dark rail in dark mode, light in
+    // light mode). Redesign "infra console" look — see docs/REDESIGN_MAP.md §2.
+    background: linear-gradient(180deg, var(--bg-sidebar), var(--bg-body));
+    border-right: 1px solid $border-subtle;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    height: 100vh;
+    z-index: $z-fixed;
+    padding: 0 1rem;
+
+    // Below the breakpoint the persistent rail becomes an off-canvas drawer
+    // (it stays mounted so its scroll position and state survive open/close).
+    @media (max-width: $breakpoint-md) {
+        top: 0;
+        left: 0;
+        height: 100dvh;
+        width: min(280px, 86vw);
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-top: env(safe-area-inset-top);
+        z-index: $z-modal;
+        transform: translateX(-100%);
+        transition: transform 0.28s $ease-out-quint;
+        will-change: transform;
+
+        &.sidebar--mobile-open {
+            transform: translateX(0);
+            box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            transition: none;
+        }
+    }
+}
+
+// Drawer close button — only rendered/visible in the mobile drawer.
+.sidebar__close {
+    display: none;
+
+    @media (max-width: $breakpoint-md) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        margin: $space-2 0 $space-1 auto;
+        border: none;
+        background: transparent;
+        color: $text-secondary;
+        border-radius: $radius-md;
+        cursor: pointer;
+        @include transition(color);
+        @include focus-ring();
+
+        &:hover {
+            color: $text-primary;
+            background: rgba(255, 255, 255, 0.06);
+        }
+    }
+}
+
+// Scrim behind the drawer. Only mounted on mobile while the drawer is open.
+.sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: $z-modal-backdrop;
+    animation: sidebarBackdropIn 0.2s ease-out;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+@keyframes sidebarBackdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+// Fixed top bar for narrow viewports — carries the hamburger + brand so the
+// drawer is reachable. Hidden entirely on desktop.
+.mobile-topbar {
+    display: none;
+
+    @media (max-width: $breakpoint-md) {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: calc(#{$mobile-header-height} + env(safe-area-inset-top));
+        padding-top: env(safe-area-inset-top);
+        padding-right: max(#{$space-4}, env(safe-area-inset-right));
+        padding-left: max(#{$space-3}, env(safe-area-inset-left));
+        background-color: $bg-sidebar;
+        border-bottom: 1px solid $border-default;
+        z-index: $z-sticky;
+    }
+}
+
+.mobile-topbar__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: $text-primary;
+    border-radius: $radius-md;
+    cursor: pointer;
+    @include transition(background);
+    @include focus-ring();
+
+    &:hover {
+        background: $bg-hover;
+    }
+}
+
+.mobile-topbar__brand {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    min-width: 0;
+}
+
+.mobile-topbar__logo {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+}
+
+.mobile-topbar__name {
+    font-size: 1.05rem;
+    font-weight: $font-weight-bold;
+    color: $text-primary;
+    letter-spacing: -0.01em;
+    @include truncate();
+}
+
+// Brand Section - Clean & Minimal
+.brand-section {
+    height: $sidebar-header-height;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+    padding: 0 0.5rem;
+    flex-shrink: 0;
+}
+
+// Demo logo: a periwinkle gradient tile with a white server glyph.
+.brand-logo {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: #fff;
+    background: linear-gradient(160deg, var(--accent-bright), var(--accent));
+    box-shadow: 0 4px 14px -2px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+
+    svg {
+        stroke: #fff;
+    }
+
+    img {
+        width: 100%;
+        height: 100%;
+    }
+}
+
+.brand-text {
+    font-size: 1.15rem;
+    font-weight: $font-weight-bold;
+    color: $text-primary;
+    letter-spacing: -0.02em;
+}
+
+// Star button in brand section — a quiet "star us on GitHub" affordance.
+// Color + a faint wash on hover; no burst, rings, or auto-play.
+.brand-star {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: $sidebar-icon-size;
+    height: $sidebar-icon-size;
+    border-radius: 50%;
+    color: $text-tertiary;
+    transition: color $transition-base, background-color $transition-base;
+    @include focus-ring();
+
+    &:hover {
+        color: $color-star;
+        background: rgba(245, 158, 11, 0.12);
+    }
+}
+
+// Custom Brand (White Label)
+.brand-section--custom {
+    justify-content: flex-start;
+}
+
+.brand-custom-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: $radius-md;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: $text-tertiary;
+    background: $bg-secondary;
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+}
+
+.brand-custom-banner {
+    width: 100%;
+    max-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: $text-tertiary;
+
+    img {
+        max-width: 100%;
+        max-height: 50px;
+        object-fit: contain;
+    }
+}
+
+.brand-custom-text {
+    font-size: 1.15rem;
+    font-weight: $font-weight-bold;
+    letter-spacing: -0.02em;
+    color: $text-primary;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+// Scrollable Navigation Container
+// Active-workspace selector (#33) — sits between the brand and the nav.
+// Uses the Radix Select UI component so the dropdown is fully theme-aware.
+.workspace-switcher__trigger.ui-select-trigger {
+    width: calc(100% - #{$space-6});
+    margin: 0 $space-3 $space-2;
+    padding: $space-1 $space-2;
+    background-color: $bg-card;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+    color: $text-primary;
+    font-size: $font-size-sm;
+    cursor: pointer;
+    transition: border-color $transition-base, background-color $transition-base;
+
+    &:hover {
+        border-color: $border-active;
+        background-color: $bg-hover;
+    }
+
+    &:focus-visible {
+        outline: 2px solid $accent-primary;
+        outline-offset: 1px;
+    }
+
+    .workspace-switcher__icon {
+        flex-shrink: 0;
+        color: $text-secondary;
+    }
+
+    // Value text wrapper
+    > span:first-of-type {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.nav-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    // Hide scrollbar visually but keep functionality
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+// Navigation Category Labels — mono, uppercase, ghost (redesign)
+.nav-category {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    font-weight: $font-weight-medium;
+    color: var(--text-ghost);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin: 1.5rem 0 0.5rem 0.65rem;
+
+    &:first-of-type {
+        margin-top: 0.75rem;
+    }
+}
+
+// Navigation
+.nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+// Navigation Item
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 0.5rem 0.625rem;
+    border-radius: 8px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.84rem;
+    font-weight: 450;
+    transition: background-color 0.14s ease, color 0.14s ease;
+    margin-bottom: 2px;
+    position: relative;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    @include focus-ring();
+
+    // Icons sit a notch dimmer than the label, then brighten on hover/active.
+    .nav-icon {
+        stroke: var(--text-faint);
+        transition: stroke 0.14s ease;
+    }
+
+    // Hover
+    &:hover {
+        color: var(--text-primary);
+        background-color: var(--surface-hover);
+
+        .nav-icon { stroke: var(--text-dim); }
+    }
+
+    // Active — gradient wash + left accent bar + brightened icon
+    &.active {
+        background: linear-gradient(90deg, var(--accent-bg), var(--accent-bg-soft));
+        color: var(--text-primary);
+        font-weight: 500;
+
+        .nav-icon { stroke: var(--accent-bright); }
+
+        &::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 18px;
+            border-radius: 0 3px 3px 0;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+    }
+}
+
+// Nav item row (parent with optional expand button)
+.nav-item-row {
+    display: flex;
+    align-items: center;
+
+    .nav-item {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &.has-children .nav-item {
+        padding-right: 0;
+    }
+}
+
+.nav-expand-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: $text-tertiary;
+    cursor: pointer;
+    border-radius: $radius-sm;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    margin-right: 4px;
+    @include focus-ring();
+
+    &:hover {
+        background: var(--surface-hover);
+        color: var(--text-primary);
+    }
+
+    svg {
+        transition: transform 0.2s ease;
+    }
+
+    &.expanded svg {
+        transform: rotate(90deg);
+    }
+}
+
+// Sub Navigation Item (indented under parent)
+.nav-sub-item {
+    padding-left: 2.25rem;
+    font-size: 0.8rem;
+}
+
+// Navigation Icon
+.nav-icon {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    opacity: 1;
+    flex-shrink: 0;
+}
+
+// Sidebar Footer
+.sidebar-footer {
+    padding: 1rem 0;
+    margin-top: auto;
+    border-top: 1px solid $border-subtle;
+    flex-shrink: 0;
+    position: relative;
+}
+
+// User Context Menu
+.user-context-menu {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: $space-1;
+    z-index: $z-tooltip;
+    animation: contextMenuIn 0.15s ease-out;
+}
+
+@keyframes contextMenuIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.context-menu-section {
+    padding: 6px 8px;
+}
+
+.context-menu-label {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    font-weight: $font-weight-medium;
+    color: var(--text-ghost);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+}
+
+.theme-switcher {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 3px;
+}
+
+.theme-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0;
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    @include focus-ring();
+
+    &:hover {
+        color: var(--text-primary);
+    }
+
+    &.active {
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+    }
+}
+
+.view-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-faint);
+    font-size: 0.65rem;
+    font-weight: $font-weight-medium;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    @include focus-ring();
+
+    &:hover {
+        border-color: var(--border-strong);
+        color: var(--text-primary);
+        background: var(--surface-3);
+    }
+
+    &.active {
+        border-color: var(--accent-dim);
+        color: var(--accent-bright);
+        background: var(--accent-bg);
+    }
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: var(--border-soft);
+    margin: $space-1 0;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    color: $text-secondary;
+    font-size: 0.82rem;
+    font-weight: $font-weight-medium;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+    @include focus-ring();
+
+    &:hover {
+        background: var(--surface-3);
+        color: var(--text-primary);
+    }
+
+    &.danger {
+        color: $danger;
+
+        &:hover {
+            background: var(--red-bg);
+            color: $danger;
+        }
+    }
+}
+
+.context-menu-arrow {
+    margin-left: auto;
+    opacity: 0.4;
+}
+
+
+// User Mini Profile
+.user-mini {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: auto;
+    padding: 0.5rem;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    border-radius: $radius-lg;
+    transition: all 0.2s ease;
+    @include focus-ring();
+
+    &:hover {
+        background: var(--surface-2);
+    }
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(150deg, var(--surface-3), var(--surface-2));
+    border: 1px solid var(--border-strong);
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: $font-weight-semibold;
+    color: var(--text-primary);
+}
+
+.user-menu-arrow {
+    margin-left: auto;
+    color: $text-tertiary;
+    opacity: 0.5;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+
+    &.open {
+        opacity: 1;
+        transform: rotate(180deg);
+    }
+}
+
+.user-mini:hover .user-menu-arrow {
+    opacity: 0.8;
+}
+
+.user-meta {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-handle {
+    font-size: 0.8rem;
+    font-weight: 550;
+    color: var(--text-primary);
+}
+
+.user-status {
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 1px;
+
+    &::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        background: currentColor;
+        border-radius: 50%;
+        box-shadow: 0 0 6px currentColor;
+    }
+}
+
+// ============================================
+// COMPACT RAIL LAYOUT  —  [data-layout="rail"]
+// A 64px icon-only rail that expands to the full sidebar on hover/focus.
+// Desktop only: below $breakpoint-md the off-canvas drawer is unchanged.
+// ============================================
+@media (min-width: ($breakpoint-md + 1)) {
+    [data-layout="rail"] {
+        .main-content {
+            margin-left: $sidebar-rail-width;
+        }
+
+        .sidebar {
+            width: $sidebar-rail-width;
+            transition: width 0.18s $ease-out-quint;
+
+            @media (prefers-reduced-motion: reduce) {
+                transition: none;
+            }
+
+            // Expand to the full sidebar while hovered or keyboard-focused. The
+            // panel is position: fixed, so it overlays content instead of
+            // pushing it — the .main-content offset stays at the rail width.
+            &:hover,
+            &:focus-within {
+                width: $sidebar-width;
+                box-shadow: 8px 0 32px rgba(0, 0, 0, 0.28);
+            }
+
+            // Collapsed state: bare icon rail. font-size: 0 hides nav text while
+            // keeping it in the accessibility tree; fixed-size SVG icons stay.
+            &:not(:hover):not(:focus-within) {
+                .nav-item {
+                    justify-content: center;
+                    gap: 0;
+                    font-size: 0;
+                }
+
+                .nav-sub-item {
+                    padding-left: 0.625rem;
+                }
+
+                .brand-section,
+                .workspace-switcher__trigger,
+                .user-mini {
+                    justify-content: center;
+                    gap: 0;
+                }
+
+                .brand-text,
+                .brand-star,
+                .nav-category,
+                .nav-expand-btn,
+                .workspace-switcher__trigger > span,
+                .workspace-switcher__trigger .ui-select-icon,
+                .user-meta,
+                .user-menu-arrow {
+                    display: none;
+                }
+            }
+        }
+    }
+}
+
+// ============================================
+// TOP BAR LAYOUT  —  [data-layout="topbar"]
+// The sidebar becomes a horizontal bar pinned to the top. Top-level items lay
+// out in a horizontally-scrollable row; sub-items are reached from each page's
+// own in-page navigation. Desktop only: below $breakpoint-md the off-canvas
+// drawer is unchanged.
+// ============================================
+@media (min-width: ($breakpoint-md + 1)) {
+    [data-layout="topbar"] {
+        .main-content {
+            margin-left: 0;
+            margin-top: $header-height;
+        }
+
+        // Full-page tools size themselves to the viewport — subtract the bar.
+        .main-content--full-page,
+        .main-content:has(.workflow-page.fullscreen),
+        .main-content:has(.page-container--full-bleed) {
+            height: calc(100vh - #{$header-height});
+        }
+
+        .sidebar {
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: $header-height;
+            flex-direction: row;
+            align-items: center;
+            gap: $space-3;
+            padding: 0 $space-4;
+            border-right: none;
+            border-bottom: 1px solid $border-subtle;
+            background: var(--bg-sidebar);
+        }
+
+        .brand-section {
+            height: auto;
+            margin-bottom: 0;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .workspace-switcher__trigger {
+            margin: 0;
+            flex-shrink: 0;
+            max-width: 170px;
+        }
+
+        // Nav fills the middle of the bar and scrolls horizontally if it runs long.
+        .nav-scroll {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: $space-1;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .nav {
+            flex-direction: row;
+            align-items: center;
+            gap: $space-1;
+        }
+
+        // No category headers, expand chevrons, or inline sub-items in the bar.
+        .nav-category,
+        .nav-expand-btn,
+        .nav-sub-item {
+            display: none;
+        }
+
+        .nav-item {
+            white-space: nowrap;
+            margin-bottom: 0;
+
+            // Active state reads as an underline rather than a left accent bar.
+            &.active::before {
+                inset: auto 0 -2px 0;
+                width: auto;
+                height: 2px;
+                transform: none;
+                border-radius: 2px 2px 0 0;
+            }
+        }
+
+        // User menu sits at the far right; its popover opens downward.
+        .sidebar-footer {
+            margin: 0 0 0 auto;
+            padding: 0;
+            border-top: none;
+            flex-shrink: 0;
+        }
+
+        .user-context-menu {
+            top: calc(100% + 4px);
+            bottom: auto;
+            left: auto;
+            right: 0;
+            min-width: 240px;
+        }
+    }
+}

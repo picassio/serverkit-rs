@@ -1,0 +1,237 @@
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Play, History, Download, Eraser, Lock, Unlock, Clock } from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
+import { runQuery, connKey } from './dbAdapter';
+import ResultsGrid from './ResultsGrid';
+import SqlEditor from './SqlEditor';
+
+const HISTORY_KEY = 'serverkit_query_history';
+const MAX_HISTORY = 50;
+
+// Platform-aware run shortcut. Operators run ServerKit from Linux/Windows far more
+// often than macOS, so default the modifier label to Ctrl and only show ⌘ on Mac.
+const IS_MAC = typeof navigator !== 'undefined'
+    && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
+const MOD_KEY = IS_MAC ? '⌘' : 'Ctrl';
+
+// One SQL console bound to a single connection. Owns its editor text, results,
+// readonly flag, and per-connection history. `active` gates keyboard handling so
+// background (hidden) consoles don't steal Ctrl+Enter.
+export default function ConsoleTab({ conn, tabId, active, isAdmin, initialQuery = '', onStatus }) {
+    const toast = useToast();
+    const editorRef = useRef(null);
+    const key = connKey(conn);
+
+    const [query, setQuery] = useState(initialQuery);
+    const [results, setResults] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [readonly, setReadonly] = useState(true);
+    const [history, setHistory] = useState([]);
+    const [showHistory, setShowHistory] = useState(false);
+
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem(HISTORY_KEY);
+            if (stored) setHistory(JSON.parse(stored)[key] || []);
+        } catch { /* ignore corrupt history */ }
+    }, [key]);
+
+    useEffect(() => {
+        if (active && editorRef.current) editorRef.current.focus();
+    }, [active]);
+
+    const report = useCallback(() => {
+        onStatus?.(tabId, {
+            connText: `${conn.dbType} · ${conn.name || conn.path?.split('/').pop() || conn.container}`,
+            readonly,
+            rowCount: results?.row_count,
+            execTime: results?.execution_time,
+            truncated: results?.truncated,
+            totalRows: results?.total_rows,
+        });
+    }, [onStatus, tabId, conn, readonly, results]);
+
+    useEffect(() => { if (active) report(); }, [active, report]);
+
+    function saveToHistory(sql) {
+        try {
+            const stored = localStorage.getItem(HISTORY_KEY);
+            const all = stored ? JSON.parse(stored) : {};
+            const list = (all[key] || []).filter((h) => h.query !== sql);
+            list.unshift({ query: sql, timestamp: new Date().toISOString() });
+            all[key] = list.slice(0, MAX_HISTORY);
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(all));
+            setHistory(all[key]);
+        } catch { /* storage full / blocked — non-fatal */ }
+    }
+
+    async function execute() {
+        const sql = query.trim();
+        if (!sql) { setError('Enter a query to run.'); return; }
+        setLoading(true);
+        setError('');
+        setResults(null);
+        try {
+            const result = await runQuery(conn, sql, readonly);
+            if (result.success) {
+                setResults(result);
+                saveToHistory(sql);
+                toast.success(`${result.row_count} row${result.row_count === 1 ? '' : 's'} · ${result.execution_time}s`);
+            } else {
+                setError(result.error || 'Query failed.');
+            }
+        } catch (err) {
+            setError(err.message || 'Failed to execute query.');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function handleKeyDown(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            execute();
+        }
+    }
+
+    function exportCsv() {
+        if (!results?.columns || !results?.rows) return;
+        const esc = (v) => {
+            if (v === null) return '';
+            const s = String(v);
+            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const csv = [
+            results.columns.map(esc).join(','),
+            ...results.rows.map((r) => r.map(esc).join(',')),
+        ].join('\n');
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${conn.name || 'query'}_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Exported results to CSV');
+    }
+
+    return (
+        <div className="dbx-console">
+            <div className="dbx-console-toolbar">
+                <button
+                    type="button"
+                    className="dbx-run"
+                    onClick={execute}
+                    disabled={loading || !query.trim()}
+                    title={`Run query (${MOD_KEY}+Enter)`}
+                >
+                    <Play size={14} aria-hidden="true" />
+                    {loading ? 'Running…' : 'Run'}
+                    <kbd>{MOD_KEY} ↵</kbd>
+                </button>
+
+                {isAdmin && (
+                    <button
+                        type="button"
+                        className={`dbx-toggle ${readonly ? '' : 'is-write'}`}
+                        onClick={() => setReadonly((r) => !r)}
+                        aria-pressed={!readonly}
+                        title={readonly ? 'Read-only: only SELECT / SHOW / DESCRIBE' : 'Writes enabled — be careful'}
+                    >
+                        {readonly ? <Lock size={13} aria-hidden="true" /> : <Unlock size={13} aria-hidden="true" />}
+                        {readonly ? 'Read-only' : 'Writes on'}
+                    </button>
+                )}
+
+                <div className="dbx-console-toolbar-spacer" />
+
+                <button
+                    type="button"
+                    className={`dbx-chip ${showHistory ? 'is-active' : ''}`}
+                    onClick={() => setShowHistory((s) => !s)}
+                    aria-pressed={showHistory}
+                >
+                    <History size={14} aria-hidden="true" /> History
+                </button>
+                <button type="button" className="dbx-chip" onClick={() => { setQuery(''); editorRef.current?.focus(); }}>
+                    <Eraser size={14} aria-hidden="true" /> Clear
+                </button>
+                <button type="button" className="dbx-chip" onClick={exportCsv} disabled={!results?.rows?.length}>
+                    <Download size={14} aria-hidden="true" /> Export
+                </button>
+            </div>
+
+            <div className="dbx-console-split">
+                <div className="dbx-editor-wrap">
+                    <SqlEditor
+                        ref={editorRef}
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder={`SELECT * FROM …  —  querying ${conn.name || conn.path || conn.container}`}
+                        ariaLabel="SQL editor"
+                    />
+                    {readonly && (
+                        <span className="dbx-editor-badge">
+                            <Lock size={11} aria-hidden="true" /> Read-only
+                        </span>
+                    )}
+                </div>
+
+                {showHistory && (
+                    <aside className="dbx-history" aria-label="Query history">
+                        <div className="dbx-history-head">Recent queries</div>
+                        {history.length === 0 ? (
+                            <p className="dbx-history-empty">No queries yet.</p>
+                        ) : (
+                            <ul>
+                                {history.map((item, idx) => (
+                                    <li key={idx}>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setQuery(item.query); setShowHistory(false); editorRef.current?.focus(); }}
+                                        >
+                                            <code>{item.query}</code>
+                                            <span className="dbx-history-time">
+                                                <Clock size={11} aria-hidden="true" />
+                                                {new Date(item.timestamp).toLocaleString()}
+                                            </span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </aside>
+                )}
+            </div>
+
+            <div className="dbx-results">
+                {(results || loading || error) ? (
+                    <>
+                        {results && !error && (
+                            <div className="dbx-results-head">
+                                <span className="dbx-results-count">
+                                    <strong>{results.row_count}</strong> row{results.row_count === 1 ? '' : 's'}
+                                    {results.truncated && ` · truncated from ${results.total_rows}`}
+                                </span>
+                                <span className="dbx-results-time">{results.execution_time}s</span>
+                            </div>
+                        )}
+                        <ResultsGrid
+                            columns={results?.columns}
+                            rows={results?.rows}
+                            loading={loading}
+                            error={error}
+                            emptyTitle="Query ran"
+                            emptyDescription="No rows returned."
+                        />
+                    </>
+                ) : (
+                    <div className="dbx-console-hint">
+                        <p>Write SQL above and press <kbd>{MOD_KEY}</kbd> + <kbd>Enter</kbd> to run.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

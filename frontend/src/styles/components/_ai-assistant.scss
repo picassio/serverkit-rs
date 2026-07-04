@@ -1,0 +1,459 @@
+// ServerKit AI assistant — core primitive (powered by Prompture).
+// Scoped under .sk-ai-* and themed entirely through runtime CSS custom
+// properties (with fallbacks) so it follows dark/light/accent automatically.
+// Owns its own z-index as a core overlay — no plugin coexistence hacks.
+
+$sk-ai-z: 1100;
+
+%sk-ai-tokens {
+    --sk-ai-bg: var(--bg-card, #{$bg-card-raw});
+    --sk-ai-bg-body: var(--bg-body, #{$bg-body-raw});
+    --sk-ai-hover: var(--bg-hover, #{$bg-hover-raw});
+    --sk-ai-elevated: var(--bg-elevated, #{$bg-elevated-raw});
+    --sk-ai-border: var(--border-subtle, #{$border-subtle-raw});
+    --sk-ai-fg: var(--text-primary, #{$text-primary-raw});
+    --sk-ai-fg-2: var(--text-secondary, #{$text-secondary-raw});
+    --sk-ai-fg-3: var(--text-tertiary, #{$text-tertiary-raw});
+    --sk-ai-accent: var(--accent-primary, #{$accent-primary-raw});
+    --sk-ai-accent-hover: var(--accent-hover, #{$accent-hover-raw});
+    --sk-ai-glow: var(--accent-glow, #{fade($accent-primary-raw, 15%)});
+    --sk-ai-shadow: var(--shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.5));
+    --sk-ai-code-bg: var(--bg-code, var(--bg-body, #0c0c0f));
+    --sk-ai-code-fg: var(--text-code, var(--text-primary, #{$text-primary-raw}));
+    --sk-ai-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --sk-ai-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --sk-ai-radius: 14px;
+}
+
+// ---------------------------------------------------------------- Bubble
+.sk-ai-bubble {
+    @extend %sk-ai-tokens;
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: $sk-ai-z - 1;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sk-ai-accent);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 20px var(--sk-ai-glow), 0 2px 8px rgba(0, 0, 0, 0.25);
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background 0.18s ease;
+
+    &:hover { background: var(--sk-ai-accent-hover); transform: translateY(-2px); }
+    &:focus-visible { outline: 2px solid var(--sk-ai-accent); outline-offset: 3px; }
+    &.is-raised { bottom: 92px; }            // lift above the serverkit-gui launcher on /servers/:id
+    &.is-busy { animation: sk-ai-pulse 1.6s ease-in-out infinite; }
+
+    @media (max-width: 768px) {
+        bottom: 88px;
+        right: 16px;
+        width: 48px;
+        height: 48px;
+        &.is-raised { bottom: 152px; }
+    }
+}
+
+.sk-ai-bubble__dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: $danger;
+    border: 2px solid var(--sk-ai-accent);
+}
+
+// ---------------------------------------------------------------- Overlay / drawer
+.sk-ai-overlay {
+    @extend %sk-ai-tokens;
+    position: fixed;
+    inset: 0;
+    z-index: $sk-ai-z;
+    pointer-events: none;             // let the page through except the drawer itself
+
+    &[data-mobile='true'] { pointer-events: auto; }
+}
+
+.sk-ai-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    animation: sk-ai-fade 0.15s ease;
+}
+
+.sk-ai-drawer {
+    --sk-ai-drawer-w: 420px;
+    pointer-events: auto;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--sk-ai-drawer-w);
+    max-width: 100vw;
+    display: flex;
+    flex-direction: column;
+    background: var(--sk-ai-bg);
+    border-left: 1px solid var(--sk-ai-border);
+    box-shadow: var(--sk-ai-shadow);
+    font-family: var(--sk-ai-sans);
+    color: var(--sk-ai-fg);
+    animation: sk-ai-slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+
+    @media (max-width: 768px) {
+        width: 100vw;
+        height: 100dvh;
+        border-left: none;
+    }
+}
+
+.sk-ai-drawer__resize {
+    position: absolute;
+    top: 0;
+    left: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 2;
+}
+
+// ---------------------------------------------------------------- Header
+.sk-ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--sk-ai-border);
+}
+
+.sk-ai-header__title { display: flex; flex-direction: column; line-height: 1.1; }
+.sk-ai-header__name { font-weight: 600; font-size: 14px; }
+.sk-ai-header__by { font-size: 11px; color: var(--sk-ai-fg-3); }
+.sk-ai-header__actions { display: flex; align-items: center; gap: 6px; }
+
+.sk-ai-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--sk-ai-fg-2);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    &:hover { background: var(--sk-ai-hover); color: var(--sk-ai-fg); }
+    &:focus-visible { outline: 2px solid var(--sk-ai-accent); outline-offset: 1px; }
+}
+
+// ---------------------------------------------------------------- Mode toggle
+.sk-ai-modes {
+    display: inline-flex;
+    background: var(--sk-ai-bg-body);
+    border: 1px solid var(--sk-ai-border);
+    border-radius: 999px;
+    padding: 2px;
+}
+.sk-ai-modes__item {
+    border: none;
+    background: transparent;
+    color: var(--sk-ai-fg-2);
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    &.is-active { background: var(--sk-ai-accent); color: #fff; }
+}
+
+// ---------------------------------------------------------------- Context chip
+.sk-ai-context-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 14px 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--sk-ai-border);
+    background: var(--sk-ai-glow);
+    color: var(--sk-ai-fg-2);
+    align-self: flex-start;
+    &.is-off { background: transparent; color: var(--sk-ai-fg-3); }
+}
+
+// ---------------------------------------------------------------- Messages
+.sk-ai-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+}
+
+.sk-ai-message { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
+.sk-ai-message--user { align-items: flex-end; }
+.sk-ai-message--user .sk-ai-message__bubble {
+    background: var(--sk-ai-accent);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 14px 14px 4px 14px;
+    max-width: 85%;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.sk-ai-message--assistant { align-items: stretch; }
+.sk-ai-message__error {
+    color: #fca5a5;
+    font-size: 13px;
+    border: 1px solid fade($danger, 40%);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.sk-ai-markdown {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--sk-ai-fg);
+    p { margin: 0 0 8px; }
+    p:last-child { margin-bottom: 0; }
+    a { color: var(--sk-ai-accent); }
+    strong { font-weight: 600; }
+}
+
+.sk-ai-code {
+    background: var(--sk-ai-code-bg);
+    color: var(--sk-ai-code-fg);
+    font-family: var(--sk-ai-mono);
+    font-size: 12.5px;
+    border: 1px solid var(--sk-ai-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    margin: 6px 0;
+    position: relative;
+    code { font-family: inherit; white-space: pre; }
+}
+.sk-ai-code__lang {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--sk-ai-fg-3);
+    margin-bottom: 4px;
+}
+.sk-ai-inline-code {
+    font-family: var(--sk-ai-mono);
+    font-size: 0.9em;
+    background: var(--sk-ai-hover);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+// ---------------------------------------------------------------- Tool cards
+.sk-ai-tool-card {
+    border: 1px solid var(--sk-ai-border);
+    border-radius: 10px;
+    background: var(--sk-ai-bg-body);
+    overflow: hidden;
+    &--error { border-color: fade($danger, 50%); }
+}
+.sk-ai-tool-card__head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    color: var(--sk-ai-fg);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+}
+.sk-ai-tool-card__name { font-family: var(--sk-ai-mono); font-size: 12.5px; flex: 1; }
+.sk-ai-tool-card__status { display: inline-flex; color: var(--sk-ai-fg-2); }
+.sk-ai-tool-card__status--done { color: #4ade80; }
+.sk-ai-tool-card__status--error { color: #f87171; }
+.sk-ai-tool-card__chev { color: var(--sk-ai-fg-3); transition: transform 0.15s ease; &.is-open { transform: rotate(180deg); } }
+.sk-ai-tool-card__body { padding: 0 10px 10px; }
+.sk-ai-tool-card__label { font-size: 11px; color: var(--sk-ai-fg-3); margin: 6px 0 2px; }
+.sk-ai-tool-card__result { max-height: 240px; overflow: auto; }
+.sk-ai-spin { animation: sk-ai-spin 1s linear infinite; }
+
+// ---------------------------------------------------------------- Confirm card
+.sk-ai-confirm {
+    border: 1px solid var(--sk-ai-accent);
+    border-radius: 10px;
+    background: var(--sk-ai-glow);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.sk-ai-confirm__head { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.sk-ai-confirm__summary { font-size: 13px; color: var(--sk-ai-fg); margin: 0; }
+.sk-ai-confirm__params { max-height: 160px; overflow: auto; }
+.sk-ai-confirm__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+// ---------------------------------------------------------------- Buttons
+.sk-ai-btn {
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid var(--sk-ai-border);
+    background: var(--sk-ai-bg);
+    color: var(--sk-ai-fg);
+    &--ghost { background: transparent; }
+    &--danger { background: var(--sk-ai-accent); border-color: var(--sk-ai-accent); color: #fff; }
+    &:focus-visible { outline: 2px solid var(--sk-ai-accent); outline-offset: 1px; }
+}
+
+// ---------------------------------------------------------------- Composer
+.sk-ai-composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 12px 14px;
+    border-top: 1px solid var(--sk-ai-border);
+}
+.sk-ai-composer__input {
+    flex: 1;
+    resize: none;
+    border-radius: 10px;
+    border: 1px solid var(--sk-ai-border);
+    background: var(--sk-ai-bg-body);
+    color: var(--sk-ai-fg);
+    padding: 10px 12px;
+    font-family: var(--sk-ai-sans);
+    font-size: 14px;
+    line-height: 1.4;
+    max-height: 160px;
+    &:focus { outline: none; border-color: var(--sk-ai-accent); box-shadow: 0 0 0 3px var(--sk-ai-glow); }
+    @media (max-width: 768px) { font-size: 16px; }   // avoid iOS zoom-on-focus
+}
+.sk-ai-composer__btn {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: none;
+    background: var(--sk-ai-accent);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+    &--stop { background: var(--sk-ai-hover); color: var(--sk-ai-fg); }
+}
+
+// ---------------------------------------------------------------- Typing
+.sk-ai-typing { display: flex; align-items: center; gap: 8px; color: var(--sk-ai-fg-3); font-size: 12px; }
+.sk-ai-typing__dots { display: inline-flex; gap: 3px; }
+.sk-ai-typing__dots i {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--sk-ai-fg-3);
+    animation: sk-ai-bounce 1.2s infinite ease-in-out;
+    &:nth-child(2) { animation-delay: 0.15s; }
+    &:nth-child(3) { animation-delay: 0.3s; }
+}
+
+// ---------------------------------------------------------------- Empty state
+.sk-ai-empty { margin: auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px; }
+.sk-ai-empty__icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--sk-ai-glow); color: var(--sk-ai-accent);
+}
+.sk-ai-empty__title { margin: 6px 0 0; font-size: 16px; }
+.sk-ai-empty__sub { margin: 0; font-size: 12px; color: var(--sk-ai-fg-3); }
+.sk-ai-empty__hint { font-size: 13px; color: var(--sk-ai-fg-2); max-width: 260px; }
+.sk-ai-empty__prompts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; width: 100%; }
+.sk-ai-suggested {
+    border: 1px solid var(--sk-ai-border);
+    background: var(--sk-ai-bg-body);
+    color: var(--sk-ai-fg);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    &:hover { background: var(--sk-ai-hover); }
+}
+
+// ---------------------------------------------------------------- Conversation menu
+.sk-ai-convo { position: relative; }
+.sk-ai-convo__menu {
+    position: absolute;
+    right: 0;
+    top: 36px;
+    width: 240px;
+    background: var(--sk-ai-elevated);
+    border: 1px solid var(--sk-ai-border);
+    border-radius: 10px;
+    box-shadow: var(--sk-ai-shadow);
+    padding: 6px;
+    z-index: 3;
+}
+.sk-ai-convo__new {
+    width: 100%; display: flex; align-items: center; gap: 6px;
+    padding: 8px; border: none; background: transparent; color: var(--sk-ai-fg);
+    border-radius: 8px; cursor: pointer; font-size: 13px;
+    &:hover { background: var(--sk-ai-hover); }
+}
+.sk-ai-convo__list { max-height: 280px; overflow-y: auto; margin-top: 4px; }
+.sk-ai-convo__empty { color: var(--sk-ai-fg-3); font-size: 12px; padding: 8px; text-align: center; }
+.sk-ai-convo__item {
+    display: flex; align-items: center; gap: 4px; border-radius: 8px;
+    &:hover { background: var(--sk-ai-hover); }
+    &.is-active { background: var(--sk-ai-glow); }
+}
+.sk-ai-convo__title {
+    flex: 1; text-align: left; border: none; background: transparent; color: var(--sk-ai-fg);
+    padding: 7px 8px; font-size: 13px; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sk-ai-convo__del {
+    border: none; background: transparent; color: var(--sk-ai-fg-3);
+    padding: 6px; cursor: pointer; border-radius: 6px;
+    &:hover { color: #f87171; }
+}
+
+// ---------------------------------------------------------------- Jump-to-latest
+.sk-ai-jump {
+    position: sticky;
+    bottom: 4px;
+    align-self: center;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--sk-ai-border);
+    background: var(--sk-ai-elevated);
+    color: var(--sk-ai-fg);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+// ---------------------------------------------------------------- Animations
+@keyframes sk-ai-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes sk-ai-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sk-ai-pulse { 0%, 100% { box-shadow: 0 6px 20px var(--sk-ai-glow), 0 2px 8px rgba(0,0,0,0.25); } 50% { box-shadow: 0 0 0 6px var(--sk-ai-glow); } }
+@keyframes sk-ai-spin { to { transform: rotate(360deg); } }
+@keyframes sk-ai-bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .sk-ai-drawer, .sk-ai-bubble, .sk-ai-overlay__backdrop { animation: none !important; transition: none !important; }
+    .sk-ai-bubble.is-busy { animation: none !important; }
+}

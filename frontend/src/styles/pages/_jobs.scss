@@ -1,0 +1,208 @@
+.jobs-page {
+    padding: $spacing-md;
+}
+
+.jobs-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: $spacing-md;
+    margin-bottom: $spacing-lg;
+}
+
+.jobs-filters {
+    display: flex;
+    gap: $spacing-lg;
+    flex-wrap: wrap;
+    margin-bottom: $spacing-md;
+
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-xs;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: $text-tertiary;
+    }
+
+    select {
+        padding: $spacing-sm;
+        border-radius: $radius-sm;
+        border: 1px solid $border-default;
+        background: $bg-card;
+        color: $text-primary;
+        font-size: 0.875rem;
+        min-width: 160px;
+    }
+}
+
+.jobs-table-wrap {
+    overflow-x: auto;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+    background: $bg-card;
+    margin-bottom: $spacing-lg;
+}
+
+.jobs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+
+    th {
+        text-align: left;
+        padding: $spacing-sm $spacing-md;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: $text-tertiary;
+        border-bottom: 1px solid $border-default;
+        white-space: nowrap;
+    }
+
+    td {
+        padding: $spacing-sm $spacing-md;
+        border-bottom: 1px solid $border-default;
+        color: $text-primary;
+        vertical-align: middle;
+    }
+
+    tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    tr.is-disabled td {
+        opacity: 0.55;
+    }
+}
+
+.jobs-row {
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover,
+    &.is-open {
+        background: $bg-hover;
+    }
+}
+
+.jobs-caret svg {
+    color: $text-tertiary;
+    transition: transform $transition-fast;
+
+    &.is-open {
+        transform: rotate(90deg);
+    }
+}
+
+.jobs-mono {
+    font-family: var(--mono, monospace);
+    font-size: 0.8125rem;
+}
+
+.jobs-owner {
+    color: $text-tertiary;
+    font-size: 0.8125rem;
+}
+
+.jobs-when {
+    color: $text-tertiary;
+    white-space: nowrap;
+}
+
+.jobs-actions {
+    display: flex;
+    gap: $spacing-xs;
+    justify-content: flex-end;
+    white-space: nowrap;
+}
+
+.jobs-detail-row > td {
+    padding: 0;
+    background: $bg-tertiary;
+}
+
+.jobs-detail {
+    padding: $spacing-md $spacing-lg;
+
+    &--loading {
+        color: $text-tertiary;
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: $spacing-xs $spacing-md;
+        font-size: 0.8125rem;
+        margin-bottom: $spacing-md;
+
+        span:nth-child(odd) {
+            color: $text-tertiary;
+        }
+
+        code {
+            font-family: var(--mono, monospace);
+            color: $text-primary;
+            word-break: break-all;
+        }
+    }
+
+    &__block {
+        margin-top: $spacing-sm;
+
+        > span {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: $text-tertiary;
+            margin-bottom: $spacing-xs;
+        }
+
+        pre {
+            margin: 0;
+            background: $bg-card;
+            border: 1px solid $border-default;
+            border-radius: $radius-sm;
+            padding: $spacing-sm $spacing-md;
+            overflow-x: auto;
+            font-size: 0.8125rem;
+            color: $text-primary;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        &--error pre {
+            color: $danger;
+            border-color: $danger;
+        }
+    }
+}
+
+.jobs-section-head {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    margin: $spacing-lg 0 $spacing-md;
+    color: $text-primary;
+
+    svg {
+        color: $text-tertiary;
+    }
+
+    h2 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+}
+
+.jobs-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-md;
+    padding: $spacing-xl;
+    color: $text-tertiary;
+}

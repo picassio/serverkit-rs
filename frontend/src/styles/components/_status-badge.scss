@@ -1,0 +1,49 @@
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-xs;
+    min-height: 24px;
+    padding: 4px $spacing-sm;
+    border-radius: $radius-full;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    line-height: 1;
+    white-space: nowrap;
+
+    &__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    &--success {
+        background: rgba($success, 0.15);
+        color: $success;
+        .status-badge__dot { background: $success; }
+    }
+
+    &--danger {
+        background: rgba($danger, 0.15);
+        color: $danger;
+        .status-badge__dot { background: $danger; }
+    }
+
+    &--warning {
+        background: rgba($warning, 0.15);
+        color: $warning;
+        .status-badge__dot { background: $warning; }
+    }
+
+    &--info {
+        background: rgba($accent-primary-raw, 0.15);
+        color: $accent-primary;
+        .status-badge__dot { background: $accent-primary; }
+    }
+
+    &--muted {
+        background: $bg-hover;
+        color: $text-tertiary;
+        .status-badge__dot { background: $text-tertiary; }
+    }
+}

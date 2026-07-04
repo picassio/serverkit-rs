@@ -1,0 +1,107 @@
+import { useState, useEffect, useCallback } from 'react';
+import api from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
+/**
+ * Reusable polymorphic tags panel for any resource.
+ *
+ * Props:
+ *   resourceType  one of SharedResourceService.RESOURCE_TYPES
+ *   resourceId    the resource's id (number or string)
+ *   readOnly      hide the add/remove controls (default false)
+ */
+const TagsPanel = ({ resourceType, resourceId, readOnly = false }) => {
+    const toast = useToast();
+    const [tags, setTags] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [newTag, setNewTag] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const load = useCallback(async () => {
+        if (!resourceType || resourceId == null) return;
+        try {
+            setLoading(true);
+            const data = await api.listResourceTags(resourceType, resourceId);
+            setTags(data.tags || []);
+        } catch (err) {
+            console.error('Failed to load tags:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [resourceType, resourceId]);
+
+    useEffect(() => { load(); }, [load]);
+
+    async function handleAdd(e) {
+        e.preventDefault();
+        const value = newTag.trim();
+        if (!value) return;
+        setSaving(true);
+        try {
+            await api.addResourceTag(resourceType, resourceId, value);
+            setNewTag('');
+            load();
+        } catch (err) {
+            toast.error(err.message || 'Failed to add tag');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleRemove(tag) {
+        try {
+            await api.removeResourceTag(resourceType, resourceId, tag);
+            setTags((prev) => prev.filter((t) => t.tag !== tag));
+        } catch (err) {
+            toast.error(err.message || 'Failed to remove tag');
+        }
+    }
+
+    return (
+        <div className="shared-tags">
+            <div className="shared-tags__list">
+                {loading ? (
+                    <span className="shared-tags__hint">Loading…</span>
+                ) : tags.length === 0 ? (
+                    <span className="shared-tags__hint">No tags yet</span>
+                ) : (
+                    tags.map((t) => (
+                        <span key={t.id} className="shared-tag">
+                            <span className="shared-tag__label">{t.tag}</span>
+                            {!readOnly && (
+                                <button
+                                    type="button"
+                                    className="shared-tag__remove"
+                                    onClick={() => handleRemove(t.tag)}
+                                    aria-label={`Remove tag ${t.tag}`}
+                                    title="Remove tag"
+                                >
+                                    &times;
+                                </button>
+                            )}
+                        </span>
+                    ))
+                )}
+            </div>
+
+            {!readOnly && (
+                <form className="shared-tags__add" onSubmit={handleAdd}>
+                    <Input
+                        type="text"
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        placeholder="Add a tag…"
+                        className="shared-tags__input"
+                    />
+                    <Button type="submit" size="sm" disabled={saving || !newTag.trim()}>
+                        Add
+                    </Button>
+                </form>
+            )}
+        </div>
+    );
+};
+
+export default TagsPanel;

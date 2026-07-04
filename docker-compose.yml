@@ -1,0 +1,58 @@
+# ============================================
+# ServerKit Docker Compose  (optional legacy frontend container)
+# ============================================
+# ServerKit runs FULLY OFF DOCKER for the panel itself:
+#   - the backend runs on the host via systemd `serverkit.service`, and
+#   - the React frontend is served as static files directly by the host nginx
+#     from frontend/dist (built by install.sh) — NO container.
+# This keeps a ServerKit update from ever touching the workloads: managed apps
+# are the only things in Docker, and host nginx (which fronts them) is never
+# stopped, only gracefully reloaded.
+#
+# The `frontend` service below is retained ONLY as an opt-in escape hatch for
+# anyone who specifically wants the panel UI in a container. It sits behind the
+# `legacy-frontend` profile, so the default `docker compose up -d` starts
+# NOTHING. To use it, also repoint nginx `location /` back at 127.0.0.1:3847:
+#
+#   docker compose --profile legacy-frontend up -d --build
+#
+# Want a quick, throwaway demo with NO host management? Use the single-container
+# image built from ./Dockerfile instead — it bundles both tiers but, as its
+# header notes, cannot manage the host.
+# ============================================
+
+services:
+  frontend:
+    profiles: ["legacy-frontend"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: serverkit-frontend
+    ports:
+      - "3847:80"
+    # Resolve `backend` (used by frontend/nginx.conf) to the host, where the
+    # ServerKit backend listens on :5000 under systemd.
+    extra_hosts:
+      - "backend:host-gateway"
+    # install.sh builds the SPA to ./frontend/dist on the host; serve that build
+    # directly so a rebuild doesn't require rebuilding the image.
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    networks:
+      - serverkit-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  serverkit-network:
+    driver: bridge
+    name: serverkit-network

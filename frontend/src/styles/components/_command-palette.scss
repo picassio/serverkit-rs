@@ -1,0 +1,139 @@
+// ============================================
+// COMMAND PALETTE (Ctrl+K)
+// ============================================
+
+.command-palette-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: $z-modal;
+    display: flex;
+    justify-content: center;
+    padding-top: 15vh;
+}
+
+.command-palette {
+    width: 560px;
+    max-height: 460px;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-xl;
+    box-shadow: $shadow-lg;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: palette-enter 0.15s ease-out;
+
+    @keyframes palette-enter {
+        from {
+            opacity: 0;
+            transform: scale(0.96) translateY(-8px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+
+    &__input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        padding: $space-4 $space-5;
+        border-bottom: 1px solid $border-subtle;
+        color: $text-tertiary;
+
+        svg {
+            flex-shrink: 0;
+        }
+    }
+
+    &__input {
+        flex: 1;
+        background: none;
+        border: none;
+        outline: none;
+        font-size: $font-size-md;
+        color: $text-primary;
+        font-family: $font-main;
+
+        &::placeholder {
+            color: $text-tertiary;
+        }
+    }
+
+    &__kbd {
+        font-size: $font-size-xs;
+        font-family: $font-main;
+        padding: 2px 6px;
+        background: $bg-hover;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-sm;
+        color: $text-tertiary;
+        flex-shrink: 0;
+    }
+
+    &__results {
+        flex: 1;
+        overflow-y: auto;
+        padding: $space-2 0;
+    }
+
+    &__empty {
+        padding: $space-8 $space-5;
+        text-align: center;
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    &__group {
+        &:not(:first-child) {
+            margin-top: $space-2;
+        }
+    }
+
+    &__group-label {
+        padding: $space-2 $space-5;
+        font-size: $font-size-xs;
+        font-weight: $font-weight-semibold;
+        color: $text-tertiary;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    &__item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: $space-2 $space-5;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: $font-size-base;
+        color: $text-secondary;
+        text-align: left;
+        transition: background $transition-fast, color $transition-fast;
+
+        &:hover,
+        &--active {
+            background: $bg-hover;
+            color: $text-primary;
+        }
+
+        &--active {
+            background: $bg-hover;
+        }
+    }
+
+    &__item-label {
+        font-weight: $font-weight-medium;
+    }
+
+    &__item-path {
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        font-family: $font-mono;
+    }
+}

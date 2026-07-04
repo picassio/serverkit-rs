@@ -1,0 +1,73 @@
+# Parameterized Vagrantfile for ServerKit E2E tests.
+# The orchestrator passes config via env vars and uses one working dir
+# per VM so multiple distros can coexist without colliding.
+#
+# Required env vars:
+#   SK_BOX       e.g. "generic/debian12"
+#   SK_VM_NAME   e.g. "sk-test-debian12-20260517-120000"
+#
+# Optional:
+#   SK_CPUS      default 2
+#   SK_MEMORY_MB default 4096
+
+box_name  = ENV['SK_BOX']     || abort("SK_BOX env var is required")
+vm_name   = ENV['SK_VM_NAME'] || abort("SK_VM_NAME env var is required")
+cpus      = (ENV['SK_CPUS']      || '2').to_i
+memory_mb = (ENV['SK_MEMORY_MB'] || '4096').to_i
+
+Vagrant.configure("2") do |config|
+  config.vm.box      = box_name
+  config.vm.hostname = vm_name
+  config.vm.define vm_name
+
+  # No synced folders — we transfer files via vagrant scp/upload instead.
+  # Default rsync sync slows boot and can fail on Windows hosts.
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider "hyperv" do |hv|
+    hv.vmname  = vm_name
+    hv.cpus    = cpus
+    hv.memory  = memory_mb
+    hv.maxmemory = memory_mb
+    hv.enable_virtualization_extensions = false
+    hv.linked_clone = true
+  end
+
+  # Pin the Hyper-V switch so vagrant up doesn't prompt the operator
+  # to pick one interactively (which blocks unattended runs). "Default
+  # Switch" is Hyper-V's built-in NAT switch and ships on every install.
+  # Override via VAGRANT_HYPERV_SWITCH_NAME env if you want a different
+  # network.
+  config.vm.network "public_network",
+                    bridge: ENV.fetch('VAGRANT_HYPERV_SWITCH_NAME', 'Default Switch')
+
+  # Bootstrap: ensure rsync + curl are present (mirrors the multipass
+  # cloud-init). Best effort — different distros use different package
+  # managers, so try them in order.
+  #
+  # IMPORTANT — on Rocky/RHEL, calling `dnf install` here pulls in
+  # the latest libcurl as a dep upgrade, which transitively upgrades
+  # openssl-libs from 3.0.x to 3.5.x. The box's openssh-server
+  # (openssh-server-8.7p1-34.el9) was built against the 3.0.x ABI and
+  # there is currently no matching el9 rebuild against 3.5.x in the
+  # repos. Every new sshd fork then dies with "OpenSSL version
+  # mismatch", TCP accepts then RSTs before the banner, and every
+  # subsequent `vagrant upload` / `vagrant ssh -c` from the harness
+  # fails silently. So skip dnf entirely when rsync+curl are already
+  # present (they ship preinstalled in generic/rocky9). If a future
+  # RHEL-family box drops them, we'll fail loudly here rather than
+  # silently corrupting the run downstream.
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+    if command -v apt-get >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -qq && apt-get install -y -qq rsync curl
+    elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
+      if ! command -v rsync >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+        echo "ERROR: rsync/curl missing on RHEL-family box — running dnf install"
+        echo "       would upgrade openssl and break sshd. See Vagrantfile comment."
+        exit 1
+      fi
+    fi
+  SHELL
+end

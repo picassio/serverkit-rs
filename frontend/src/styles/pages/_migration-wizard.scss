@@ -1,0 +1,315 @@
+// ============================================
+// MIGRATION WIZARD (Database Update)
+// ============================================
+
+.migration-wizard {
+    // Extends .setup-wizard — same full-screen centered layout
+}
+
+// --------------------------------------------
+// Status panel (version info)
+// --------------------------------------------
+.migration-status-panel {
+    background: $bg-elevated;
+    border: 1px solid $border-default;
+    border-radius: $radius-xl;
+    padding: $space-5;
+    margin-bottom: $space-6;
+}
+
+.migration-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $space-2 0;
+
+    &:not(:last-child) {
+        border-bottom: 1px solid $border-subtle;
+    }
+}
+
+.migration-status-label {
+    color: $text-secondary;
+    font-size: $font-size-sm;
+}
+
+.migration-status-value {
+    font-weight: $font-weight-semibold;
+    font-size: $font-size-sm;
+
+    @at-root code#{&} {
+        background: $bg-secondary;
+        padding: 2px 8px;
+        border-radius: $radius-md;
+        font-family: $font-family-mono;
+    }
+}
+
+// --------------------------------------------
+// Migration list (pending changes)
+// --------------------------------------------
+.migration-list {
+    margin-bottom: $space-6;
+}
+
+.migration-list-title {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $text-secondary;
+    margin-bottom: $space-3;
+}
+
+.migration-list-item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: $bg-elevated;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    font-size: $font-size-sm;
+
+    &:not(:last-child) {
+        margin-bottom: $space-2;
+    }
+
+    svg {
+        flex-shrink: 0;
+        color: $accent-primary;
+    }
+
+    code {
+        font-family: $font-family-mono;
+        color: $text-secondary;
+        font-size: $font-size-xs;
+    }
+
+    span {
+        color: $text-primary;
+    }
+}
+
+// --------------------------------------------
+// Login section (inline login for wizard)
+// --------------------------------------------
+.migration-login-section {
+    margin-top: $space-6;
+    padding-top: $space-6;
+    border-top: 1px solid $border-default;
+}
+
+.migration-login-form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    max-width: 400px;
+
+    input {
+        width: 100%;
+        padding: $space-3 $space-4;
+        background: $bg-elevated;
+        border: 1px solid $border-default;
+        border-radius: $radius-lg;
+        font-size: $font-size-base;
+        color: $text-primary;
+        @include transition(border-color);
+
+        &::placeholder {
+            color: $text-tertiary;
+        }
+
+        &:focus {
+            outline: none;
+            border-color: $accent-primary;
+        }
+    }
+
+    .btn-wizard-next {
+        align-self: flex-start;
+    }
+}
+
+.migration-error-inline {
+    padding: $space-3;
+    background: $danger-bg;
+    border: 1px solid $danger-border;
+    border-radius: $radius-lg;
+    color: $danger;
+    font-size: $font-size-sm;
+}
+
+// --------------------------------------------
+// Backup status
+// --------------------------------------------
+.migration-backup-actions {
+    margin-bottom: $space-6;
+}
+
+.backup-status {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+    padding: $space-4;
+    border-radius: $radius-lg;
+    margin-bottom: $space-6;
+
+    &--success {
+        background: $success-bg;
+        border: 1px solid $success-border;
+        color: $success;
+    }
+
+    &--error {
+        background: $danger-bg;
+        border: 1px solid $danger-border;
+        color: $danger;
+    }
+
+    svg {
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    strong {
+        display: block;
+        margin-bottom: $space-1;
+    }
+
+    code {
+        display: block;
+        font-size: $font-size-xs;
+        color: $text-secondary;
+        word-break: break-all;
+        font-family: $font-family-mono;
+    }
+
+    span {
+        font-size: $font-size-sm;
+    }
+}
+
+// --------------------------------------------
+// Apply / progress
+// --------------------------------------------
+.migration-apply-actions {
+    text-align: center;
+    padding: $space-6 0;
+}
+
+.migration-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-4;
+    padding: $space-8 0;
+    color: $text-secondary;
+
+    svg {
+        color: $accent-primary;
+    }
+
+    span {
+        font-size: $font-size-base;
+    }
+}
+
+// --------------------------------------------
+// Result states
+// --------------------------------------------
+.migration-success {
+    text-align: center;
+    padding: $space-8 0;
+
+    svg {
+        color: $success;
+        margin-bottom: $space-4;
+    }
+
+    h2 {
+        font-size: $font-size-xl;
+        font-weight: $font-weight-bold;
+        margin-bottom: $space-2;
+    }
+
+    p {
+        color: $text-secondary;
+        font-size: $font-size-base;
+    }
+
+    code {
+        background: $bg-secondary;
+        padding: 2px 8px;
+        border-radius: $radius-md;
+        font-family: $font-family-mono;
+        font-size: $font-size-sm;
+    }
+}
+
+.migration-error {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+    padding: $space-4;
+    background: $danger-bg;
+    border: 1px solid $danger-border;
+    border-radius: $radius-lg;
+    margin-bottom: $space-6;
+
+    > svg {
+        flex-shrink: 0;
+        color: $danger;
+        margin-top: 2px;
+    }
+
+    strong {
+        display: block;
+        color: $danger;
+        margin-bottom: $space-1;
+    }
+
+    span {
+        display: block;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+    }
+
+    .btn-wizard-prev {
+        margin-left: auto;
+        flex-shrink: 0;
+        align-self: center;
+    }
+}
+
+// --------------------------------------------
+// Nav helpers
+// --------------------------------------------
+.migration-nav-right {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+}
+
+.btn-text-link {
+    background: none;
+    border: none;
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    @include transition(color);
+
+    &:hover {
+        color: $text-secondary;
+    }
+}
+
+// Spin animation for loader
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}

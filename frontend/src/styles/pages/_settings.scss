@@ -1,0 +1,2060 @@
+// ============================================
+// SETTINGS PAGE STYLES
+// ============================================
+
+.settings-layout {
+    display: grid;
+    grid-template-columns: 206px 1fr;
+    gap: $space-6;
+    min-height: calc(100vh - 200px);
+
+    @media (max-width: $breakpoint-lg) {
+        grid-template-columns: 1fr;
+    }
+}
+
+// Settings Navigation
+.settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    position: sticky;
+    top: $space-6;
+    max-height: calc(100vh - $space-12);
+    overflow-y: auto;
+
+    // Custom scrollbar for nav
+    &::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: $border-active;
+        border-radius: $radius-full;
+    }
+
+    @media (max-width: $breakpoint-lg) {
+        flex-direction: row;
+        flex-wrap: wrap;
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+        background: $bg-card;
+        padding: $space-2;
+        border-radius: $radius-lg;
+    }
+}
+
+// Two-way section switch (My Account / Admin) at the top of the settings rail
+.settings-nav-groups {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-1;
+    padding: $space-1;
+    margin-bottom: $space-3;
+    background: $bg-card;
+    border: 1px solid $border-color;
+    border-radius: $radius-md;
+
+    @media (max-width: $breakpoint-lg) {
+        flex-basis: 100%;
+        width: 100%;
+    }
+}
+
+.settings-nav-group {
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: $space-2 $space-3;
+    border-radius: $radius-sm;
+    color: $text-secondary;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    cursor: pointer;
+    transition: all $transition-fast;
+    white-space: nowrap;
+
+    &:hover {
+        color: $text-primary;
+        background: $bg-hover;
+    }
+
+    &.active {
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+    }
+}
+
+.settings-nav-item,
+.settings-nav-item.settings-nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start !important;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: transparent;
+    border: none;
+    border-radius: $radius-md;
+    color: $text-secondary;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    transition: all $transition-fast;
+    text-align: left;
+    width: 100%;
+
+    svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        flex-shrink: 0;
+    }
+
+    &:hover {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+
+    &.active {
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+
+        svg {
+            stroke: var(--accent-bright);
+        }
+    }
+
+    @media (max-width: $breakpoint-lg) {
+        width: auto;
+        padding: $space-2 $space-3;
+    }
+}
+
+// Nav spacer pushes About to the bottom of the sticky sidebar
+.settings-nav-spacer {
+    flex: 1;
+    min-height: $space-4;
+}
+
+// Settings Content Area
+.settings-content {
+    min-width: 0;
+}
+
+// Settings Section
+.settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: $space-5;
+
+    .section-header {
+        // Reset the global `.section-header { @include flex-between(); }` from
+        // _cards.scss — settings sections stack their title over the description
+        // instead of pushing the description to the far right.
+        display: block;
+        margin-bottom: $space-2;
+
+        h2 {
+            font-size: $font-size-lg;
+            font-weight: $font-weight-semibold;
+            margin: 0 0 $space-1 0;
+        }
+
+        p {
+            color: $text-secondary;
+            margin: 0;
+            font-size: $font-size-sm;
+        }
+    }
+
+    h3 {
+        font-size: $font-size-base;
+        font-weight: $font-weight-semibold;
+        margin: 0 0 $space-3 0;
+        color: $text-primary;
+    }
+}
+
+// Settings Cards
+.settings-card {
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    padding: $space-5;
+
+    h3 {
+        margin: 0;
+    }
+
+    > p {
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        margin: 0 0 $space-4 0;
+    }
+}
+
+.settings-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $space-4;
+    margin-bottom: $space-5;
+}
+
+.settings-card__header-left {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+
+    > svg {
+        flex-shrink: 0;
+        color: $text-tertiary;
+        margin-top: 2px;
+    }
+
+    h3 {
+        font-size: $font-size-base;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+        margin: 0;
+    }
+
+    p {
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        margin: $space-1 0 0 0;
+    }
+}
+
+.settings-card__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-8 $space-4;
+    color: $text-tertiary;
+    text-align: center;
+
+    > svg {
+        opacity: 0.4;
+    }
+
+    p {
+        margin: 0;
+        font-size: $font-size-sm;
+        color: $text-tertiary;
+    }
+}
+
+// Source provider connections
+.source-connections {
+    .source-connection-status {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-1;
+        padding: $space-1 $space-2;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-full;
+        color: $text-tertiary;
+        font-size: $font-size-xs;
+        font-weight: $font-weight-medium;
+
+        &--connected {
+            border-color: $success-border;
+            background: $success-bg;
+            color: $success;
+        }
+    }
+
+    .source-connection-profile,
+    .source-connection-empty {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: $space-3;
+        padding: $space-4;
+        background: $bg-elevated;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+    }
+
+    .source-connection-profile {
+        img {
+            width: 42px;
+            height: 42px;
+            border-radius: $radius-full;
+        }
+
+        strong,
+        span {
+            display: block;
+        }
+
+        strong {
+            color: $text-primary;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-semibold;
+        }
+
+        span {
+            margin-top: 2px;
+            color: $text-tertiary;
+            font-size: $font-size-xs;
+        }
+    }
+
+    .source-connection-empty {
+        > svg {
+            color: $accent-primary;
+        }
+
+        strong,
+        span {
+            display: block;
+        }
+
+        strong {
+            color: $text-primary;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-semibold;
+        }
+
+        span {
+            margin-top: 3px;
+            color: $text-tertiary;
+            font-size: $font-size-xs;
+            line-height: 1.45;
+        }
+    }
+}
+
+.source-oauth-config {
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: $space-4;
+        margin-bottom: $space-4;
+    }
+
+    &__callback {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        padding: $space-3;
+        background: $bg-elevated;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        color: $text-tertiary;
+        font-size: $font-size-xs;
+        overflow-wrap: anywhere;
+
+        svg {
+            flex-shrink: 0;
+            color: $text-secondary;
+        }
+    }
+}
+
+@media (max-width: $breakpoint-md) {
+    .source-connections {
+        .source-connection-profile,
+        .source-connection-empty {
+            grid-template-columns: 1fr;
+
+            .btn,
+            button {
+                width: 100%;
+            }
+        }
+    }
+
+    .source-oauth-config__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.settings-card__loading {
+    padding: $space-6;
+    text-align: center;
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+}
+
+.settings-card__footer {
+    display: flex;
+    gap: $space-2;
+    margin-top: $space-5;
+    padding-top: $space-4;
+    border-top: 1px solid $border-subtle;
+}
+
+// Settings Form
+.settings-form {
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    padding: $space-5;
+
+    .form-group {
+        margin-bottom: $space-4;
+
+        &:last-of-type {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-medium;
+            color: $text-secondary;
+            margin-bottom: $space-2;
+        }
+
+        input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+            width: 100%;
+            padding: $space-3;
+            background: $bg-hover;
+            border: 1px solid $border-subtle;
+            border-radius: $radius-md;
+            color: $text-primary;
+            font-size: $font-size-sm;
+            transition: border-color $transition-fast;
+
+            &:focus {
+                outline: none;
+                border-color: $accent-primary;
+            }
+
+            &:disabled,
+            &.input-disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                background: $bg-body;
+            }
+        }
+
+        .form-help {
+            display: block;
+            margin-top: $space-1;
+            font-size: $font-size-xs;
+            color: $text-tertiary;
+        }
+    }
+
+    .form-actions {
+        margin-top: $space-5;
+        padding-top: $space-5;
+        border-top: 1px solid $border-subtle;
+        display: flex;
+        gap: $space-2;
+    }
+}
+
+// Alert Messages — see components/_alerts.scss
+
+// Session Items
+.session-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $space-4;
+    background: $bg-hover;
+    border-radius: $radius-md;
+    margin-top: $space-3;
+
+    .session-info {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+
+        svg {
+            stroke: $text-secondary;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .session-device {
+            display: block;
+            font-weight: $font-weight-medium;
+            color: $text-primary;
+        }
+
+        .session-details {
+            display: block;
+            font-size: $font-size-xs;
+            color: $text-tertiary;
+        }
+    }
+}
+
+// Theme Options
+.theme-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: $space-3;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.theme-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-4;
+    background: transparent;
+    border: 2px solid $border-subtle;
+    border-radius: $radius-lg;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        border-color: $border-active;
+    }
+
+    &.active {
+        border-color: $accent-primary;
+        background: fade($accent-primary-raw, 5%);
+    }
+
+    span {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+        color: $text-primary;
+    }
+}
+
+.theme-preview {
+    width: 100%;
+    height: 80px;
+    border-radius: $radius-md;
+    display: flex;
+    overflow: hidden;
+
+    .preview-sidebar {
+        width: 25%;
+        background: #18181b;
+    }
+
+    .preview-content {
+        flex: 1;
+        padding: $space-2;
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+    }
+
+    .preview-card {
+        flex: 1;
+        border-radius: $radius-sm;
+    }
+
+    &.dark {
+        border: 1px solid $border-subtle;
+
+        .preview-sidebar {
+            background: #0d0f15;
+        }
+
+        .preview-content {
+            background: #0a0b0e;
+        }
+
+        .preview-card {
+            background: #101218;
+        }
+    }
+
+    &.light {
+        border: 1px solid #e5e5e5;
+
+        .preview-sidebar {
+            background: #f5f5f5;
+        }
+
+        .preview-content {
+            background: #ffffff;
+        }
+
+        .preview-card {
+            background: #f5f5f5;
+        }
+    }
+
+    &.system {
+        border: 1px solid $border-subtle;
+        background: linear-gradient(135deg, #0a0b0e 50%, #ffffff 50%);
+
+        .preview-sidebar {
+            background: linear-gradient(180deg, #0d0f15 50%, #f1f3f9 50%);
+        }
+
+        .preview-content {
+            background: transparent;
+        }
+
+        .preview-card {
+            background: linear-gradient(135deg, #101218 50%, #f1f3f9 50%);
+        }
+    }
+}
+
+// Density Options
+.density-options {
+    display: flex;
+    gap: $space-4;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    cursor: pointer;
+
+    input[type="radio"] {
+        width: 18px;
+        height: 18px;
+        accent-color: $accent-primary;
+        cursor: pointer;
+    }
+
+    span {
+        font-size: $font-size-sm;
+        color: $text-primary;
+    }
+}
+
+// Notification Options
+.notification-options {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+}
+
+.notification-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $space-4;
+    background: $bg-hover;
+    border-radius: $radius-md;
+    gap: $space-4;
+
+    .notification-info {
+        flex: 1;
+
+        .notification-title {
+            display: block;
+            font-weight: $font-weight-medium;
+            color: $text-primary;
+            margin-bottom: $space-1;
+        }
+
+        .notification-desc {
+            display: block;
+            font-size: $font-size-xs;
+            color: $text-tertiary;
+        }
+    }
+}
+
+// Toggle Switch
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+
+    input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+
+        &:checked + .toggle-slider {
+            background: linear-gradient(160deg, var(--accent-bright), var(--accent-primary));
+
+            &::before {
+                transform: translateX(20px);
+            }
+        }
+
+        &:focus + .toggle-slider {
+            box-shadow: 0 0 0 2px var(--accent-bg);
+        }
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--surface-3);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        transition: all $transition-fast;
+
+        &::before {
+            content: '';
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: transform $transition-fast;
+        }
+    }
+}
+
+// Div-based toggle (used in SidebarSettings)
+// Mirrors the input-based .toggle-switch above but driven by .on class
+.toggle-switch:not(:has(input)) {
+    width: 44px;
+    height: 24px;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: background $transition-fast;
+    flex-shrink: 0;
+
+    &.on {
+        background: linear-gradient(160deg, var(--accent-bright), var(--accent-primary));
+        border-color: transparent;
+
+        .toggle-knob {
+            transform: translateX(20px);
+        }
+    }
+
+    .toggle-knob {
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        top: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: transform $transition-fast;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+}
+
+// Toggle Label (checkbox + text inline)
+.toggle-label {
+    display: flex !important;
+    align-items: center;
+    gap: $space-3;
+    cursor: pointer;
+
+    input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: $accent-primary;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    span {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+        color: $text-primary;
+    }
+}
+
+// System Info Grid
+.system-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $space-4;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.info-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: $space-2 0;
+        border-bottom: 1px solid $border-subtle;
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-size: $font-size-sm;
+            color: $text-tertiary;
+        }
+
+        .info-value {
+            font-size: $font-size-sm;
+            font-weight: $font-weight-medium;
+            color: $text-primary;
+        }
+    }
+}
+
+// Timezone Selector
+.timezone-selector {
+    display: flex;
+    gap: $space-3;
+    align-items: center;
+
+    select {
+        flex: 1;
+        max-width: 300px;
+    }
+
+    .btn {
+        flex-shrink: 0;
+    }
+}
+
+.timezone-message {
+    margin-top: $space-2;
+    padding: $space-2 $space-3;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+
+    &.success {
+        background: fade($success, 15%);
+        color: $success;
+    }
+
+    &.error {
+        background: fade($danger, 15%);
+        color: $danger;
+    }
+}
+
+// About Section
+.about-card {
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    padding: $space-8;
+    text-align: center;
+
+    .about-logo {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto $space-4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    h3 {
+        font-size: $font-size-xl;
+        margin-bottom: $space-1;
+    }
+
+    .version {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+        margin-bottom: $space-4;
+    }
+
+    .description {
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        line-height: $line-height-relaxed;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .update-check {
+        margin-top: $space-4;
+        padding-top: $space-4;
+        border-top: 1px solid $border-subtle;
+
+        .btn-sm {
+            font-size: $font-size-xs;
+            padding: $space-2 $space-3;
+            display: inline-flex;
+            align-items: center;
+            gap: $space-1;
+
+            .spinning {
+                animation: spin 1s linear infinite;
+            }
+        }
+
+        .update-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: $space-2;
+            font-size: $font-size-sm;
+
+            &.current {
+                color: $success;
+            }
+
+            &.available {
+                color: $warning;
+                flex-wrap: wrap;
+
+                .btn {
+                    margin-left: $space-2;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: $space-1;
+                }
+            }
+
+            &.error {
+                color: $danger;
+
+                .btn-link {
+                    background: none;
+                    border: none;
+                    color: $accent-primary;
+                    cursor: pointer;
+                    text-decoration: underline;
+                    font-size: $font-size-sm;
+                    padding: 0;
+                    margin-left: $space-2;
+
+                    &:hover {
+                        color: $accent-hover;
+                    }
+                }
+            }
+        }
+    }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+// Star Prompt Card
+.star-prompt-card {
+    position: relative;
+    background: linear-gradient(135deg, $accent-glow 0%, fade($accent-primary-raw, 8%) 100%);
+    border: 1px solid fade($accent-primary-raw, 30%);
+    border-radius: $radius-lg;
+    padding: $space-6;
+    display: flex;
+    align-items: flex-start;
+    gap: $space-4;
+
+    .dismiss-btn {
+        position: absolute;
+        top: $space-3;
+        right: $space-3;
+        background: none;
+        border: none;
+        color: $text-tertiary;
+        cursor: pointer;
+        padding: $space-1;
+        border-radius: $radius-sm;
+        transition: all $transition-fast;
+
+        &:hover {
+            background: $bg-hover;
+            color: $text-primary;
+        }
+    }
+
+    .star-icon {
+        flex-shrink: 0;
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, $warning 0%, darken($warning, 10%) 100%);
+        border-radius: $radius-lg;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    .star-content {
+        flex: 1;
+        padding-right: $space-6;
+
+        h4 {
+            margin: 0 0 $space-2;
+            font-size: $font-size-md;
+            font-weight: $font-weight-semibold;
+        }
+
+        p {
+            margin: 0 0 $space-4;
+            font-size: $font-size-sm;
+            color: $text-secondary;
+            line-height: $line-height-relaxed;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: $space-2;
+        }
+    }
+
+    @media (max-width: $breakpoint-sm) {
+        flex-direction: column;
+        text-align: center;
+
+        .star-content {
+            padding-right: 0;
+        }
+    }
+}
+
+// Feature List
+.feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $space-2;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: 1fr;
+    }
+
+    li {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        padding: $space-2;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+
+        svg {
+            stroke: $success;
+            fill: none;
+            stroke-width: 2;
+            flex-shrink: 0;
+        }
+    }
+}
+
+// Link List
+.link-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+}
+
+.link-item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: $bg-hover;
+    border-radius: $radius-md;
+    color: $text-secondary;
+    text-decoration: none;
+    font-size: $font-size-sm;
+    transition: all $transition-fast;
+
+    svg {
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        flex-shrink: 0;
+    }
+
+    &:hover {
+        background: $accent-primary;
+        color: white;
+    }
+}
+
+// License Text
+.license-text {
+    color: $text-secondary;
+    font-size: $font-size-sm;
+    margin: 0;
+}
+
+// Loading State
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $space-12;
+    color: $text-secondary;
+    font-size: $font-size-sm;
+}
+
+// Settings Row (for app settings tab)
+.settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: $space-4;
+    background: $bg-hover;
+    border-radius: $radius-md;
+    gap: $space-4;
+
+    &:not(:last-child) {
+        margin-bottom: $space-3;
+    }
+
+    &.settings-linked-warning {
+        background: fade($warning, 10%);
+        border: 1px solid fade($warning, 20%);
+    }
+}
+
+.settings-label {
+    flex: 1;
+
+    > span:first-child {
+        display: block;
+        font-weight: $font-weight-medium;
+        color: $text-primary;
+        margin-bottom: $space-1;
+    }
+
+    .settings-hint {
+        display: block;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+    }
+}
+
+.settings-control {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-shrink: 0;
+}
+
+.settings-select {
+    min-width: 160px;
+    padding: $space-2 $space-3;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    color: $text-primary;
+    font-size: $font-size-sm;
+    cursor: pointer;
+    transition: border-color $transition-fast;
+
+    &:hover {
+        border-color: $border-default;
+    }
+
+    &:focus {
+        outline: none;
+        border-color: $accent-primary;
+    }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+}
+
+.settings-saving {
+    font-size: $font-size-xs;
+    color: $text-tertiary;
+    font-style: italic;
+}
+
+// ============================================
+// ICON REFERENCE (Developer Mode)
+// ============================================
+
+.icon-reference-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: $space-2;
+    margin-top: $space-3;
+}
+
+.icon-reference-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-1;
+    padding: $space-3 $space-2;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+    background: $bg-card;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+        border-color: $accent-primary;
+        background: $bg-hover;
+    }
+
+    &.copied {
+        border-color: $success;
+        background: $success-bg;
+    }
+
+    svg {
+        color: $text-primary;
+        opacity: 0.8;
+    }
+
+    .icon-reference-name {
+        font-size: $font-size-xs;
+        color: $text-secondary;
+        text-align: center;
+        word-break: break-word;
+        line-height: 1.2;
+    }
+
+    &.copied .icon-reference-name {
+        color: $success;
+        font-weight: $font-weight-medium;
+    }
+}
+
+// ============================================
+// ACCENT COLOR PRESETS
+// ============================================
+
+.accent-presets {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: $space-2;
+    margin-bottom: $space-4;
+
+    @media (max-width: $breakpoint-sm) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.accent-preset {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    background: transparent;
+    border: 2px solid $border-subtle;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        border-color: $border-active;
+    }
+
+    &.active {
+        border-color: $accent-primary;
+        background: $bg-hover;
+    }
+}
+
+.accent-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: $radius-full;
+    flex-shrink: 0;
+}
+
+.accent-label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $text-primary;
+}
+
+.accent-custom {
+    padding-top: $space-3;
+    border-top: 1px solid $border-subtle;
+}
+
+.accent-custom-label {
+    display: block;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $text-secondary;
+    margin-bottom: $space-2;
+}
+
+.accent-custom-row {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+}
+
+.accent-custom-input {
+    width: 40px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    background: transparent;
+    cursor: pointer;
+
+    &::-webkit-color-swatch-wrapper {
+        padding: 2px;
+    }
+
+    &::-webkit-color-swatch {
+        border: none;
+        border-radius: $radius-sm;
+    }
+}
+
+.accent-custom-hex {
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+}
+
+// ============================================
+// DASHBOARD WIDGET CONFIG
+// ============================================
+
+.widget-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+}
+
+.widget-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $space-3 $space-4;
+    background: $bg-hover;
+    border-radius: $radius-md;
+    transition: opacity $transition-fast;
+
+    &--hidden {
+        opacity: 0.5;
+    }
+}
+
+.widget-item__info {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+}
+
+.widget-item__label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $text-primary;
+}
+
+.widget-item__controls {
+    display: flex;
+    gap: $space-1;
+}
+
+.widget-move-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover:not(:disabled) {
+        background: $bg-card;
+        color: $text-primary;
+        border-color: $border-active;
+    }
+
+    &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+    }
+}
+
+// ============================================
+// WHITE LABEL / CUSTOM BRANDING
+// ============================================
+
+.whitelabel-modes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: $space-3;
+    margin-top: $space-4;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.whitelabel-mode {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-4;
+    background: transparent;
+    border: 2px solid $border-subtle;
+    border-radius: $radius-lg;
+    cursor: pointer;
+    transition: all $transition-fast;
+    text-align: center;
+    color: $text-secondary;
+
+    svg {
+        opacity: 0.7;
+    }
+
+    &:hover {
+        border-color: $border-active;
+    }
+
+    &.active {
+        border-color: $accent-primary;
+        background: fade($accent-primary-raw, 5%);
+        color: $text-primary;
+
+        svg {
+            color: $accent-primary;
+            opacity: 1;
+        }
+    }
+
+    .whitelabel-mode__label {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+        color: $text-primary;
+    }
+
+    .whitelabel-mode__desc {
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+    }
+}
+
+.whitelabel-fields {
+    margin-top: $space-4;
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    .form-group {
+        label {
+            display: block;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-medium;
+            color: $text-secondary;
+            margin-bottom: $space-2;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            max-width: 320px;
+            padding: $space-3;
+            background: $bg-hover;
+            border: 1px solid $border-subtle;
+            border-radius: $radius-md;
+            color: $text-primary;
+            font-size: $font-size-sm;
+            transition: border-color $transition-fast;
+
+            &:focus {
+                outline: none;
+                border-color: $accent-primary;
+            }
+        }
+    }
+}
+
+.whitelabel-upload {
+    border: 2px dashed $border-subtle;
+    border-radius: $radius-lg;
+    padding: $space-5;
+    cursor: pointer;
+    transition: all $transition-fast;
+    text-align: center;
+
+    &:hover {
+        border-color: $accent-primary;
+        background: fade($accent-primary-raw, 3%);
+    }
+
+    .whitelabel-upload__placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: $space-2;
+        color: $text-tertiary;
+
+        svg {
+            opacity: 0.5;
+        }
+
+        span {
+            font-size: $font-size-sm;
+        }
+    }
+
+    .whitelabel-upload__hint {
+        font-size: $font-size-xs !important;
+        color: $text-tertiary;
+        opacity: 0.7;
+    }
+}
+
+.whitelabel-logo-preview {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+    justify-content: center;
+
+    img {
+        width: 48px;
+        height: 48px;
+        object-fit: contain;
+        border-radius: $radius-md;
+        border: 1px solid $border-subtle;
+        background: $bg-hover;
+        padding: $space-1;
+    }
+}
+
+.whitelabel-preview {
+    margin-top: $space-4;
+
+    .whitelabel-preview__label {
+        display: block;
+        font-size: $font-size-xs;
+        font-weight: $font-weight-semibold;
+        color: $text-tertiary;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: $space-2;
+    }
+
+    .whitelabel-preview__box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 70px;
+        padding: 0 $space-4;
+        background: $bg-body;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+    }
+}
+
+.whitelabel-star-prompt {
+    margin-top: $space-4;
+    background: linear-gradient(135deg, $accent-glow 0%, fade($accent-primary-raw, 8%) 100%);
+    border: 1px solid fade($accent-primary-raw, 30%);
+    border-radius: $radius-lg;
+    padding: $space-5;
+    display: flex;
+    align-items: flex-start;
+    gap: $space-4;
+
+    .star-icon {
+        flex-shrink: 0;
+        width: 44px;
+        height: 44px;
+        background: linear-gradient(135deg, $warning 0%, darken($warning, 10%) 100%);
+        border-radius: $radius-lg;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+
+    .star-content {
+        flex: 1;
+
+        h4 {
+            margin: 0 0 $space-2;
+            font-size: $font-size-md;
+            font-weight: $font-weight-semibold;
+        }
+
+        p {
+            margin: 0 0 $space-3;
+            font-size: $font-size-sm;
+            color: $text-secondary;
+            line-height: $line-height-relaxed;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: $space-2;
+        }
+    }
+
+    @media (max-width: $breakpoint-sm) {
+        flex-direction: column;
+    }
+}
+
+// ============================================
+// SSO CONFIG & LINKED ACCOUNTS
+// ============================================
+
+.sso-config {
+    display: flex;
+    flex-direction: column;
+    gap: $space-5;
+}
+
+.sso-general-form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    .form-group {
+        label {
+            display: block;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-medium;
+            color: $text-secondary;
+            margin-bottom: $space-2;
+        }
+
+        select,
+        input[type="text"] {
+            width: 100%;
+            padding: $space-3;
+            background: $bg-hover;
+            border: 1px solid $border-subtle;
+            border-radius: $radius-md;
+            color: $text-primary;
+            font-size: $font-size-sm;
+
+            &:focus {
+                outline: none;
+                border-color: $accent-primary;
+            }
+        }
+    }
+}
+
+.sso-provider-config {
+    border: 1px solid $border-subtle;
+
+    &--enabled {
+        border-color: $accent-primary;
+    }
+
+    .sso-provider-config__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        padding: $space-4;
+
+        &:hover {
+            background: $bg-hover;
+        }
+    }
+
+    .sso-provider-config__title {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+
+        h3 {
+            margin: 0;
+        }
+    }
+
+    .sso-provider-config__status {
+        font-size: $font-size-xs;
+        padding: $space-1 $space-2;
+        border-radius: $radius-full;
+        font-weight: $font-weight-medium;
+
+        &--active {
+            background: fade($color-success, 15%);
+            color: $color-success;
+        }
+    }
+
+    .sso-provider-config__body {
+        padding: $space-4;
+        border-top: 1px solid $border-subtle;
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+
+        .form-group {
+            label {
+                display: block;
+                font-size: $font-size-sm;
+                font-weight: $font-weight-medium;
+                color: $text-secondary;
+                margin-bottom: $space-2;
+            }
+
+            input,
+            textarea {
+                width: 100%;
+                padding: $space-3;
+                background: $bg-hover;
+                border: 1px solid $border-subtle;
+                border-radius: $radius-md;
+                color: $text-primary;
+                font-size: $font-size-sm;
+                font-family: $font-mono;
+
+                &:focus {
+                    outline: none;
+                    border-color: $accent-primary;
+                }
+            }
+
+            textarea {
+                resize: vertical;
+                font-family: $font-mono;
+            }
+        }
+    }
+
+    .sso-provider-config__actions {
+        display: flex;
+        gap: $space-3;
+        padding-top: $space-2;
+    }
+}
+
+// Linked accounts (Security tab)
+.linked-accounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    margin: $space-4 0;
+}
+
+.linked-account {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $space-3;
+    background: $bg-secondary;
+    border-radius: $radius-lg;
+    border: 1px solid $border-subtle;
+
+    .linked-account__info {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+
+        div {
+            display: flex;
+            flex-direction: column;
+        }
+    }
+
+    .linked-account__provider {
+        font-weight: $font-weight-medium;
+        text-transform: capitalize;
+    }
+
+    .linked-account__email {
+        font-size: $font-size-sm;
+        color: $text-secondary;
+    }
+}
+
+.linked-accounts-available {
+    display: flex;
+    gap: $space-3;
+    margin-top: $space-3;
+    flex-wrap: wrap;
+
+    .btn {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+    }
+}
+
+// ============================================
+// SIDEBAR SETTINGS
+// ============================================
+
+.sidebar-settings {
+    display: flex;
+    flex-direction: column;
+    gap: $space-8;
+
+    .settings-section-desc {
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        margin: 0;
+        line-height: $line-height-normal;
+    }
+
+    .settings-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: $space-1;
+
+        h3 { margin-bottom: 0; }
+    }
+}
+
+.sidebar-item-count {
+    font-size: $font-size-xs;
+    color: $text-tertiary;
+    background: $bg-secondary;
+    padding: $space-1 $space-2;
+    border-radius: $radius-full;
+    font-weight: $font-weight-medium;
+}
+
+// Preset cards
+.sidebar-presets {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: $space-3;
+    margin-top: $space-2;
+}
+
+.sidebar-preset-card {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+    padding: $space-4;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    cursor: pointer;
+    transition: all $transition-fast;
+    text-align: left;
+    width: 100%;
+    position: relative;
+
+    &:hover {
+        border-color: $border-hover;
+        background: $bg-hover;
+    }
+
+    &.active {
+        border-color: $accent-primary;
+        background: $bg-card;
+        box-shadow: 0 0 0 1px $accent-primary;
+    }
+
+    .preset-card-icon {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: $bg-secondary;
+        border-radius: $radius-md;
+        color: $text-secondary;
+
+        svg {
+            stroke-width: 1.5;
+        }
+    }
+
+    &.active .preset-card-icon {
+        background: fade($accent-primary-raw, 15%);
+        color: $accent-primary;
+    }
+
+    .preset-card-info {
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .preset-card-label {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+
+    .preset-card-desc {
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        line-height: $line-height-normal;
+    }
+
+    .preset-card-check {
+        position: absolute;
+        top: $space-3;
+        right: $space-3;
+        color: $accent-primary;
+    }
+}
+
+// ─── Database Migrations ──────────────────────────────────────
+// Pending-update banner + apply action on the Settings → Migrations tab.
+.migration-pending-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+    padding: $space-4;
+    margin-bottom: $space-4;
+    background: fade($warning, 10%);
+    border: 1px solid fade($warning, 20%);
+    border-radius: $radius-md;
+
+    .migration-pending-icon { color: $warning; flex-shrink: 0; margin-top: 1px; }
+    .migration-pending-body { flex: 1; min-width: 0; }
+
+    .migration-pending-title {
+        margin: 0 0 $space-1;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+
+    .migration-pending-desc {
+        margin: 0 0 $space-3;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+    }
+
+    .migration-pending-actions {
+        display: flex;
+        align-items: center;
+        gap: $space-4;
+        flex-wrap: wrap;
+    }
+
+    .migration-backup-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        cursor: pointer;
+        user-select: none;
+
+        input { accent-color: $accent-primary; cursor: pointer; }
+    }
+}
+
+.migration-uptodate {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    margin-bottom: $space-4;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+
+    svg { color: $success; flex-shrink: 0; }
+}
+
+// Inline code chips shared by the banner and the up-to-date line.
+.migration-pending-desc code,
+.migration-uptodate code {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    padding: 1px 5px;
+    background: $bg-tertiary;
+    border-radius: $radius-sm;
+    color: $text-primary;
+}
+
+// Items toggle list
+.sidebar-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-5;
+    margin-top: $space-2;
+}
+
+.sidebar-items-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.sidebar-items-group-label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: $text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0 0 $space-2 0;
+    border-bottom: 1px solid $border-subtle;
+    margin-bottom: $space-1;
+}
+
+.sidebar-item-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $space-3 $space-2;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: $bg-hover;
+    }
+
+    &.hidden-item {
+        .sidebar-item-toggle-info {
+            opacity: 0.5;
+        }
+    }
+}
+
+.sidebar-item-toggle-info {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    transition: opacity $transition-fast;
+
+    span {
+        font-size: $font-size-sm;
+        color: $text-primary;
+        font-weight: $font-weight-medium;
+    }
+}
+
+.sidebar-item-toggle-icon {
+    width: 18px;
+    height: 18px;
+    stroke: $text-secondary;
+    fill: none;
+    stroke-width: 2;
+    flex-shrink: 0;
+}
+
+// Actions bar
+.sidebar-settings-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $space-3;
+    padding-top: $space-5;
+    border-top: 1px solid $border-subtle;
+}

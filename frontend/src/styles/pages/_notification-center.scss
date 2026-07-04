@@ -1,0 +1,394 @@
+// Notifications history page (sk-notif-page).
+
+.sk-notif-page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 20px 24px 40px;
+
+    &__filters {
+        display: inline-flex;
+        gap: 4px;
+        margin-bottom: 16px;
+        background: $bg-card;
+        border: 1px solid $border-subtle;
+        border-radius: 9px;
+        padding: 3px;
+
+        button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 6px 14px;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 500;
+            color: $text-secondary;
+
+            &:hover { color: $text-primary; }
+            &.is-active {
+                background: $accent-bg;
+                color: $accent-primary;
+            }
+        }
+    }
+
+    &__state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 60px 20px;
+        color: $text-secondary;
+
+        svg { opacity: 0.5; }
+        p { margin: 0; font-size: 14px; }
+    }
+
+    &__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border: 1px solid $border-subtle;
+        border-radius: 12px;
+        overflow: hidden;
+        background: $bg-card;
+    }
+
+    &__more {
+        display: flex;
+        justify-content: center;
+        margin-top: 16px;
+    }
+}
+
+.sk-notif-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid $border-subtle;
+
+    &:last-child { border-bottom: none; }
+    &:hover { background: $bg-hover; }
+    &.is-unread { background: $accent-bg; }
+
+    &__dot {
+        flex: 0 0 auto;
+        width: 9px;
+        height: 9px;
+        margin-top: 5px;
+        border-radius: 50%;
+    }
+
+    &__body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &__title {
+        font-size: 14px;
+        font-weight: 600;
+        color: $text-primary;
+    }
+
+    &__text {
+        margin-top: 2px;
+        font-size: 13px;
+        color: $text-secondary;
+    }
+
+    &__time {
+        flex: 0 0 auto;
+        font-size: 12px;
+        color: $text-secondary;
+        opacity: 0.8;
+        white-space: nowrap;
+    }
+
+    &__action {
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        color: $accent-primary;
+    }
+
+    &__dismiss {
+        flex: 0 0 auto;
+        align-self: flex-start;
+        padding: 2px;
+        border: none;
+        background: none;
+        border-radius: 6px;
+        cursor: pointer;
+        color: $text-secondary;
+        line-height: 0;
+
+        &:hover { background: $bg-hover; color: $text-primary; }
+    }
+}
+
+// Admin delivery log (sk-dlog).
+.sk-dlog {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px 24px 40px;
+
+    &__stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    &__filters {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 14px;
+
+        label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: $text-secondary;
+        }
+
+        select {
+            background: $bg-card;
+            border: 1px solid $border-default;
+            border-radius: 8px;
+            color: $text-primary;
+            padding: 6px 10px;
+            font-size: 13px;
+            text-transform: capitalize;
+        }
+    }
+
+    &__empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 50px 20px;
+        color: $text-secondary;
+
+        svg { opacity: 0.5; }
+        p { margin: 0; }
+    }
+
+    &__table-wrap {
+        border: 1px solid $border-subtle;
+        border-radius: 12px;
+        overflow: hidden;
+        background: $bg-card;
+    }
+
+    &__table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+
+        th {
+            text-align: left;
+            padding: 10px 14px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: $text-secondary;
+            border-bottom: 1px solid $border-subtle;
+        }
+
+        td {
+            padding: 11px 14px;
+            border-bottom: 1px solid $border-subtle;
+            color: $text-primary;
+            vertical-align: top;
+        }
+
+        tr:last-child td { border-bottom: none; }
+    }
+
+    &__status {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: capitalize;
+
+        &.is-sent { background: rgba(61, 220, 151, 0.15); color: #1f9d6b; }
+        &.is-pending { background: rgba(109, 124, 255, 0.15); color: #5560d6; }
+        &.is-failed { background: rgba(251, 111, 111, 0.15); color: #d2544f; }
+        &.is-skipped { background: rgba(154, 161, 178, 0.18); color: $text-secondary; }
+    }
+
+    &__target {
+        font-family: 'SFMono-Regular', ui-monospace, Consolas, monospace;
+        font-size: 12px;
+        color: $text-secondary;
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__title { font-weight: 600; }
+
+    &__error {
+        margin-top: 3px;
+        font-size: 12px;
+        color: #d2544f;
+        max-width: 320px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__when {
+        color: $text-secondary;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 720px) {
+    .sk-dlog__stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+// Email transport / provider management (sk-eprov).
+.sk-eprov {
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+
+    &__head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    &__title {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 14px;
+        font-weight: 600;
+        color: $text-primary;
+    }
+
+    &__sub { font-size: 12px; color: $text-secondary; }
+
+    &__empty {
+        font-size: 13px;
+        color: $text-secondary;
+        padding: 6px 0 12px;
+    }
+
+    &__list {
+        list-style: none;
+        margin: 0 0 12px;
+        padding: 0;
+    }
+
+    &__item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid $border-subtle;
+
+        &:last-child { border-bottom: none; }
+    }
+
+    &__meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    &__name {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: $text-primary;
+    }
+
+    &__badge {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 1px 7px;
+        border-radius: 999px;
+        background: $accent-bg;
+        color: $accent-primary;
+    }
+
+    &__type { font-size: 12px; color: $text-secondary; }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex: 0 0 auto;
+    }
+
+    &__add {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    &__form {
+        border-top: 1px solid $border-subtle;
+        margin-top: 6px;
+        padding-top: 14px;
+    }
+
+    &__form-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: $text-primary;
+        margin-bottom: 10px;
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    &__field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    &__check {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 13px;
+        color: $text-secondary;
+        padding-top: 6px;
+    }
+
+    &__form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 14px;
+    }
+}
+
+@media (max-width: 720px) {
+    .sk-eprov__grid { grid-template-columns: 1fr; }
+}

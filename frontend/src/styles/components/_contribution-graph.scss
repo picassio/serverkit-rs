@@ -1,0 +1,91 @@
+.contribution-graph-container {
+    padding: $space-4;
+    background: $bg-card;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+    margin-bottom: $space-6;
+
+    .graph-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-4;
+
+        h4 {
+            margin: 0;
+            font-size: $font-size-md;
+            font-weight: 600;
+
+            .username {
+                color: $accent-primary;
+                margin-left: $space-2;
+                font-weight: 500;
+            }
+        }
+
+        .graph-legend {
+            display: flex;
+            align-items: center;
+            gap: $space-2;
+            font-size: $font-size-xs;
+            color: $text-tertiary;
+
+            .legend-cells {
+                display: flex;
+                gap: 2px;
+
+                .cell {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 2px;
+                }
+            }
+        }
+    }
+
+    .graph-grid-wrapper {
+        overflow-x: auto;
+        padding-bottom: $space-2;
+
+        &::-webkit-scrollbar {
+            height: 6px;
+        }
+        &::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        &::-webkit-scrollbar-thumb {
+            background: $bg-hover;
+            border-radius: $radius-full;
+        }
+    }
+
+    .graph-grid {
+        display: flex;
+        gap: 3px;
+        min-width: fit-content;
+    }
+
+    .graph-week {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .graph-cell {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        transition: transform 0.1s ease;
+
+        &:hover {
+            transform: scale(1.2);
+            z-index: 10;
+        }
+    }
+
+    .level-0 { background-color: $bg-hover; }
+    .level-1 { background-color: fade($accent-primary-raw, 30%); }
+    .level-2 { background-color: fade($accent-primary-raw, 55%); }
+    .level-3 { background-color: fade($accent-primary-raw, 80%); }
+    .level-4 { background-color: $accent-primary; }
+}

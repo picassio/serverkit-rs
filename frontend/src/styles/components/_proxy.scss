@@ -1,0 +1,178 @@
+// Managed reverse-proxy stack panel (ProxyStackPanel.jsx).
+// Server detail "Proxy" tab: type selector, compose preview, custom snippet.
+
+.proxy-panel {
+    display: flex;
+    flex-direction: column;
+    gap: $space-5;
+
+    &__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+    }
+
+    &__title {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+
+        h3 {
+            margin: 0;
+            font-size: $font-size-lg;
+            font-weight: $font-weight-semibold;
+            color: $text-primary;
+        }
+    }
+
+    &__status {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+    }
+
+    &__status-label {
+        font-size: $font-size-xs;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: $text-tertiary;
+    }
+
+    &__hint {
+        margin: 0;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        line-height: 1.5;
+    }
+
+    &__section {
+        display: flex;
+        flex-direction: column;
+        gap: $space-3;
+        padding: $space-4;
+        background: $bg-card;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+    }
+
+    &__label {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-semibold;
+        color: $text-secondary;
+    }
+
+    &__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+    }
+
+    &__code {
+        margin: 0;
+        max-height: 360px;
+        overflow: auto;
+        padding: $space-3;
+        background: $bg-body;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        font-family: $font-mono;
+        font-size: $font-size-xs;
+        line-height: 1.5;
+        color: $text-secondary;
+        white-space: pre;
+    }
+
+    &__empty {
+        padding: $space-3;
+        font-size: $font-size-sm;
+        color: $text-tertiary;
+    }
+
+    &__error {
+        padding: $space-3;
+        margin-bottom: $space-3;
+        background: $danger-bg;
+        border: 1px solid $danger-border;
+        border-radius: $radius-md;
+        color: $danger-color;
+        font-size: $font-size-sm;
+    }
+
+    // Ingress-plane mismatch banner: apps whose expected plane disagrees with
+    // the server's active proxy.
+    &__ingress-warning {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+        padding: $space-4;
+        background: $warning-bg;
+        border: 1px solid $warning-border;
+        border-radius: $radius-lg;
+    }
+
+    &__ingress-warning-head {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        color: $warning;
+
+        strong {
+            font-size: $font-size-sm;
+            font-weight: $font-weight-semibold;
+            color: $text-primary;
+        }
+    }
+
+    &__ingress-warning-text {
+        margin: 0;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        line-height: 1.5;
+
+        strong {
+            color: $text-primary;
+        }
+    }
+
+    &__ingress-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+    }
+
+    &__ingress-item {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: $space-2;
+        font-size: $font-size-sm;
+    }
+
+    &__ingress-link {
+        font-weight: $font-weight-medium;
+        color: $accent-primary;
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    &__ingress-reason {
+        color: $text-tertiary;
+        font-size: $font-size-xs;
+    }
+
+    // Subtle "all aligned" note when there are apps but no mismatches.
+    &__ingress-ok {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-sm;
+        color: $success;
+    }
+}

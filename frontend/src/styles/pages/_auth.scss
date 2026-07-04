@@ -1,0 +1,124 @@
+// ============================================
+// AUTHENTICATION PAGES (Login, Register)
+// ============================================
+
+.auth-container {
+    min-height: 100vh;
+    @include flex-center();
+    padding: $space-5;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 400px;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-2xl;
+    padding: $space-10;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: $space-8;
+
+    .brand-logo {
+        width: 48px;
+        height: 48px;
+        margin: 0 auto $space-4;
+    }
+
+    h1 {
+        font-size: $font-size-2xl;
+        font-weight: $font-weight-bold;
+        margin-bottom: $space-2;
+    }
+
+    p {
+        color: $text-secondary;
+    }
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: $space-6;
+    color: $text-secondary;
+
+    a {
+        color: $accent-primary;
+        font-weight: $font-weight-medium;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}
+
+// SSO login buttons
+.sso-providers {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+}
+
+.btn-sso {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-3;
+    width: 100%;
+    padding: $space-3 $space-4;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    background: $bg-card;
+    color: $text-primary;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover:not(:disabled) {
+        border-color: $border-active;
+        background: $bg-hover;
+    }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    svg {
+        flex-shrink: 0;
+    }
+}
+
+.sso-divider {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+    margin: $space-6 0;
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+
+    &::before,
+    &::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: $border-subtle;
+    }
+}
+
+.sso-loading {
+    display: flex;
+    justify-content: center;
+    margin-bottom: $space-4;
+
+    .spinning {
+        animation: spin 1s linear infinite;
+    }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

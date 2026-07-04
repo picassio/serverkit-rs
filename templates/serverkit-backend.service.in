@@ -1,0 +1,37 @@
+[Unit]
+Description=ServerKit Backend API
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+WorkingDirectory=@SERVERKIT_DIR@/backend
+Environment="PATH=@SERVERKIT_VENV_DIR@/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="FLASK_ENV=production"
+Environment="SERVERKIT_INSTALL_DIR=@SERVERKIT_DIR@"
+EnvironmentFile=@SERVERKIT_DIR@/.env
+# Single PROCESS (-w 1) is mandatory: the agent gateway keeps connected-agent
+# state in memory. Threaded worker (not GeventWebSocketWorker): the app runs
+# async_mode='threading', where engineio serves WebSocket via simple-websocket
+# on the raw socket — a gevent-websocket worker ALSO answers the upgrade,
+# producing a double 101 handshake the browser reports as
+# "Invalid frame header" (WS then silently degrades to polling).
+ExecStart=@SERVERKIT_VENV_DIR@/bin/gunicorn -w 1 --threads 100 -b 0.0.0.0:@PORT@ --timeout 120 --access-logfile @LOG_DIR@/access.log --error-logfile @LOG_DIR@/error.log run:app
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+
+# Security settings (while still allowing system management)
+NoNewPrivileges=no
+ProtectSystem=no
+ProtectHome=no
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=serverkit
+
+[Install]
+WantedBy=multi-user.target

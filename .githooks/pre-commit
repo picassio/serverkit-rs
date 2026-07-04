@@ -1,0 +1,26 @@
+#!/bin/sh
+# ServerKit pre-commit hook — lints staged frontend JS/JSX and blocks the commit
+# on ESLint ERRORS only (warnings are allowed). It exits early for commits that
+# touch no frontend JS/JSX (backend, SCSS, docs), so it never gets in the way of
+# those. Enable once per clone with:
+#
+#     git config core.hooksPath .githooks
+#
+# (Or run frontend/setup-hooks.sh.)
+
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^frontend/src/.*\.(js|jsx)$' || true)
+[ -z "$files" ] && exit 0
+
+cd frontend || exit 0
+# Skip silently if deps aren't installed yet (don't fetch/block).
+[ -d node_modules ] || exit 0
+
+rel=$(echo "$files" | sed 's#^frontend/##')
+echo "$rel" | xargs npx eslint
+status=$?
+if [ "$status" -ne 0 ]; then
+    echo ""
+    echo "✖ Commit blocked: fix the ESLint error(s) above (warnings are allowed)."
+    echo "  To bypass for an emergency commit: git commit --no-verify"
+fi
+exit $status

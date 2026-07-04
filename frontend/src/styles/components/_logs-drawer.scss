@@ -1,0 +1,343 @@
+// ============================================
+// INFRA OVERLAYS (redesign map §4 #21)
+// Bottom-dock logs drawer + SSH remote-terminal overlay.
+// The logs drawer STAYS a bottom dock (open product decision §6.3).
+// ============================================
+
+@keyframes sk-overlay-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+// --------------------------------------------
+// PERSISTENT LOGS DRAWER (bottom dock)
+// --------------------------------------------
+.logs-drawer {
+    position: fixed;
+    bottom: 0;
+    left: $sidebar-width;
+    right: 0;
+    z-index: $z-fixed;
+    background: var(--surface);
+    border-top: 1px solid var(--border-strong);
+    display: flex;
+    flex-direction: column;
+
+    // Sidebar is off-canvas on mobile — dock spans the full width.
+    @media (max-width: $breakpoint-md) {
+        left: 0;
+    }
+
+    &--collapsed {
+        height: 36px;
+        cursor: pointer;
+        transition: background $transition-fast;
+
+        &:hover {
+            background: var(--surface-hover);
+        }
+    }
+
+    &--expanded {
+        // Up-facing variant of --shadow-lg (token shadows cast downward).
+        box-shadow: 0 -16px 48px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    // Resize drag handle
+    &__resize-handle {
+        height: 4px;
+        cursor: ns-resize;
+        background: transparent;
+        transition: background $transition-fast;
+        flex-shrink: 0;
+
+        &:hover,
+        &:active {
+            background: var(--accent);
+        }
+    }
+
+    // Collapsed bar
+    &__collapsed-bar {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        padding: 0 $space-4;
+        height: 36px;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    &__collapsed-actions {
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+
+    // Header (expanded)
+    &__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+        padding: $space-2 $space-4;
+        border-bottom: 1px solid var(--border-soft);
+        flex-shrink: 0;
+    }
+
+    &__header-left {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        min-width: 0;
+    }
+
+    &__header-right {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        flex-shrink: 0;
+    }
+
+    // Icon tile (drawer-head idiom)
+    &__ico {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: var(--cyan-bg);
+        color: var(--cyan);
+        flex-shrink: 0;
+    }
+
+    &__titles {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    &__service-name {
+        font-size: 13px;
+        font-weight: $font-weight-semibold;
+        color: var(--text);
+        white-space: nowrap;
+    }
+
+    // Mono sub — the log source (path / container)
+    &__source {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--text-faint);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    // Live indicator + line count (mono, demo log-foot idiom)
+    &__live {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+        white-space: nowrap;
+    }
+
+    &__live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 7px var(--green);
+        animation: sk-overlay-blink 1.4s infinite;
+        flex-shrink: 0;
+    }
+
+    &__last-line {
+        flex: 1;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &__toggle {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        cursor: pointer;
+        user-select: none;
+    }
+
+    // Log content area — code well
+    &__content {
+        flex: 1;
+        overflow-y: auto;
+        padding: $space-2 $space-4;
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        line-height: 1.7;
+        background: var(--bg-code);
+        scrollbar-width: thin;
+    }
+
+    &__empty {
+        font-family: var(--mono);
+        color: var(--text-faint);
+        padding: $space-4;
+        text-align: center;
+    }
+
+    &__line {
+        color: var(--text-dim);
+        white-space: pre-wrap;
+        word-break: break-all;
+
+        &--error {
+            color: var(--red);
+        }
+
+        &--warn {
+            color: var(--amber);
+        }
+    }
+}
+
+// --------------------------------------------
+// REMOTE TERMINAL (SSH overlay — xterm host)
+// All rules scoped under the container so the generic class names
+// (.terminal-header/.terminal-title/…) can never leak.
+// --------------------------------------------
+.remote-terminal-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+
+    .terminal-header {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        padding: $space-2 $space-3;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border-soft);
+        flex-shrink: 0;
+    }
+
+    // Icon tile (demo SSH drawer: green terminal tile)
+    .terminal-ico {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: var(--green-bg);
+        color: var(--green);
+        flex-shrink: 0;
+    }
+
+    .terminal-titles {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .terminal-title {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: 13px;
+        font-weight: $font-weight-semibold;
+        color: var(--text);
+        white-space: nowrap;
+    }
+
+    .terminal-status {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--text-ghost);
+        flex-shrink: 0;
+
+        &.connected {
+            background: var(--green);
+            box-shadow: 0 0 7px var(--green);
+            animation: sk-overlay-blink 1.4s infinite;
+        }
+
+        &.disconnected {
+            background: var(--red);
+        }
+    }
+
+    .session-id {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--text-faint);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .terminal-actions {
+        display: flex;
+        align-items: center;
+        gap: $space-1;
+        flex-shrink: 0;
+    }
+
+    .terminal-close-btn {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        border: none;
+        border-radius: $radius-md;
+        color: var(--text-faint);
+        cursor: pointer;
+        transition: background $transition-fast, color $transition-fast;
+
+        &:hover {
+            background: var(--surface-2);
+            color: var(--text);
+        }
+    }
+
+    // The xterm well is intentionally near-black in BOTH themes — it must
+    // match the literal `background` in RemoteTerminal's xterm theme object
+    // (xterm requires literal hex, so it can't follow var(--bg-code)).
+    .terminal-content {
+        flex: 1;
+        min-height: 0;
+        padding: $space-2 $space-3;
+        background: #0a0b0e;
+
+        .xterm {
+            height: 100%;
+        }
+    }
+
+    .terminal-alert {
+        padding: $space-2 $space-3;
+        border-top: 1px solid var(--border-soft);
+        background: var(--red-bg);
+        color: var(--red);
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+    }
+}

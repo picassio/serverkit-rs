@@ -1,0 +1,244 @@
+"""Unit tests for the transparent build-pack layer (BuildpackService).
+
+Pure / no network / no Flask app needed — detection runs against temp dirs full
+of marker files, and generation is pure string production.
+"""
+
+import json
+
+import pytest
+
+from app.services.buildpack_service import BuildpackService
+
+
+# --------------------------------------------------------------------------- #
+# detect()
+# --------------------------------------------------------------------------- #
+def test_detect_node_express(tmp_path):
+    (tmp_path / 'package.json').write_text(json.dumps({
+        'name': 'demo',
+        'dependencies': {'express': '^4.18.0'},
+        'scripts': {'start': 'node server.js'},
+        'engines': {'node': '>=20'},
+    }), encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['builder'] == 'nixpacks'
+    assert plan['language'] == 'node'
+    assert plan['framework'] == 'express'
+    assert plan['versions']['node'] == '20'
+    assert plan['start_command'] == 'node server.js'
+    assert plan['port'] == 3000
+    assert plan['confidence'] > 0
+
+
+def test_detect_node_nextjs_build_command(tmp_path):
+    (tmp_path / 'package.json').write_text(json.dumps({
+        'dependencies': {'next': '14.0.0', 'react': '18'},
+        'scripts': {'build': 'next build', 'start': 'next start'},
+    }), encoding='utf-8')
+    (tmp_path / 'next.config.js').write_text('module.exports = {}', encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['framework'] == 'nextjs'
+    assert plan['build_command'] == 'npm run build'
+
+
+def test_detect_python_flask(tmp_path):
+    (tmp_path / 'requirements.txt').write_text('Flask==3.0\ngunicorn\n', encoding='utf-8')
+    (tmp_path / 'app.py').write_text('app = None\n', encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['builder'] == 'nixpacks'
+    assert plan['language'] == 'python'
+    assert plan['framework'] == 'flask'
+    assert 'gunicorn' in plan['start_command']
+    assert plan['build_command'].startswith('pip install')
+
+
+def test_detect_python_version_from_pyproject(tmp_path):
+    (tmp_path / 'pyproject.toml').write_text(
+        '[project]\nname="x"\nrequires-python = ">=3.12"\n', encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['language'] == 'python'
+    assert plan['versions']['python'] == '3.12'
+
+
+def test_detect_go(tmp_path):
+    (tmp_path / 'go.mod').write_text('module example.com/app\n\ngo 1.21\n', encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['builder'] == 'nixpacks'
+    assert plan['language'] == 'go'
+    assert plan['versions']['go'] == '1.21'
+    assert plan['build_command'] == 'go build -o /app/server ./...'
+
+
+def test_detect_static(tmp_path):
+    (tmp_path / 'index.html').write_text('<html></html>', encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['builder'] == 'static'
+    assert plan['language'] == 'static'
+    assert plan['port'] == 80
+
+
+def test_detect_dockerfile_present_wins(tmp_path):
+    # Dockerfile present alongside a package.json — defer to the author's build.
+    (tmp_path / 'Dockerfile').write_text('FROM node:20\n', encoding='utf-8')
+    (tmp_path / 'package.json').write_text('{}', encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['builder'] == 'dockerfile-present'
+    assert plan['confidence'] == 1.0
+    assert plan['language'] == 'node'  # still labeled for display
+
+
+def test_detect_unknown(tmp_path):
+    (tmp_path / 'README.md').write_text('# nothing here', encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['builder'] == 'unknown'
+    assert plan['confidence'] == 0.0
+    assert plan['notes']
+
+
+def test_detect_missing_path():
+    plan = BuildpackService.detect('/path/that/does/not/exist/xyz')
+    assert plan['builder'] == 'unknown'
+    assert plan['notes']
+
+
+def test_procfile_overrides_start_command(tmp_path):
+    (tmp_path / 'requirements.txt').write_text('flask\n', encoding='utf-8')
+    (tmp_path / 'Procfile').write_text('web: gunicorn wsgi:application\n', encoding='utf-8')
+
+    plan = BuildpackService.detect(str(tmp_path))
+
+    assert plan['start_command'] == 'gunicorn wsgi:application'
+
+
+# --------------------------------------------------------------------------- #
+# generate_dockerfile()
+# --------------------------------------------------------------------------- #
+def test_generate_dockerfile_node():
+    plan = {
+        'builder': 'nixpacks', 'language': 'node', 'framework': 'express',
+        'versions': {'node': '20'}, 'build_command': 'npm run build',
+        'start_command': 'node server.js', 'port': 3000,
+    }
+    df = BuildpackService.generate_dockerfile(plan)
+    assert 'FROM node:20-slim' in df
+    assert 'npm run build' in df
+    assert 'EXPOSE 3000' in df
+    assert 'server.js' in df
+
+
+def test_generate_dockerfile_python():
+    plan = {
+        'builder': 'nixpacks', 'language': 'python', 'framework': 'flask',
+        'versions': {'python': '3.11'},
+        'build_command': 'pip install --no-cache-dir -r requirements.txt',
+        'start_command': 'gunicorn app:app', 'port': 8000,
+    }
+    df = BuildpackService.generate_dockerfile(plan)
+    assert 'FROM python:3.11-slim' in df
+    assert 'pip install' in df
+    assert 'EXPOSE 8000' in df
+    assert 'gunicorn app:app' in df
+
+
+def test_generate_dockerfile_go_multistage():
+    plan = {
+        'builder': 'nixpacks', 'language': 'go', 'versions': {'go': '1.22'},
+        'build_command': 'go build -o /app/server ./...', 'port': 8080,
+        'start_command': '/app/server',
+    }
+    df = BuildpackService.generate_dockerfile(plan)
+    assert 'FROM golang:1.22 AS build' in df
+    assert 'distroless' in df
+    assert 'EXPOSE 8080' in df
+
+
+def test_generate_dockerfile_static_nginx():
+    plan = {'builder': 'static', 'language': 'static', 'port': 80, 'versions': {}}
+    df = BuildpackService.generate_dockerfile(plan)
+    assert 'FROM nginx:alpine' in df
+    assert '/usr/share/nginx/html' in df
+
+
+def test_generate_dockerfile_present_is_noop():
+    plan = {'builder': 'dockerfile-present', 'language': 'node'}
+    df = BuildpackService.generate_dockerfile(plan)
+    assert 'already provides a Dockerfile' in df
+
+
+def test_generate_dockerfile_unknown():
+    plan = {'builder': 'unknown'}
+    df = BuildpackService.generate_dockerfile(plan)
+    assert 'Unable to generate' in df
+
+
+def test_generate_compose():
+    plan = {'builder': 'nixpacks', 'language': 'node', 'port': 3000, 'versions': {}}
+    compose = BuildpackService.generate_compose(plan, 'My App!')
+    assert 'services:' in compose
+    assert 'my-app' in compose
+    assert '"3000:3000"' in compose
+
+
+# --------------------------------------------------------------------------- #
+# apply_overrides()
+# --------------------------------------------------------------------------- #
+def test_apply_overrides_merges():
+    plan = {
+        'builder': 'nixpacks', 'language': 'node', 'versions': {'node': '18'},
+        'build_command': 'npm run build', 'start_command': 'node index.js',
+        'port': 3000, 'notes': [],
+    }
+    merged = BuildpackService.apply_overrides(plan, {
+        'node_version': '20',
+        'build_command': 'npm run compile',
+        'start_command': 'node dist/main.js',
+        'port': 8080,
+    })
+    assert merged['versions']['node'] == '20'
+    assert merged['build_command'] == 'npm run compile'
+    assert merged['start_command'] == 'node dist/main.js'
+    assert merged['port'] == 8080
+    # Original plan must be untouched (non-mutating).
+    assert plan['versions']['node'] == '18'
+    assert plan['port'] == 3000
+
+
+def test_apply_overrides_none_is_safe():
+    plan = {'builder': 'nixpacks', 'language': 'go', 'versions': {'go': '1.22'}}
+    merged = BuildpackService.apply_overrides(plan, None)
+    assert merged['versions']['go'] == '1.22'
+
+
+def test_apply_overrides_bad_port_ignored():
+    plan = {'builder': 'nixpacks', 'port': 3000, 'versions': {}}
+    merged = BuildpackService.apply_overrides(plan, {'port': 'not-a-number'})
+    assert merged['port'] == 3000
+
+
+# --------------------------------------------------------------------------- #
+# cache key
+# --------------------------------------------------------------------------- #
+def test_plan_cache_key_stable_and_distinct():
+    k1 = BuildpackService.plan_cache_key('https://github.com/a/b.git', 'abc')
+    k2 = BuildpackService.plan_cache_key('https://github.com/a/b.git', 'abc')
+    k3 = BuildpackService.plan_cache_key('https://github.com/a/b.git', 'def')
+    assert k1 == k2
+    assert k1 != k3
+    assert k1.startswith('buildpack:plan:')

@@ -1,0 +1,1368 @@
+// ============================================
+// SERVICE DETAIL PAGE (redesign — infra console look)
+// Shares the WordPress detail page's layout: a full-bleed PageTopbar
+// (.sk-topbar) above a centered .app-detail-body, reusing the shared
+// app-detail-* base chrome (_applications.scss). Tab bodies consume the
+// shared sk- primitives (Pill / MetricCard / Gauge / .sk-info-row / .sk-dtable).
+// ============================================
+
+// Run the detail page FULL-BLEED like the list pages: drop the .main-content
+// frame so the .sk-topbar spans edge-to-edge; .app-detail-body re-pads a
+// centered column below. (Mirrors .main-content:has(.wp-detail-page).)
+.main-content:has(.svc-detail) {
+    padding: 0;
+
+    // padding:0 also drops the base rule's mobile top-clearance, so restore it
+    // (the fixed mobile header would otherwise overlap the top bar).
+    @media (max-width: $breakpoint-md) {
+        margin-top: calc(#{$mobile-header-height} + env(safe-area-inset-top));
+    }
+}
+
+.svc-detail {
+    // ── Full-bleed shell ────────────────────────────────────────────────
+    // Mirrors .wp-detail-page: the page reuses the shared app-detail-* base
+    // chrome (from _applications.scss) and runs full-bleed, so the .sk-topbar
+    // spans edge-to-edge above a centered, padded body. The .main-content
+    // frame is dropped by the `:has()` rule at the bottom of this file.
+    gap: 0;
+
+    // Centered max-width column below the full-bleed top bar.
+    .app-detail-body {
+        display: flex;
+        flex-direction: column;
+        gap: $space-5;
+        width: 100%;
+        max-width: 1200px;
+        margin-inline: auto;
+        padding: $space-6 $space-6 $space-10;
+    }
+
+    // Identity row — flat (no card): just the tile + name on the page.
+    .app-detail-header {
+        padding: 4px 0 0;
+        background: none;
+        border: none;
+        border-radius: 0;
+
+        &::before { content: none; }
+    }
+
+    // Breadcrumb rendered in the top bar's title slot.
+    .svc-crumbs {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+
+        a {
+            color: var(--text-dim);
+            text-decoration: none;
+            &:hover { color: var(--accent-bright); }
+        }
+        &__sep { color: var(--text-ghost); }
+        &__cur { color: var(--text); }
+    }
+
+    // The detail page carries several actions, so let the whole bar wrap
+    // instead of squeezing the breadcrumb (matches .wp-detail-topbar).
+    .svc-detail-topbar {
+        padding: 10px $space-4;
+        flex-wrap: wrap;
+        row-gap: 8px;
+
+        .sk-topbar__spacer { display: none; }
+        .sk-topbar__titles { flex-shrink: 0; }
+
+        .sk-topbar__actions {
+            margin-left: auto;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            row-gap: 6px;
+
+            .ui-button {
+                height: 32px;
+                padding: 0 10px;
+                font-size: 12.5px;
+                gap: 6px;
+            }
+        }
+    }
+
+    // Gradient initial avatar (ds ServiceTile — size via props)
+    &__tile {
+        border-radius: 13px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    // Service-type tag (brand colors arrive via inline style props)
+    &__type-badge {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 5px;
+        border: 1px solid;
+    }
+
+    // Dropdown
+    &__dropdown {
+        position: relative;
+    }
+
+    &__dropdown-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: $space-1;
+        min-width: 200px;
+        z-index: $z-dropdown;
+        box-shadow: var(--shadow-md);
+
+        &--right {
+            left: auto;
+            right: 0;
+        }
+
+        button, a {
+            display: flex;
+            align-items: center;
+            gap: $space-2;
+            width: 100%;
+            padding: $space-2 $space-3;
+            background: none;
+            border: none;
+            color: $text-secondary;
+            font-size: $font-size-sm;
+            cursor: pointer;
+            border-radius: $radius-md;
+            text-decoration: none;
+
+            &:hover {
+                background: var(--surface-hover);
+                color: $text-primary;
+            }
+
+            &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+        }
+    }
+
+    &__dropdown-divider {
+        height: 1px;
+        background: var(--border-soft);
+        margin: $space-1 0;
+    }
+
+    &__dropdown-danger {
+        color: $danger !important;
+
+        &:hover {
+            background: $danger-bg !important;
+            color: $danger !important;
+        }
+    }
+
+    // Repo Bar (spacing handled by the .app-detail-body flex gap)
+    &__repo-bar {
+        display: flex;
+    }
+
+    &__repo-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        padding: 6px $space-3;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: $radius-full;
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        color: var(--text-dim);
+        cursor: pointer;
+        transition: border-color $transition-fast, background $transition-fast;
+
+        svg { color: var(--text-faint); }
+
+        &:hover {
+            border-color: var(--accent-dim);
+            background: var(--surface-2);
+        }
+
+        &--static {
+            cursor: default;
+
+            &:hover {
+                border-color: var(--border);
+                background: var(--surface);
+            }
+        }
+    }
+
+    &__repo-url {
+        font-size: $font-size-sm;
+        color: $text-primary;
+    }
+
+    &__repo-arrow {
+        color: var(--text-ghost);
+    }
+
+    &__repo-branch {
+        font-size: $font-size-sm;
+        color: var(--accent-bright);
+        font-weight: $font-weight-medium;
+    }
+
+    &__auto-deploy-badge {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 1px 6px;
+        background: var(--green-bg);
+        color: var(--green);
+        border-radius: $radius-sm;
+    }
+
+    &__connect-repo {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        padding: 6px $space-3;
+        background: none;
+        border: 1px dashed var(--border-strong);
+        border-radius: $radius-full;
+        font-size: $font-size-sm;
+        color: var(--text-faint);
+        cursor: pointer;
+        transition: all $transition-fast;
+
+        &:hover {
+            border-color: var(--accent-dim);
+            color: var(--accent-bright);
+            background: var(--accent-bg-soft);
+        }
+    }
+
+    &__versions {
+        padding: $space-4;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: $radius-lg;
+    }
+
+    &__versions-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+        margin-bottom: $space-3;
+
+        h3 {
+            margin: 0;
+            font-size: $font-size-sm;
+            font-weight: $font-weight-semibold;
+            color: var(--text-primary);
+        }
+    }
+
+    &__upload-label {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        padding: 6px $space-3;
+        background: var(--accent-bg-soft);
+        border: 1px solid var(--accent-dim);
+        border-radius: $radius-md;
+        color: var(--accent-bright);
+        font-size: $font-size-xs;
+        font-weight: $font-weight-medium;
+        cursor: pointer;
+        transition: background $transition-fast;
+
+        &:hover {
+            background: var(--accent-bg);
+        }
+
+        input {
+            display: none;
+        }
+    }
+
+    &__versions-list {
+        display: grid;
+        gap: $space-2;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+
+        li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: $space-3;
+            padding: $space-3;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: $radius-md;
+
+            &.is-current {
+                border-color: rgba(61, 220, 151, 0.35);
+                background: rgba(61, 220, 151, 0.06);
+            }
+        }
+    }
+
+    &__version-name {
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        font-weight: $font-weight-semibold;
+        color: var(--text-primary);
+    }
+
+    &__version-date {
+        margin-left: auto;
+        color: var(--text-faint);
+        font-size: $font-size-xs;
+    }
+
+    &__version-current {
+        padding: 3px $space-2;
+        background: rgba(61, 220, 151, 0.1);
+        border: 1px solid rgba(61, 220, 151, 0.2);
+        border-radius: $radius-full;
+        color: #3ddc97;
+        font-size: $font-size-xs;
+        font-weight: $font-weight-medium;
+    }
+
+    // Tab strip + content reuse the shared app-detail-tabs / app-detail-tab /
+    // app-detail-content chrome (defined in _applications.scss), matching the
+    // WordPress detail page. Let the strip WRAP (instead of scroll) so the
+    // right-pinned Settings tab can never get pushed off-screen.
+    .app-detail-tabs {
+        flex-wrap: wrap;
+        overflow-x: visible;
+        row-gap: 2px;
+    }
+
+    // Settings pinned to the far right of the strip (matches the mockup's gear).
+    .app-detail-tab--end { margin-left: auto; }
+
+    // Scoped console/editor polish for tabs that use shared classes
+    // (Gunicorn editor, Commands output) — token re-tint only.
+    .code-editor {
+        background: var(--bg-code);
+        border-color: var(--border-soft);
+        color: var(--text-code);
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+    }
+
+    .command-output {
+        background: var(--bg-code);
+        border-color: var(--border-soft);
+        border-radius: var(--radius);
+
+        pre {
+            color: var(--text-code);
+            font-size: $font-size-sm;
+        }
+
+        &.error {
+            border-color: rgba(251, 111, 111, 0.4);
+        }
+
+        .stderr {
+            color: var(--red);
+        }
+    }
+}
+
+// ============================================
+// SHARED TAB CHROME
+// ============================================
+
+// Mono eyebrow section label (used by tab section headers).
+// The h3 variant out-specifies the global `.section-header h3` sizing.
+.svc-eyebrow,
+h3.svc-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+
+    &__count {
+        font-weight: $font-weight-medium;
+        color: var(--text-ghost);
+        letter-spacing: 0.02em;
+    }
+
+    // standalone eyebrow followed by a hint paragraph (Commands tab)
+    + .hint {
+        margin-top: $space-2;
+    }
+}
+
+// Plain surface card wrapper (tables, consoles)
+.svc-card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+// Accent-tinted mono cell (e.g. package names)
+.svc-pkg-name {
+    color: var(--accent-bright) !important;
+}
+
+// ============================================
+// EVENTS TAB — dense feed-style timeline
+// ============================================
+.events-tab {
+    &__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-4;
+    }
+
+    // The timeline is one card; events are dense rows inside it
+    &__timeline {
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    &__event {
+        display: flex;
+        gap: $space-4;
+        padding: $space-3 $space-4;
+        background: transparent;
+        cursor: pointer;
+        transition: background $transition-fast;
+
+        & + & {
+            border-top: 1px solid var(--border-soft);
+        }
+
+        &:hover {
+            background: var(--surface-2);
+        }
+
+        &--expanded {
+            background: var(--surface-2);
+        }
+    }
+
+    &__event-status {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 6px;
+        flex-shrink: 0;
+        background: var(--text-ghost);
+
+        &--green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        &--red   { background: var(--red); }
+        &--amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+        &--cyan  { background: var(--cyan); }
+        &--gray  { background: var(--text-faint); }
+    }
+
+    &__event-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &__event-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: $space-3;
+    }
+
+    &__event-commit {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        min-width: 0;
+    }
+
+    &__event-sha {
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        color: var(--accent-bright);
+        background: var(--accent-bg);
+        padding: 1px $space-2;
+        border-radius: $radius-sm;
+        flex-shrink: 0;
+    }
+
+    &__event-message {
+        font-size: $font-size-base - 1;
+        color: $text-primary;
+        font-weight: $font-weight-medium;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &__event-meta {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        margin-top: $space-1;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+    }
+
+    &__event-logs {
+        margin-top: $space-3;
+        padding: $space-3;
+        background: var(--bg-code);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-md;
+        max-height: 300px;
+        overflow-y: auto;
+
+        pre {
+            margin: 0;
+            font-family: var(--mono);
+            font-size: $font-size-sm;
+            color: var(--text-code);
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    }
+
+    &__empty {
+        // Flex-center so the icon centers too — svgs are display:block (Tailwind
+        // preflight), so text-align:center alone left-aligns the glyph.
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: $space-2;
+        padding: $space-12 $space-8;
+        color: $text-tertiary;
+
+        h3 {
+            color: $text-secondary;
+            margin: 0;
+        }
+    }
+}
+
+// ============================================
+// SHELL TAB — console re-tinted to tokens
+// ============================================
+.shell-tab {
+    &__container {
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    &__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: $space-3 $space-4;
+        background: var(--surface-2);
+        border-bottom: 1px solid var(--border-soft);
+    }
+
+    &__title {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    &__terminal {
+        background: var(--bg-code);
+        padding: $space-4;
+        min-height: 400px;
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        color: var(--text-code);
+        overflow-y: auto;
+        max-height: 600px;
+    }
+
+    &__hint {
+        color: var(--text-faint);
+    }
+
+    &__line {
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-all;
+
+        &--input {
+            color: var(--cyan);
+        }
+
+        &--error {
+            color: var(--red);
+        }
+    }
+
+    &__input-row {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        padding: $space-3 $space-4;
+        background: var(--surface);
+        border-top: 1px solid var(--border-soft);
+    }
+
+    &__prompt {
+        color: var(--accent-bright);
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        flex-shrink: 0;
+    }
+
+    &__input {
+        flex: 1;
+        background: none;
+        border: none;
+        color: $text-primary;
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        outline: none;
+    }
+}
+
+// ============================================
+// METRICS TAB — point-in-time spec cards + gauges
+// (no metrics HISTORY backend yet — see docs/REDESIGN_MAP.md §5; the cards
+// bind to live point-in-time stats only, no fabricated series)
+// ============================================
+.metrics-tab {
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: $space-4;
+    }
+
+    &__card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        padding: $space-4 $space-5;
+        transition: border-color 0.15s;
+
+        &:hover {
+            border-color: var(--border-strong);
+        }
+
+        .sk-gauge {
+            margin-top: $space-3;
+        }
+    }
+
+    &__card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: $space-3;
+
+        h4 {
+            margin: 0;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        span {
+            font-family: var(--mono);
+            font-size: 22px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: -0.02em;
+            color: $text-primary;
+        }
+    }
+
+    &__info {
+        margin-top: $space-2;
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        color: var(--text-dim);
+    }
+}
+
+// Settings tab within service detail — grouped left sub-nav + content pane,
+// mirroring the WordPress detail page's settings layout (.wp-settings).
+.svc-settings {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: $space-4;
+    align-items: start;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: 1fr;
+    }
+
+    &__nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        position: sticky;
+        top: $space-4;
+
+        @media (max-width: $breakpoint-md) {
+            position: static;
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+    }
+
+    // Grouped left nav — an uppercase mono label per group.
+    &__group + &__group {
+        margin-top: $space-4;
+    }
+
+    &__grouplabel {
+        padding: 0 12px;
+        margin-bottom: 6px;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    &__navitem {
+        display: flex;
+        width: 100%; // fill the nav column — a flex <button> otherwise shrinks
+                     // to its label, so each item's box was a different width
+        align-items: center;
+        gap: 9px;
+        padding: 9px 12px;
+        border: none;
+        border-radius: 8px;
+        background: none;
+        color: var(--text-dim);
+        font-size: 13.5px;
+        font-weight: $font-weight-medium;
+        text-align: left;
+        cursor: pointer;
+        transition: background 0.14s, color 0.14s;
+
+        svg { color: var(--text-faint); flex-shrink: 0; }
+
+        &:hover { background: var(--surface-hover); color: var(--text); }
+        &.is-active {
+            background: var(--accent-bg);
+            color: var(--accent-bright);
+            svg { color: var(--accent-bright); }
+        }
+    }
+
+    &__content {
+        min-width: 0;
+    }
+
+    &__section {
+        margin-bottom: $space-6;
+
+        &:last-child { margin-bottom: 0; }
+    }
+
+    &__section-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0 0 $space-3;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    // A divided sub-block within a section — e.g. the Deployment pipeline under
+    // the Git connect form in "Git & Deploy". Mirrors the .svc-give-subdomain
+    // divider so stacked panels read as distinct steps rather than one slab.
+    &__subsection {
+        margin-top: $space-5;
+        padding-top: $space-5;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    &__subsection-title {
+        margin: 0 0 $space-3;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+}
+
+// Icon-only button (global utility consumed by several other components)
+.btn-icon {
+    padding: $space-2 !important;
+    min-width: auto !important;
+}
+
+// ============================================
+// DOMAIN & SSL PANEL (service settings)
+// Mirrors the WordPress SiteSSLPanel layout so both detail pages feel the same.
+// ============================================
+.svc-domain-panel {
+    .ssl-guide {
+        display: flex;
+        flex-direction: column;
+        gap: $space-3;
+        margin-top: $space-3;
+    }
+
+    // "Give it a subdomain" action — sits under the domain/SSL summary grid.
+    .svc-give-subdomain {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        flex-wrap: wrap;
+        margin-top: $space-3;
+        padding-top: $space-3;
+        border-top: 1px solid var(--border-soft);
+
+        .form-hint { margin: 0; }
+    }
+
+    // Editable label + fixed base-domain suffix inside the publish modal.
+    .svc-subdomain-input {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+
+        input { flex: 1; min-width: 0; }
+
+        &__suffix {
+            font-family: var(--mono);
+            font-size: $font-size-sm;
+            color: var(--text-dim);
+            white-space: nowrap;
+        }
+    }
+
+    .ssl-checklist {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+        padding: $space-3;
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+    }
+
+    .ssl-check-item {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-sm;
+        color: var(--text-dim);
+    }
+
+    .ssl-check-icon {
+        flex-shrink: 0;
+
+        &--ok { color: var(--green); }
+        &--missing { color: var(--amber); }
+    }
+
+    .ssl-check-label {
+        &--ok { color: var(--text); }
+    }
+
+    .ssl-inline-attach {
+        display: flex;
+        flex-direction: column;
+        gap: $space-3;
+        margin-top: $space-3;
+        padding-top: $space-3;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    .ssl-context {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+    }
+
+    .ssl-context-links {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-xs;
+        color: var(--text-faint);
+
+        a {
+            color: var(--accent-bright);
+            text-decoration: none;
+
+            &:hover { text-decoration: underline; }
+        }
+    }
+}
+
+// ============================================
+// OVERVIEW TAB
+// ============================================
+.overview-tab {
+    // KPI strip (ds MetricCard)
+    &__kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: $space-4;
+        margin-bottom: $space-4;
+
+        @media (max-width: $breakpoint-lg) { grid-template-columns: repeat(2, 1fr); }
+        @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+    }
+
+    // Grid layout for info + metrics
+    &__grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $space-4;
+        margin-bottom: $space-4;
+
+        @media (max-width: $breakpoint-md) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        padding: $space-4 $space-5;
+
+        &--full {
+            grid-column: 1 / -1;
+        }
+    }
+
+    &__card-title {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0 0 $space-3;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    &__card-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-3;
+
+        .overview-tab__card-title {
+            margin: 0;
+        }
+    }
+
+    &__see-all {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+    }
+
+    // Info badge (brand colors via inline style props)
+    &__info-badge {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 5px;
+        border: 1px solid;
+    }
+
+    &__info-link {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-1;
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        color: var(--accent-bright);
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    &__branch {
+        margin-left: $space-2;
+        color: var(--accent-bright);
+        font-weight: $font-weight-medium;
+    }
+
+    // Resource metrics (ds Gauge bars + mono values)
+    &__metrics {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+    }
+
+    &__metric-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-2;
+        font-size: $font-size-sm + 1;
+        color: $text-secondary;
+    }
+
+    &__metric-value {
+        font-family: var(--mono);
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+
+    &__metric-detail {
+        display: block;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+        margin-top: $space-1;
+    }
+
+    &__metric-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $space-3;
+    }
+
+    &__metric-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    &__metric-item-label {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    &__metric-item-value {
+        font-family: var(--mono);
+        font-size: $font-size-base - 1;
+        font-weight: $font-weight-medium;
+        color: $text-primary;
+    }
+
+    &__loading, &__no-metrics, &__no-deploys {
+        padding: $space-6;
+        text-align: center;
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    // Recent Deployments list — dense rows
+    &__deploy-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    &__deploy-row {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        padding: 11px 0;
+
+        & + & {
+            border-top: 1px solid var(--border-soft);
+        }
+    }
+
+    &__deploy-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: var(--text-ghost);
+
+        &--green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        &--red   { background: var(--red); }
+        &--amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+        &--cyan  { background: var(--cyan); }
+        &--gray  { background: var(--text-faint); }
+    }
+
+    &__deploy-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &__deploy-message {
+        font-size: $font-size-base - 1;
+        color: $text-primary;
+        font-weight: $font-weight-medium;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &__deploy-meta {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+        margin-top: 2px;
+    }
+
+    &__deploy-sha {
+        color: var(--accent-bright);
+        background: var(--accent-bg);
+        padding: 0 $space-1;
+        border-radius: $radius-sm;
+    }
+}
+
+// ============================================
+// LOGS TAB V2 — console re-tinted to tokens
+// ============================================
+.logs-tab-v2 {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.logs-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius) var(--radius) 0 0;
+
+    &__left {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        flex: 1;
+    }
+
+    &__right {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        flex-shrink: 0;
+    }
+
+    &__search {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: $radius-md;
+        padding: 0 $space-2;
+        flex: 1;
+        max-width: 300px;
+
+        &:focus-within {
+            border-color: var(--accent-primary);
+        }
+
+        svg {
+            color: var(--text-faint);
+            flex-shrink: 0;
+        }
+
+        input {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: $space-1 0;
+            color: $text-primary;
+            font-size: $font-size-sm;
+            outline: none;
+            min-width: 0;
+
+            &::placeholder {
+                color: var(--text-faint);
+            }
+        }
+    }
+
+    &__match-count {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--accent-bright);
+        white-space: nowrap;
+    }
+
+    &__select {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: $radius-md;
+        padding: $space-1 $space-2;
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        outline: none;
+        cursor: pointer;
+
+        &:focus { border-color: var(--accent-primary); }
+    }
+
+    &__toggle {
+        display: flex;
+        align-items: center;
+        gap: $space-1;
+        font-size: $font-size-sm;
+        color: $text-tertiary;
+        cursor: pointer;
+        white-space: nowrap;
+
+        input {
+            accent-color: var(--accent-primary);
+        }
+    }
+
+    &__divider {
+        width: 1px;
+        height: 16px;
+        background: var(--border);
+    }
+}
+
+.logs-source-hint {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-1 $space-4;
+    background: var(--surface-2);
+    border-left: 1px solid var(--border-soft);
+    border-right: 1px solid var(--border-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+
+    &__live {
+        font-size: 9px;
+        font-weight: $font-weight-bold;
+        letter-spacing: 0.08em;
+        padding: 1px $space-1;
+        background: var(--red-bg);
+        color: var(--red);
+        border-radius: $radius-sm;
+        animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+}
+
+.logs-viewer {
+    background: var(--bg-code);
+    border: 1px solid var(--border-soft);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    min-height: 400px;
+    max-height: 600px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: $font-size-sm;
+    line-height: 1.7;
+    scroll-behavior: smooth;
+
+    &__loading, &__empty {
+        padding: $space-8;
+        text-align: center;
+        color: var(--text-faint);
+    }
+
+    &__line {
+        display: flex;
+        padding: 0 $space-4;
+        transition: background 0.1s;
+
+        &:hover {
+            background: var(--surface-hover);
+        }
+
+        &--error {
+            background: rgba(251, 111, 111, 0.06);
+            .logs-viewer__line-text { color: var(--red); }
+        }
+
+        &--warn {
+            background: rgba(245, 185, 69, 0.06);
+            .logs-viewer__line-text { color: var(--amber); }
+        }
+
+        &--debug {
+            .logs-viewer__line-text { color: var(--text-faint); }
+        }
+    }
+
+    &__line-num {
+        width: 48px;
+        padding-right: $space-3;
+        color: var(--text-ghost);
+        text-align: right;
+        flex-shrink: 0;
+        user-select: none;
+    }
+
+    &__line-text {
+        flex: 1;
+        color: var(--text-code);
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
+    &__highlight {
+        background: rgba(245, 185, 69, 0.35);
+        color: var(--text);
+        border-radius: 2px;
+        padding: 0 1px;
+    }
+}

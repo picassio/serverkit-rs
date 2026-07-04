@@ -1,0 +1,2314 @@
+// ============================================
+// WORKFLOW BUILDER — redesign "infra console" look (demo wf-head / wf-rail):
+// flush header bar + left node-palette rail + ReactFlow canvas, joined by
+// 1px borders instead of floating cards. ReactFlow geometry (node paddings,
+// min-widths, handle sizes/offsets) is intentionally unchanged.
+// ============================================
+
+.workflow-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - $space-6);
+    padding: $space-4;
+
+    &.fullscreen {
+        height: 100vh;
+        padding: 0;
+
+        .workflow-canvas {
+            border-radius: 0;
+            border: none;
+        }
+    }
+}
+
+// ============================================
+// CANVAS CONTAINER (page shell: head + body)
+// ============================================
+
+.workflow-canvas {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: $bg-body;
+    border: 1px solid var(--border-soft);
+    border-radius: $radius-lg;
+    overflow: hidden;
+    position: relative;
+
+    .react-flow {
+        background: $bg-body;
+    }
+
+    // React Flow Controls
+    .react-flow__controls {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: $radius-md;
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+
+        button {
+            background: var(--surface);
+            border: none;
+            border-bottom: 1px solid var(--border-soft);
+            color: $text-secondary;
+            width: 28px;
+            height: 28px;
+
+            &:hover {
+                background: var(--surface-hover);
+                color: $text-primary;
+            }
+
+            &:last-child {
+                border-bottom: none;
+            }
+
+            svg {
+                fill: currentColor;
+            }
+        }
+    }
+
+    // React Flow MiniMap
+    .react-flow__minimap {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: $radius-md;
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+    }
+
+    .react-flow__minimap-mask {
+        fill: var(--bg-body);
+        fill-opacity: 0.85;
+    }
+
+    .react-flow__minimap-node {
+        stroke: none;
+    }
+
+    // React Flow Background
+    .react-flow__background {
+        background: $bg-body;
+    }
+
+    // In-progress connection line
+    .react-flow__connection-path {
+        stroke: var(--accent);
+        stroke-width: 2;
+    }
+
+    // Drag-selection rectangle
+    .react-flow__selection {
+        background: var(--accent-bg-soft);
+        border: 1px dashed var(--accent-dim);
+    }
+
+    .react-flow__attribution {
+        background: transparent;
+
+        a {
+            color: var(--text-ghost);
+        }
+    }
+}
+
+// ============================================
+// HEAD BAR (demo wf-head: title + mono meta + actions)
+// ============================================
+
+.wf-head {
+    position: relative;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: 9px 16px 9px 10px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.wf-head__main {
+    flex: 1;
+    min-width: 200px;
+}
+
+.wf-head__titlerow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wf-head__meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 1px;
+    padding-left: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wf-head__actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+}
+
+// Workflow name renders as the page title (ghost input).
+.workflow-name-input {
+    width: 220px;
+    height: auto;
+    padding: 5px 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: $radius-lg;
+    color: $text-primary;
+    font-size: 15px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: -0.01em;
+    transition: border-color $transition-fast, background $transition-fast;
+
+    &:hover {
+        border-color: var(--border);
+    }
+
+    &:focus,
+    &:focus-visible {
+        outline: none;
+        border-color: var(--accent);
+        background: var(--surface-2);
+        box-shadow: none;
+    }
+
+    &::placeholder {
+        color: var(--text-ghost);
+    }
+}
+
+// Active/paused switch (persists Workflow.is_active)
+.wf-active-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    margin-right: $space-1;
+    cursor: pointer;
+
+    span {
+        font-size: 12px;
+        color: var(--text-faint);
+    }
+}
+
+.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 30px;
+    padding: 0 11px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: $radius-lg;
+    color: $text-secondary;
+    font-size: 12.5px;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    transition: all $transition-fast;
+    white-space: nowrap;
+
+    svg {
+        flex-shrink: 0;
+    }
+
+    &:hover {
+        background: var(--surface-2);
+        border-color: var(--border-strong);
+        color: $text-primary;
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.toolbar-btn-execute {
+    color: var(--green);
+
+    &:hover:not(:disabled) {
+        background: var(--green-bg);
+        border-color: rgba($success, 0.35);
+        color: var(--green);
+    }
+}
+
+.toolbar-btn-primary {
+    background: linear-gradient(180deg, var(--accent), var(--accent-dim));
+    border-color: var(--accent-dim);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+        background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+        border-color: var(--accent-dim);
+        color: #fff;
+    }
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 22px;
+    background: var(--border);
+    margin: 0 $space-1;
+}
+
+.toolbar-message {
+    position: absolute;
+    top: 100%;
+    right: $space-4;
+    margin-top: 6px;
+    padding: 5px 10px;
+    background: $success-bg;
+    border: 1px solid $success-border;
+    border-radius: $radius-md;
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 30;
+    animation: slideDown 0.2s ease-out;
+}
+
+// ============================================
+// BODY (rail + stage)
+// ============================================
+
+.wf-body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+}
+
+// Node palette rail (demo wf-rail / pal-node)
+.wf-rail {
+    width: 248px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px 14px;
+    border-right: 1px solid var(--border-soft);
+    background: $bg-sidebar;
+    overflow-y: auto;
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: $border-default;
+        border-radius: $radius-sm;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        width: 160px;
+        padding: 4px 7px 10px;
+    }
+}
+
+.wf-rail__grp {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-ghost);
+    padding: 11px 8px 6px;
+}
+
+.wf-rail__node {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 7px 9px;
+    margin-bottom: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: $radius-lg;
+    color: $text-secondary;
+    font-size: 12.5px;
+    font-weight: $font-weight-medium;
+    text-align: left;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    span:last-child {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &:hover {
+        background: var(--surface-3);
+        border-color: rgba($accent-primary-raw, 0.45);
+        color: $text-primary;
+    }
+}
+
+.wf-rail__pi {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    background: var(--surface-3);
+    color: $text-secondary;
+
+    &--trigger {
+        color: var(--green);
+    }
+
+    &--action {
+        color: var(--accent-bright);
+    }
+
+    &--logic {
+        color: var(--amber);
+    }
+}
+
+.wf-rail__hint {
+    margin-top: auto;
+    padding: $space-3 $space-2 0;
+    border-top: 1px solid var(--border-soft);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-faint);
+}
+
+// Canvas stage (hosts ReactFlow + config panel + error toast)
+.wf-stage {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+// ============================================
+// NODE STYLES (geometry unchanged: min-width/padding/handles)
+// ============================================
+
+.workflow-node {
+    min-width: 180px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    transition: border-color $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+        border-color: var(--border-strong);
+        box-shadow: var(--shadow-lg);
+    }
+
+    &.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px $accent-glow, var(--shadow-lg);
+    }
+}
+
+.workflow-node-header {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    border-bottom: 1px solid var(--border-soft);
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.workflow-node-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(140deg, var(--accent), var(--accent-dim));
+    border-radius: $radius-lg;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.workflow-node-type {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+}
+
+.workflow-node-body {
+    padding: $space-3;
+}
+
+.workflow-node-label {
+    font-size: 13px;
+    font-weight: $font-weight-semibold;
+    color: $text-primary;
+    margin-bottom: $space-1;
+}
+
+.workflow-node-status {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    padding: $space-1 $space-2;
+    border-radius: $radius-md;
+    font-family: var(--mono);
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+
+    &.status-running {
+        background: $success-bg;
+        color: var(--green);
+    }
+
+    &.status-stopped {
+        background: var(--surface-3);
+        color: var(--text-faint);
+    }
+
+    &.status-error {
+        background: $danger-bg;
+        color: var(--red);
+    }
+}
+
+// ============================================
+// COMPACT NODE VARIANTS (Trigger, Script, Logic, Notification)
+// ============================================
+
+// Shared compact node layout
+.node-trigger,
+.node-script,
+.node-logic,
+.node-notification {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3;
+    min-width: 180px;
+    position: relative;
+
+    &.node-selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px $accent-glow, var(--shadow-lg);
+    }
+}
+
+.node-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    background: var(--surface-2);
+    border-radius: $radius-lg;
+    color: $text-secondary;
+}
+
+.node-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.node-label {
+    font-size: 13px;
+    font-weight: $font-weight-semibold;
+    color: $text-primary;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-sublabel {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+// Node icon color variants (categorical tints; pink stays literal — it has
+// no semantic token, matching the file-type palette convention)
+.node-icon-manual { color: var(--cyan); }
+.node-icon-cron { color: var(--violet); }
+.node-icon-webhook { color: var(--green); }
+.node-icon-event { color: var(--amber); }
+.node-icon-bash { color: $text-secondary; }
+.node-icon-python { color: var(--cyan); }
+.node-icon-logic { color: #f97316; }
+.node-icon-discord { color: var(--violet); }
+.node-icon-slack { color: #ec4899; }
+.node-icon-email { color: var(--cyan); }
+
+// Node status glow variants
+.node-status-active { border-color: var(--cyan); box-shadow: 0 0 10px fade($info, 30%); }
+.node-status-success { border-color: var(--green); box-shadow: 0 0 10px fade($success, 30%); }
+.node-status-error { border-color: var(--red); box-shadow: 0 0 10px fade($danger, 30%); }
+.node-status-inactive { border-color: var(--border-soft); }
+
+// Logic If/Else branching outputs
+.node-outputs {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    margin-top: $space-2;
+    padding-top: $space-2;
+    border-top: 1px solid var(--border-soft);
+}
+
+.node-output-branch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.node-branch-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-bottom: $space-1;
+
+    &.node-branch-true { color: var(--green); }
+    &.node-branch-false { color: var(--red); }
+}
+
+// Compact handle styles (sizes unchanged)
+.handle-input,
+.handle-output {
+    width: 10px !important;
+    height: 10px !important;
+    background: var(--surface-3) !important;
+    border: 2px solid var(--border-strong) !important;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        transform: scale(1.2);
+    }
+}
+
+.handle-true {
+    border-color: var(--green) !important;
+    &:hover { background: var(--green) !important; }
+}
+
+.handle-false {
+    border-color: var(--red) !important;
+    &:hover { background: var(--red) !important; }
+}
+
+// ============================================
+// HANDLE STYLES (sizes/offsets unchanged)
+// ============================================
+
+.workflow-handle {
+    width: 12px !important;
+    height: 12px !important;
+    background: var(--surface-3) !important;
+    border: 2px solid var(--border-strong) !important;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        transform: scale(1.2);
+    }
+}
+
+.workflow-handle-target {
+    left: -6px !important;
+}
+
+.workflow-handle-source {
+    right: -6px !important;
+}
+
+
+// ============================================
+// EDGE STYLES
+// ============================================
+
+.react-flow__edge-path {
+    stroke: $border-active;
+    stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke: var(--accent-bright);
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+    stroke: var(--accent);
+}
+
+// Animated edges
+.react-flow__edge.animated path {
+    stroke-dasharray: 5;
+    animation: flowAnimation 0.5s linear infinite;
+}
+
+@keyframes flowAnimation {
+    from {
+        stroke-dashoffset: 10;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+// ============================================
+// NODE TYPE-SPECIFIC STYLES (categorical gradients; docker brand kept)
+// ============================================
+
+// Docker App Node
+.workflow-node-docker {
+    .node-icon-docker {
+        background: linear-gradient(140deg, #2496ed, #1d77c4);
+    }
+}
+
+// Database Node
+.workflow-node-database {
+    .node-icon-database {
+        background: linear-gradient(140deg, #f5b945, #cf9430);
+    }
+}
+
+// Domain Node
+.workflow-node-domain {
+    .node-icon-domain {
+        background: linear-gradient(140deg, #3ddc97, #2aa873);
+    }
+
+    .node-label-domain {
+        font-family: $font-mono;
+        font-size: 13.5px;
+        font-weight: $font-weight-semibold;
+    }
+}
+
+// Service Node (icon bg comes inline from the brand color; gradient fallback)
+.workflow-node-service {
+    .node-icon-service {
+        background: linear-gradient(140deg, #6d7cff, #4a5cd0);
+    }
+}
+
+// ============================================
+// NODE DETAIL STYLES
+// ============================================
+
+.node-detail {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-top: $space-2;
+    font-size: $font-size-xs;
+
+    .node-detail-label {
+        color: var(--text-ghost);
+        font-family: var(--mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .node-detail-value {
+        color: $text-secondary;
+        font-family: $font-mono;
+        font-size: 11px;
+    }
+}
+
+.node-detail-image .node-detail-value {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.node-detail-memory,
+.node-detail-size {
+    color: $text-tertiary;
+
+    svg {
+        opacity: 0.7;
+    }
+}
+
+.node-description {
+    font-size: $font-size-xs;
+    color: $text-tertiary;
+    margin-top: $space-1;
+}
+
+// ============================================
+// PORT PILLS
+// ============================================
+
+.node-ports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1;
+    margin-top: $space-2;
+}
+
+.node-port-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px $space-2;
+    background: var(--accent-bg);
+    border: 1px solid fade($accent-primary-raw, 30%);
+    border-radius: 5px;
+    font-size: $font-size-xs;
+    font-family: $font-mono;
+    color: var(--accent-bright);
+}
+
+// ============================================
+// TYPE BADGES (db engine chip — solid brand bg set inline)
+// ============================================
+
+.node-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px $space-2;
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.04em;
+    color: #fff;
+    margin-top: $space-1;
+}
+
+// ============================================
+// SSL & DNS BADGES
+// ============================================
+
+.node-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+    margin-top: $space-2;
+}
+
+.node-ssl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    padding: 2px $space-2;
+    border: 1px solid;
+    border-radius: 5px;
+    background: var(--surface-2);
+    font-family: var(--mono);
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+}
+
+.node-dns-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    padding: 2px $space-2;
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+
+    &.dns-propagated {
+        background: $success-bg;
+        color: var(--green);
+    }
+
+    &.dns-pending {
+        background: $warning-bg;
+        color: var(--amber);
+    }
+}
+
+// ============================================
+// STATUS DOT (ANIMATED)
+// ============================================
+
+.node-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-left: auto;
+
+    &.status-running {
+        background: var(--green);
+        box-shadow: 0 0 0 2px fade($success, 30%);
+        animation: pulseRunning 2s ease-in-out infinite;
+    }
+
+    &.status-stopped {
+        background: var(--text-ghost);
+    }
+
+    &.status-error {
+        background: var(--red);
+        box-shadow: 0 0 0 2px fade($danger, 30%);
+        animation: pulseError 1s ease-in-out infinite;
+    }
+}
+
+@keyframes pulseRunning {
+    0%, 100% {
+        box-shadow: 0 0 0 2px fade($success, 30%);
+    }
+    50% {
+        box-shadow: 0 0 0 4px fade($success, 15%);
+    }
+}
+
+@keyframes pulseError {
+    0%, 100% {
+        box-shadow: 0 0 0 2px fade($danger, 30%);
+    }
+    50% {
+        box-shadow: 0 0 0 4px fade($danger, 15%);
+    }
+}
+
+// ============================================
+// DATABASE HANDLE (BOTTOM)
+// ============================================
+
+.workflow-handle-database {
+    bottom: -6px !important;
+    left: 50% !important;
+    transform: translateX(-50%);
+}
+
+// ============================================
+// CONFIGURATION PANEL
+// ============================================
+
+.config-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 320px;
+    height: 100%;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: transform 0.25s ease-out, opacity 0.2s ease-out;
+    pointer-events: none;
+
+    &.open {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+// Per-type tint arrives inline via borderColor on the header.
+.config-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+}
+
+.config-panel-title {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+
+    h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+}
+
+.config-panel-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    color: #fff;
+}
+
+.config-panel-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: $radius-sm;
+    color: $text-tertiary;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+}
+
+.config-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: $space-4;
+    @include custom-scrollbar();
+
+    .form-group {
+        margin-bottom: $space-4;
+
+        label {
+            display: block;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-faint);
+            margin-bottom: $space-2;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: $space-2 $space-3;
+            background: $bg-body;
+            border: 1px solid var(--border);
+            border-radius: $radius-md;
+            color: $text-primary;
+            font-size: $font-size-sm;
+            transition: border-color $transition-fast;
+
+            &:focus {
+                outline: none;
+                border-color: $accent-primary;
+            }
+
+            &::placeholder {
+                color: $text-tertiary;
+            }
+        }
+
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23646b7a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right $space-3 center;
+            padding-right: $space-8;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
+        }
+
+        .input-readonly {
+            background: $bg-hover;
+            cursor: not-allowed;
+            color: $text-tertiary;
+        }
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $space-3;
+    }
+
+    .form-hint {
+        display: block;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        margin-top: $space-1;
+        text-transform: none;
+        letter-spacing: normal;
+    }
+}
+
+.config-panel-footer {
+    padding: $space-4;
+    border-top: 1px solid var(--border-soft);
+    flex-shrink: 0;
+}
+
+// ============================================
+// CONFIG PANEL ELEMENTS
+// ============================================
+
+// Trigger type selector grid
+.trigger-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-2;
+}
+
+.trigger-type-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-1;
+    padding: $space-3;
+    background: $bg-body;
+    border: 1px solid var(--border);
+    border-radius: $radius-lg;
+    color: $text-tertiary;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        border-color: var(--border-strong);
+        color: $text-secondary;
+    }
+
+    &.active {
+        background: var(--accent-bg);
+        border-color: var(--accent);
+        color: var(--accent-bright);
+    }
+
+    .trigger-type-name {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+    }
+
+    .trigger-type-desc {
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        text-align: center;
+        line-height: $line-height-tight;
+    }
+}
+
+// Notification channel selector
+.channel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: $space-2;
+}
+
+.channel-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-1;
+    padding: $space-2;
+    background: $bg-body;
+    border: 1px solid var(--border);
+    border-radius: $radius-md;
+    color: $text-tertiary;
+    font-size: $font-size-xs;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        border-color: var(--border-strong);
+        color: $text-secondary;
+    }
+
+    &.active {
+        background: var(--accent-bg);
+        border-color: var(--accent);
+        color: var(--accent-bright);
+    }
+}
+
+// Language toggle
+.lang-toggle {
+    display: flex;
+    gap: $space-2;
+}
+
+.lang-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-2;
+    padding: $space-2;
+    background: $bg-body;
+    border: 1px solid var(--border);
+    border-radius: $radius-md;
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover { border-color: var(--border-strong); color: $text-secondary; }
+    &.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-bright); }
+}
+
+// Script editor textarea
+.script-editor {
+    min-height: 240px;
+    background: var(--bg-code) !important;
+    color: var(--text-code) !important;
+    font-size: $font-size-xs;
+    line-height: 1.6;
+    tab-size: 4;
+}
+
+// Toggle switch label row
+.toggle-label {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+}
+
+// Input with action button (e.g. copy)
+.input-with-action {
+    display: flex;
+    gap: $space-2;
+
+    input { flex: 1; }
+}
+
+.input-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $space-2 $space-3;
+    background: $bg-body;
+    border: 1px solid var(--border);
+    border-radius: $radius-md;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover { background: $bg-hover; color: $text-primary; }
+}
+
+// Info boxes in panels
+.panel-info-box {
+    padding: $space-3;
+    background: var(--accent-bg-soft);
+    border: 1px solid fade($accent-primary-raw, 20%);
+    border-radius: $radius-md;
+    font-size: $font-size-xs;
+    color: $text-secondary;
+    line-height: 1.6;
+    margin-top: $space-3;
+
+    code {
+        background: var(--surface-3);
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-family: var(--mono);
+        font-size: $font-size-xs;
+        color: var(--accent-bright);
+    }
+
+    &.panel-info-warning {
+        background: $warning-bg;
+        border-color: $warning-border;
+
+        code { color: var(--amber); }
+    }
+}
+
+// Delete node button
+.btn-delete-node {
+    width: 100%;
+    padding: $space-2 $space-4;
+    background: transparent;
+    border: 1px solid $danger;
+    border-radius: $radius-md;
+    color: $danger;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: $danger;
+        color: white;
+    }
+}
+
+// Branch legend (If/Else panel)
+.branch-legend {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    margin-top: $space-4;
+}
+
+.branch-legend-item {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-xs;
+    color: $text-secondary;
+}
+
+.branch-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+
+    &.branch-dot-true { background: var(--green); }
+    &.branch-dot-false { background: var(--red); }
+}
+
+// 3-col form row
+.form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: $space-3;
+}
+
+// Font mono utility
+.font-mono {
+    font-family: $font-mono !important;
+}
+
+// ============================================
+// PORT LIST (Docker Config Panel)
+// ============================================
+
+.port-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+}
+
+.port-item {
+    display: flex;
+    gap: $space-2;
+
+    input {
+        flex: 1;
+    }
+}
+
+.btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: $radius-md;
+    flex-shrink: 0;
+}
+
+.btn-danger-ghost {
+    background: transparent;
+    border: 1px solid transparent;
+    color: $text-tertiary;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: $danger-bg;
+        border-color: $danger-border;
+        color: $danger;
+    }
+}
+
+// ============================================
+// CONNECTION ERROR TOAST
+// ============================================
+
+.connection-error-toast {
+    position: absolute;
+    top: $space-4;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    padding: $space-2 $space-4;
+    background: $danger-bg;
+    border: 1px solid $danger-border;
+    border-radius: $radius-md;
+    color: $danger;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    box-shadow: var(--shadow-lg);
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+// ============================================
+// EDGE LABEL STYLES (mono chip tinted by --edge-c, set inline per edge)
+// ============================================
+
+.edge-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--edge-c, var(--accent));
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: $font-weight-medium;
+    color: var(--edge-c, var(--accent));
+    white-space: nowrap;
+    transition: opacity $transition-fast;
+    opacity: 0;
+
+    .react-flow__edge:hover &,
+    &.edge-label-selected {
+        opacity: 1;
+    }
+
+    &.edge-label-selected {
+        background: var(--accent-bg);
+        border-color: var(--accent);
+        color: var(--accent-bright);
+    }
+}
+
+.edge-label-text {
+    line-height: 1.5;
+}
+
+.edge-delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    margin-left: 2px;
+    background: $danger;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: darken($danger, 10%);
+    }
+}
+
+// ============================================
+// HANDLE HOVER STATES
+// ============================================
+
+.workflow-handle {
+    transition: all $transition-fast;
+
+    &:hover {
+        transform: scale(1.3);
+    }
+}
+
+// Connecting state - show valid handles
+.react-flow__handle-connecting {
+    &.react-flow__handle-valid {
+        background: $success !important;
+        box-shadow: 0 0 6px fade($success, 60%);
+    }
+
+    &:not(.react-flow__handle-valid) {
+        background: $danger !important;
+        box-shadow: 0 0 6px fade($danger, 60%);
+    }
+}
+
+// ============================================
+// EDGE SELECTION STATES
+// ============================================
+
+.react-flow__edge {
+    cursor: pointer;
+
+    &.selected .react-flow__edge-path {
+        stroke: var(--accent-bright) !important;
+        stroke-width: 2 !important;
+    }
+}
+
+// ============================================
+// WORKFLOW LIST MODAL (shadcn Dialog internals)
+// ============================================
+
+.workflow-modal {
+    width: 500px;
+    max-width: 90vw;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.workflow-modal-content {
+    flex: 1;
+    overflow-y: auto;
+    @include custom-scrollbar();
+}
+
+.workflow-list-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-8;
+    color: $text-tertiary;
+
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.workflow-list-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-8;
+    color: $danger;
+}
+
+.workflow-list-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-8;
+    color: var(--text-ghost);
+
+    p {
+        margin: 0;
+        font-size: $font-size-base;
+        font-weight: $font-weight-medium;
+        color: $text-secondary;
+    }
+
+    span {
+        font-size: $font-size-sm;
+        color: $text-tertiary;
+    }
+}
+
+.workflow-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+}
+
+.workflow-list-item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: $radius-lg;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+        border-color: var(--accent);
+        background: var(--accent-bg-soft);
+    }
+}
+
+.workflow-item-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.workflow-item-name {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: 13px;
+    font-weight: $font-weight-semibold;
+    color: $text-primary;
+    overflow: hidden;
+
+    > span:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.workflow-item-desc {
+    font-size: $font-size-xs;
+    color: $text-tertiary;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+}
+
+.workflow-item-meta {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    flex-shrink: 0;
+}
+
+.workflow-item-stats {
+    display: flex;
+    gap: $space-3;
+
+    .stat {
+        display: flex;
+        align-items: center;
+        gap: $space-1;
+        font-family: var(--mono);
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+    }
+}
+
+.workflow-item-date {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    font-family: var(--mono);
+    font-size: $font-size-xs;
+    color: var(--text-ghost);
+}
+
+.workflow-item-delete {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: $radius-md;
+    color: $text-tertiary;
+    cursor: pointer;
+    transition: all $transition-fast;
+    flex-shrink: 0;
+
+    &:hover {
+        background: $danger-bg;
+        border-color: $danger-border;
+        color: $danger;
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+}
+
+// ============================================
+// DEPLOYMENT PROGRESS MODAL
+// ============================================
+
+.deployment-modal {
+    width: 520px;
+    max-width: 90vw;
+}
+
+.deployment-modal-content {
+    flex: 1;
+    overflow-y: auto;
+    @include custom-scrollbar();
+}
+
+.deployment-modal-footer {
+    padding: $space-4 0 0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.deployment-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-8;
+    color: $text-tertiary;
+
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+
+    p {
+        margin: 0;
+        font-size: $font-size-base;
+        font-weight: $font-weight-medium;
+        color: $text-secondary;
+    }
+
+    span {
+        font-size: $font-size-sm;
+    }
+}
+
+.deployment-summary {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    border-radius: $radius-md;
+    margin-bottom: $space-4;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+
+    &.success {
+        background: $success-bg;
+        border: 1px solid $success-border;
+        color: var(--green);
+    }
+
+    &.has-errors {
+        background: $danger-bg;
+        border: 1px solid $danger-border;
+        color: var(--red);
+    }
+}
+
+.deployment-results {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+}
+
+.deployment-result-item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: $radius-md;
+    transition: all $transition-fast;
+
+    &.success {
+        border-color: $success-border;
+    }
+
+    &.error {
+        border-color: $danger-border;
+        background: $danger-bg;
+    }
+
+    &.pending {
+        opacity: 0.6;
+    }
+}
+
+.result-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: $radius-lg;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.result-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.result-name {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $text-primary;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.result-type {
+    font-family: var(--mono);
+    font-size: $font-size-xs;
+    color: $text-tertiary;
+}
+
+.result-status {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+
+    .spin {
+        animation: spin 1s linear infinite;
+        color: $text-tertiary;
+    }
+
+    .status-success {
+        color: var(--green);
+    }
+
+    .status-error {
+        color: var(--red);
+    }
+
+    .status-pending {
+        font-family: var(--mono);
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+    }
+}
+
+.result-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: $radius-sm;
+    color: $text-tertiary;
+    text-decoration: none;
+    transition: all $transition-fast;
+    flex-shrink: 0;
+
+    &:hover {
+        background: $bg-hover;
+        border-color: $accent-primary;
+        color: $accent-primary;
+    }
+}
+
+.deployment-errors {
+    margin-top: $space-4;
+    padding: $space-3;
+    background: $danger-bg;
+    border: 1px solid $danger-border;
+    border-radius: $radius-md;
+
+    h4 {
+        margin: 0 0 $space-2;
+        font-size: $font-size-sm;
+        font-weight: $font-weight-semibold;
+        color: $danger;
+    }
+}
+
+.error-item {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-2;
+    padding: $space-2 0;
+    font-size: $font-size-xs;
+    color: $danger;
+
+    svg {
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    &:not(:last-child) {
+        border-bottom: 1px solid fade($danger, 20%);
+    }
+}
+
+// ============================================
+// EXECUTION HISTORY (framed two-pane console in the modal)
+// ============================================
+
+.wf-history {
+    display: flex;
+    height: min(62vh, 600px);
+    border: 1px solid var(--border-soft);
+    border-radius: $radius-lg;
+    background: var(--surface);
+    overflow: hidden;
+}
+
+.wf-history__list {
+    width: 230px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-soft);
+    background: $bg-sidebar;
+    overflow-y: auto;
+    @include custom-scrollbar();
+
+    @media (max-width: $breakpoint-sm) {
+        width: 150px;
+    }
+}
+
+.wf-history__item {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover {
+        background: var(--surface-2);
+    }
+
+    &.is-on {
+        background: var(--accent-bg);
+        box-shadow: inset 2px 0 0 var(--accent);
+    }
+}
+
+.wf-history__item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2;
+    margin-bottom: 4px;
+}
+
+.wf-history__id {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+.wf-history__trigger {
+    font-size: 12.5px;
+    font-weight: $font-weight-medium;
+    color: $text-primary;
+}
+
+.wf-history__time {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+
+    svg {
+        flex-shrink: 0;
+    }
+}
+
+.wf-history__detail {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.wf-history__head {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+}
+
+.wf-history__title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: $font-weight-semibold;
+    color: $text-primary;
+}
+
+.wf-history__dur {
+    margin-top: 4px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+}
+
+.wf-history__logs {
+    flex: 1;
+    overflow-y: auto;
+    padding: $space-3 $space-4;
+    background: var(--bg-code);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    @include custom-scrollbar();
+}
+
+.wf-history__logs-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-bottom: $space-2;
+    margin-bottom: $space-2;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.wf-history__lines {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wf-log {
+    display: flex;
+    gap: 10px;
+    padding: 1px 4px;
+    border-radius: 4px;
+    transition: background $transition-fast;
+
+    &:hover {
+        background: var(--surface-2);
+    }
+}
+
+.wf-log__ts {
+    color: var(--text-ghost);
+    flex-shrink: 0;
+}
+
+.wf-log__lvl {
+    flex-shrink: 0;
+    width: 56px;
+    font-weight: $font-weight-bold;
+
+    &--error { color: var(--red); }
+    &--warning { color: var(--amber); }
+    &--debug { color: var(--text-faint); }
+    &--info { color: var(--cyan); }
+}
+
+.wf-log__node {
+    color: var(--accent-bright);
+    flex-shrink: 0;
+}
+
+.wf-log__msg {
+    color: var(--text-code);
+    overflow-wrap: anywhere;
+}
+
+.wf-history__nolog {
+    color: var(--text-faint);
+    font-style: italic;
+}
+
+.wf-history__loading {
+    display: flex;
+    justify-content: center;
+    padding: $space-8;
+    color: var(--text-faint);
+}
+
+.wf-history__empty {
+    padding: $space-6 $space-4;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-faint);
+}
+
+.wf-history__placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: $space-3;
+    color: var(--text-ghost);
+
+    svg {
+        opacity: 0.35;
+    }
+
+    p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-faint);
+    }
+}
+
+// ============================================
+// DEPLOYED NODE INDICATOR
+// ============================================
+
+.workflow-node.deployed {
+    border-color: var(--green);
+
+    &::after {
+        content: '';
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 12px;
+        height: 12px;
+        background: var(--green);
+        border: 2px solid var(--surface);
+        border-radius: 50%;
+    }
+}
+
+// ============================================
+// REAL APP NODE INDICATOR
+// ============================================
+
+.workflow-node.is-real {
+    border-color: fade($accent-primary-raw, 40%);
+
+    &.selected {
+        border-color: var(--accent);
+    }
+
+    .workflow-node-header {
+        background: var(--accent-bg-soft);
+    }
+}
+
+// ============================================
+// DOMAIN PILLS IN NODE
+// ============================================
+
+.node-domains {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1;
+    margin-top: $space-2;
+}
+
+.node-domain-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px $space-2;
+    background: $success-bg;
+    border: 1px solid fade($success, 30%);
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--green);
+
+    svg {
+        opacity: 0.7;
+    }
+}
+
+.node-domain-more {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: $text-tertiary;
+    padding: 2px $space-1;
+}
+
+// ============================================
+// PRIVATE URL IN NODE
+// ============================================
+
+.node-detail-private-url {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    margin-top: $space-2;
+    padding: $space-1 $space-2;
+    background: $info-bg;
+    border-radius: 5px;
+
+    svg {
+        color: var(--cyan);
+        flex-shrink: 0;
+    }
+
+    .node-detail-value {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--cyan);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+// ============================================
+// CONFIG PANEL ENHANCEMENTS
+// ============================================
+
+.form-value {
+    padding: $space-2 $space-3;
+    background: $bg-body;
+    border: 1px solid var(--border);
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+    color: $text-primary;
+
+    &.status-badge {
+        display: inline-flex;
+        padding: $space-1 $space-2;
+        border-radius: 6px;
+        font-family: var(--mono);
+        font-size: $font-size-xs;
+        font-weight: $font-weight-medium;
+        text-transform: capitalize;
+    }
+
+    &.status-running {
+        background: $success-bg;
+        border-color: $success-border;
+        color: var(--green);
+    }
+
+    &.status-stopped {
+        background: var(--surface-3);
+        border-color: var(--border);
+        color: var(--text-faint);
+    }
+
+    &.status-error {
+        background: $danger-bg;
+        border-color: $danger-border;
+        color: var(--red);
+    }
+}
+
+.form-value-link {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    cursor: pointer;
+    color: $accent-primary;
+
+    &:hover {
+        text-decoration: underline;
+    }
+
+    svg:last-child {
+        opacity: 0.5;
+        margin-left: auto;
+    }
+}
+
+.form-domains {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+}
+
+.form-domain-item {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2;
+    background: $bg-body;
+    border: 1px solid var(--border);
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+
+    svg {
+        color: var(--green);
+    }
+
+    .ssl-badge {
+        margin-left: auto;
+        padding: 2px 6px;
+        background: $success-bg;
+        border-radius: 5px;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-medium;
+        color: var(--green);
+    }
+}
+
+.action-buttons {
+    display: flex;
+    gap: $space-2;
+    flex-wrap: wrap;
+
+    .btn {
+        flex: 1;
+        min-width: 70px;
+    }
+}
+
+.action-message {
+    margin-top: $space-2;
+    padding: $space-2;
+    background: $success-bg;
+    border: 1px solid $success-border;
+    border-radius: $radius-sm;
+    font-family: var(--mono);
+    font-size: $font-size-xs;
+    color: var(--green);
+    text-align: center;
+}
+
+.btn-block {
+    width: 100%;
+    justify-content: center;
+}

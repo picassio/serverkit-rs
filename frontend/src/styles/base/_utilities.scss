@@ -1,0 +1,349 @@
+// ============================================
+// TAILWIND-LIKE UTILITY CLASSES
+// ============================================
+// These classes provide layout and spacing utilities
+// used in some newer pages that expect Tailwind.
+
+// --------------------------------------------
+// DISPLAY & FLEX
+// --------------------------------------------
+.flex { display: flex; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.self-start { align-self: flex-start; }
+.self-end { align-self: flex-end; }
+.self-center { align-self: center; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.justify-center { justify-content: center; }
+.flex-1 { flex: 1; }
+.flex-shrink-0 { flex-shrink: 0; }
+.flex-grow { flex-grow: 1; }
+
+// --------------------------------------------
+// GRID
+// --------------------------------------------
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (min-width: $breakpoint-md) {
+    .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: $breakpoint-lg) {
+    .lg\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+// --------------------------------------------
+// SPACING (Gaps)
+// --------------------------------------------
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
+.gap-8 { gap: 2rem; }
+
+// --------------------------------------------
+// STACK SPACING (space-y)
+// --------------------------------------------
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.space-y-4 > * + * { margin-top: 1rem; }
+.space-y-6 > * + * { margin-top: 1.5rem; }
+.space-y-8 > * + * { margin-top: 2rem; }
+
+.space-x-2 > * + * { margin-left: 0.5rem; }
+.space-x-4 > * + * { margin-left: 1rem; }
+
+// --------------------------------------------
+// MARGINS
+// --------------------------------------------
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mt-6 { margin-top: 1.5rem; }
+.mt-8 { margin-top: 2rem; }
+.mt-10 { margin-top: 2.5rem; }
+
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-6 { margin-bottom: 1.5rem; }
+.mb-8 { margin-bottom: 2rem; }
+
+.ml-1 { margin-left: 0.25rem; }
+.ml-2 { margin-left: 0.5rem; }
+.ml-3 { margin-left: 0.75rem; }
+.ml-4 { margin-left: 1rem; }
+.ml-auto { margin-left: auto; }
+
+.mr-1 { margin-right: 0.25rem; }
+.mr-2 { margin-right: 0.5rem; }
+
+.mx-1 { margin-left: 0.25rem; margin-right: 0.25rem; }
+.mx-2 { margin-left: 0.5rem; margin-right: 0.5rem; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+// --------------------------------------------
+// PADDING
+// --------------------------------------------
+.p-2 { padding: 0.5rem; }
+.p-4 { padding: 1rem; }
+.p-6 { padding: 1.5rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.py-12 { padding-top: 3rem; padding-bottom: 3rem; }
+
+// --------------------------------------------
+// SIZING
+// --------------------------------------------
+.w-full { width: 100%; }
+.w-auto { width: auto; }
+.w-\[1px\] { width: 1px; }
+.min-w-0 { min-width: 0; }
+.max-w-sm { max-width: 24rem; }
+.max-w-md { max-width: 28rem; }
+.max-w-lg { max-width: 32rem; }
+.max-w-xl { max-width: 36rem; }
+.h-6 { height: 1.5rem; }
+.h-full { height: 100%; }
+
+// --------------------------------------------
+// TEXT
+// --------------------------------------------
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.875rem; }
+.text-lg { font-size: 1.125rem; }
+.text-xl { font-size: 1.25rem; }
+.text-gray-300 { color: $text-tertiary; }
+.text-gray-400 { color: $text-tertiary; }
+.text-gray-500 { color: $text-secondary; }
+.text-gray-600 { color: $text-secondary; }
+.text-blue-600 { color: $accent-primary; }
+.text-green-600 { color: $success; }
+.text-red-600 { color: $danger; }
+.text-green-400 { color: $success; }
+.text-green-500 { color: $success; }
+.text-red-500 { color: $danger; }
+.text-yellow-600 { color: $warning; }
+.text-yellow-700 { color: $warning; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-muted { color: $text-tertiary; }
+
+// --------------------------------------------
+// BACKGROUNDS
+// --------------------------------------------
+.bg-gray-700 { background-color: $bg-hover; }
+.bg-gray-100 { background-color: $bg-elevated; }
+.bg-blue-100 { background-color: fade($accent-primary-raw, 10%); }
+.bg-green-100 { background-color: fade($success, 10%); }
+.bg-red-100 { background-color: fade($danger, 10%); }
+.bg-body { background-color: $bg-body; }
+
+// --------------------------------------------
+// BORDERS
+// --------------------------------------------
+.border { border: 1px solid $border-default; }
+.border-b { border-bottom: 1px solid $border-subtle; }
+.rounded { border-radius: $radius-md; }
+.rounded-lg { border-radius: $radius-lg; }
+
+// --------------------------------------------
+// MISC
+// --------------------------------------------
+.block { display: block; }
+.inline-flex { display: inline-flex; }
+.hidden { display: none; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whitespace-nowrap { white-space: nowrap; }
+.overflow-hidden { overflow: hidden; }
+.overflow-y-auto { overflow-y: auto; }
+.cursor-pointer { cursor: pointer; }
+.inline-block { display: inline-block; }
+.btn-dismiss { float: right; background: none; border: none; cursor: pointer; color: inherit; }
+.align-middle { vertical-align: middle; }
+.max-h-24 { max-height: 6rem; }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
+}
+
+// ============================================
+// TAILWIND-REMOVAL COMPATIBILITY LAYER
+// ============================================
+// Added when Tailwind was removed from the build
+// (docs/plans/05_FRONTEND_UX_TAILWIND_CLEANUP_PLAN.md, Phase 2). These re-create,
+// theme-aware, the remaining Tailwind utility classes still referenced in
+// pages/components so dropping the Tailwind dependency causes no visual
+// regression. New code should prefer semantic SCSS classes over these.
+
+// ---- Positioning ----
+.fixed { position: fixed; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+.sticky { position: sticky; }
+.inset-0 { inset: 0; }
+.z-10 { z-index: 10; }
+.z-20 { z-index: 20; }
+.z-30 { z-index: 30; }
+.z-40 { z-index: 40; }
+.z-50 { z-index: 50; }
+
+// ---- Grid spans + sm breakpoint cols ----
+.col-span-2 { grid-column: span 2 / span 2; }
+.col-span-full { grid-column: 1 / -1; }
+
+@media (min-width: $breakpoint-sm) {
+    .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .sm\:col-span-2 { grid-column: span 2 / span 2; }
+    .sm\:max-w-2xl { max-width: 42rem; }
+    .sm\:justify-center { justify-content: center; }
+    .sm\:justify-end { justify-content: flex-end; }
+    .sm\:text-center { text-align: center; }
+}
+@media (min-width: $breakpoint-lg) {
+    .lg\:col-span-2 { grid-column: span 2 / span 2; }
+}
+
+// ---- Sizing ----
+.size-2 { width: 0.5rem; height: 0.5rem; }
+.size-3 { width: 0.75rem; height: 0.75rem; }
+.size-4 { width: 1rem; height: 1rem; }
+.size-5 { width: 1.25rem; height: 1.25rem; }
+.size-12 { width: 3rem; height: 3rem; }
+.size-1\.5 { width: 0.375rem; height: 0.375rem; }
+.size-3\.5 { width: 0.875rem; height: 0.875rem; }
+.h-3 { height: 0.75rem; }
+.h-3\.5 { height: 0.875rem; }
+.h-10 { height: 2.5rem; }
+.h-12 { height: 3rem; }
+.h-px { height: 1px; }
+.w-10 { width: 2.5rem; }
+.w-12 { width: 3rem; }
+.w-20 { width: 5rem; }
+.w-24 { width: 6rem; }
+.w-48 { width: 12rem; }
+.w-72 { width: 18rem; }
+.max-w-2xl { max-width: 42rem; }
+.min-w-\[8rem\] { min-width: 8rem; }
+.max-h-48 { max-height: 12rem; }
+.max-h-\[80vh\] { max-height: 80vh; }
+.max-h-\[90vh\] { max-height: 90vh; }
+.max-h-\[300px\] { max-height: 300px; }
+
+// ---- Spacing ----
+.pt-4 { padding-top: 1rem; }
+.pb-2 { padding-bottom: 0.5rem; }
+.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+.gap-1\.5 { gap: 0.375rem; }
+.space-y-1 > * + * { margin-top: 0.25rem; }
+.space-y-1\.5 > * + * { margin-top: 0.375rem; }
+.mt-1\.5 { margin-top: 0.375rem; }
+.my-1 { margin-top: 0.25rem; margin-bottom: 0.25rem; }
+.-mx-1 { margin-left: -0.25rem; margin-right: -0.25rem; }
+
+// ---- Typography (semantic color names mapped to theme tokens) ----
+.text-2xl { font-size: 1.5rem; }
+.text-foreground { color: $text-primary; }
+.text-muted-foreground { color: $text-tertiary; }
+.text-accent-foreground { color: $text-primary; }
+.text-popover-foreground { color: $text-primary; }
+.text-secondary { color: $text-secondary; }
+.text-tertiary { color: $text-tertiary; }
+.text-destructive { color: $danger; }
+.text-yellow-400 { color: $warning; }
+.text-blue-400 { color: $accent-primary; }
+.tracking-widest { letter-spacing: 0.1em; }
+.fill-current { fill: currentColor; }
+
+// ---- Backgrounds (semantic names mapped to theme tokens) ----
+.bg-card { background-color: $bg-card; }
+.bg-popover { background-color: $bg-elevated; }
+.bg-accent { background-color: $bg-hover; }
+.bg-secondary { background-color: $bg-secondary; }
+.bg-muted { background-color: $bg-secondary; }
+.bg-primary { background-color: $accent-primary; }
+.bg-border { background-color: $border-default; }
+.bg-transparent { background-color: transparent; }
+.bg-black\/60 { background-color: rgba(0, 0, 0, 0.6); }
+.bg-black\/50 { background-color: rgba(0, 0, 0, 0.5); }
+
+// ---- Borders & radius ----
+.border-t { border-top: 1px solid $border-subtle; }
+.border-border { border-color: $border-default; }
+.rounded-sm { border-radius: $radius-sm; }
+.rounded-md { border-radius: $radius-md; }
+.rounded-full { border-radius: $radius-full; }
+
+// ---- Flex / interaction / state ----
+.shrink-0 { flex-shrink: 0; }
+.select-none { user-select: none; }
+.pointer-events-none { pointer-events: none; }
+.cursor-default { cursor: default; }
+.outline-none { outline: none; }
+.transition-colors {
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.opacity-50 { opacity: 0.5; }
+.opacity-60 { opacity: 0.6; }
+
+// ---- Hover variants still referenced outside the rewritten primitives ----
+.hover\:text-destructive:hover { color: $danger; }
+
+// ---- Additional utilities found in the final completeness audit ----
+.h-8 { height: 2rem; }
+.w-8 { width: 2rem; }
+.w-32 { width: 8rem; }
+.w-56 { width: 14rem; }
+.w-2\/5 { width: 40%; }
+.w-3\/5 { width: 60%; }
+.m-4 { margin: 1rem; }
+.mb-1\.5 { margin-bottom: 0.375rem; }
+.py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+.rounded-xl { border-radius: $radius-xl; }
+.overflow-x-auto { overflow-x: auto; }
+.whitespace-pre-wrap { white-space: pre-wrap; }
+.max-w-\[200px\] { max-width: 200px; }
+
+// ---- Accessibility: visually-hidden (Tailwind `sr-only`) ----
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}

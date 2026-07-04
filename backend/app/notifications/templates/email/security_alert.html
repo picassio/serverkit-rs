@@ -1,0 +1,14 @@
+{% extends 'email/base.html' %}
+{% from 'email/partials/_macros.html' import button, metrics, chip with context %}
+{% block content %}
+  <p style="margin:0 0 16px;">{{ data.message or 'A security event was detected that may need your attention.' }}</p>
+  {% set facts = [] %}
+  {% if data.alert_type %}{% set _ = facts.append({'label': 'Type', 'value': data.alert_type}) %}{% endif %}
+  {% if data.source_ip %}{% set _ = facts.append({'label': 'Source IP', 'value': data.source_ip, 'mono': true}) %}{% endif %}
+  {% if data.identity %}{% set _ = facts.append({'label': 'Account', 'value': data.identity}) %}{% endif %}
+  {% set _ = facts.append({'label': 'Server', 'value': data.hostname or hostname, 'mono': true}) %}
+  {{ metrics(facts) }}
+  {% if action_url %}
+  <div style="margin-top:26px;">{{ button(action_url, action_label) }}</div>
+  {% endif %}
+{% endblock %}

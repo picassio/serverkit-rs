@@ -1,0 +1,355 @@
+import { useState, useEffect } from 'react';
+import api from '../services/api';
+import { Button } from '@/components/ui/button';
+import { useTopbarActions } from '@/hooks/useTopbarActions';
+
+// Platform icons as SVG components
+const LinuxIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="platform-icon">
+        {/* Tux body */}
+        <ellipse cx="12" cy="14" rx="7" ry="8" />
+        {/* Head */}
+        <circle cx="12" cy="5.5" r="3.5" />
+        {/* Left eye */}
+        <circle cx="10.5" cy="5" r="0.7" fill="currentColor" stroke="none" />
+        {/* Right eye */}
+        <circle cx="13.5" cy="5" r="0.7" fill="currentColor" stroke="none" />
+        {/* Beak */}
+        <ellipse cx="12" cy="6.5" rx="1.2" ry="0.5" fill="currentColor" stroke="none" />
+        {/* Belly */}
+        <ellipse cx="12" cy="15" rx="4" ry="5.5" />
+        {/* Left foot */}
+        <path d="M7 21c-1.5 0.5-2.5 1-2 1.5s2.5 0.5 4 0" />
+        {/* Right foot */}
+        <path d="M17 21c1.5 0.5 2.5 1 2 1.5s-2.5 0.5-4 0" />
+    </svg>
+);
+
+const WindowsIcon = () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="platform-icon">
+        <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801" />
+    </svg>
+);
+
+const DownloadIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7,10 12,15 17,10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+);
+
+const CopyIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+);
+
+const CheckIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20,6 9,17 4,12" />
+    </svg>
+);
+
+const RefreshIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23,4 23,10 17,10" />
+        <polyline points="1,20 1,14 7,14" />
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+);
+
+function Downloads() {
+    const [versionInfo, setVersionInfo] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [copiedCommand, setCopiedCommand] = useState(null);
+
+    useEffect(() => {
+        fetchVersionInfo();
+    }, []);
+
+    const fetchVersionInfo = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await api.getAgentVersion();
+            setVersionInfo(data);
+        } catch (err) {
+            setError(err.message || 'Failed to fetch version information');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const copyToClipboard = async (text, commandId) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedCommand(commandId);
+            setTimeout(() => setCopiedCommand(null), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
+    };
+
+    const getBaseUrl = () => {
+        // Get the base URL for the API
+        if (import.meta.env.PROD) {
+            return window.location.origin;
+        }
+        return import.meta.env.VITE_API_URL?.replace('/api/v1', '') || window.location.origin;
+    };
+
+    const platforms = [
+        {
+            id: 'linux-amd64',
+            name: 'Linux',
+            arch: 'x64 (amd64)',
+            icon: LinuxIcon,
+            os: 'linux',
+            archKey: 'amd64',
+            command: `curl -fsSL ${getBaseUrl()}/api/v1/servers/install.sh | sudo bash -s -- --token "YOUR_TOKEN" --server "${getBaseUrl()}"`,
+        },
+        {
+            id: 'linux-arm64',
+            name: 'Linux',
+            arch: 'ARM64',
+            icon: LinuxIcon,
+            os: 'linux',
+            archKey: 'arm64',
+            command: `curl -fsSL ${getBaseUrl()}/api/v1/servers/install.sh | sudo bash -s -- --token "YOUR_TOKEN" --server "${getBaseUrl()}"`,
+        },
+        {
+            id: 'windows-amd64',
+            name: 'Windows',
+            arch: 'x64 (amd64)',
+            icon: WindowsIcon,
+            os: 'windows',
+            archKey: 'amd64',
+            command: `irm ${getBaseUrl()}/api/v1/servers/install.ps1 | iex; Install-ServerKitAgent -Token "YOUR_TOKEN" -Server "${getBaseUrl()}"`,
+        },
+    ];
+
+    const handleDownload = (os, arch) => {
+        const url = versionInfo?.downloads?.[`${os}-${arch}`];
+        if (url) {
+            window.open(url, '_blank');
+        }
+    };
+
+    useTopbarActions(() =>
+        <>
+            <Button size="sm" variant="outline" onClick={fetchVersionInfo}>
+                <RefreshIcon />
+                Refresh
+            </Button>
+        </>,
+        [],
+    );
+
+    if (loading) {
+        return (
+            <div className="sk-tabgroup__inner downloads-page">
+                <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <p>Loading version information...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="sk-tabgroup__inner downloads-page">
+            {error && (
+                <div className="alert alert-error">
+                    <p>{error}</p>
+                    <button type="button" onClick={fetchVersionInfo}>Try Again</button>
+                </div>
+            )}
+
+            {versionInfo && (
+                <>
+                    <div className="version-banner">
+                        <div className="version-info">
+                            <span className="version-label">Latest Version</span>
+                            <span className="version-number">v{versionInfo.version}</span>
+                            <span className="version-date">Released {new Date(versionInfo.published_at).toLocaleDateString()}</span>
+                        </div>
+                        <div className="version-actions">
+                            {versionInfo.release_notes_url && (
+                                <a
+                                    href={versionInfo.release_notes_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-banner-outline"
+                                >
+                                    Release Notes
+                                </a>
+                            )}
+                            <a href="#downloads" className="btn btn-banner-primary" onClick={(e) => {
+                                e.preventDefault();
+                                document.querySelector('.download-cards')?.scrollIntoView({ behavior: 'smooth' });
+                            }}>
+                                <DownloadIcon />
+                                Download Now
+                            </a>
+                        </div>
+                    </div>
+
+                    <section className="downloads-section">
+                        <h2>Direct Downloads</h2>
+                        <p className="section-description">
+                            Download the agent binary for your platform. After downloading, follow the installation instructions below.
+                        </p>
+
+                        <div className="download-cards">
+                            {platforms.map((platform) => {
+                                const Icon = platform.icon;
+                                const downloadUrl = versionInfo.downloads?.[platform.id];
+                                const isAvailable = !!downloadUrl;
+
+                                return (
+                                    <div
+                                        key={platform.id}
+                                        className={`download-card ${!isAvailable ? 'unavailable' : ''}`}
+                                    >
+                                        <div className="platform-icon-wrapper">
+                                            <Icon />
+                                        </div>
+                                        <div className="platform-info">
+                                            <h3>{platform.name}</h3>
+                                            <span className="platform-arch">{platform.arch}</span>
+                                        </div>
+                                        <Button
+                                            className="download-btn"
+                                            onClick={() => handleDownload(platform.os, platform.archKey)}
+                                            disabled={!isAvailable}
+                                        >
+                                            <DownloadIcon />
+                                            {isAvailable ? 'Download' : 'Not Available'}
+                                        </Button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    <section className="downloads-section">
+                        <h2>Quick Install Commands</h2>
+                        <p className="section-description">
+                            Use these one-liner commands to download and install the agent. Replace <code>YOUR_TOKEN</code> with the server registration token.
+                        </p>
+
+                        <div className="install-commands">
+                            <div className="command-block">
+                                <div className="command-header">
+                                    <LinuxIcon />
+                                    <h3>Linux (Bash)</h3>
+                                </div>
+                                <div className="command-content">
+                                    <pre>
+                                        <code>{platforms[0].command}</code>
+                                    </pre>
+                                    <button type="button"
+                                        className="copy-btn"
+                                        onClick={() => copyToClipboard(platforms[0].command, 'linux')}
+                                        title="Copy to clipboard"
+                                    >
+                                        {copiedCommand === 'linux' ? <CheckIcon /> : <CopyIcon />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="command-block">
+                                <div className="command-header">
+                                    <WindowsIcon />
+                                    <h3>Windows (PowerShell)</h3>
+                                </div>
+                                <div className="command-content">
+                                    <pre>
+                                        <code>{platforms[2].command}</code>
+                                    </pre>
+                                    <button type="button"
+                                        className="copy-btn"
+                                        onClick={() => copyToClipboard(platforms[2].command, 'windows')}
+                                        title="Copy to clipboard"
+                                    >
+                                        {copiedCommand === 'windows' ? <CheckIcon /> : <CopyIcon />}
+                                    </button>
+                                </div>
+                                <p className="command-note">Run PowerShell as Administrator</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="downloads-section">
+                        <h2>Manual Installation</h2>
+                        <div className="manual-steps">
+                            <div className="step">
+                                <div className="step-number">1</div>
+                                <div className="step-content">
+                                    <h4>Download the Agent</h4>
+                                    <p>Download the appropriate binary for your platform from the downloads above.</p>
+                                </div>
+                            </div>
+                            <div className="step">
+                                <div className="step-number">2</div>
+                                <div className="step-content">
+                                    <h4>Extract and Install</h4>
+                                    <p>
+                                        <strong>Linux:</strong> Extract with <code>tar -xzf serverkit-agent-*.tar.gz</code> and move to <code>/usr/local/bin/</code>
+                                    </p>
+                                    <p>
+                                        <strong>Windows:</strong> Extract the ZIP and move to <code>C:\Program Files\ServerKit\</code>
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="step">
+                                <div className="step-number">3</div>
+                                <div className="step-content">
+                                    <h4>Register the Agent</h4>
+                                    <p>Run the registration command with your token:</p>
+                                    <pre><code>{`serverkit-agent register --token "YOUR_TOKEN" --server "${getBaseUrl()}"`}</code></pre>
+                                </div>
+                            </div>
+                            <div className="step">
+                                <div className="step-number">4</div>
+                                <div className="step-content">
+                                    <h4>Start the Agent</h4>
+                                    <p>Start the agent service:</p>
+                                    <pre><code>serverkit-agent start</code></pre>
+                                    <p className="step-note">Or use systemd/Windows Service for automatic startup</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="downloads-section">
+                        <h2>Verification</h2>
+                        <p className="section-description">
+                            Verify your download using the SHA256 checksums:
+                        </p>
+                        {versionInfo.checksums_url && (
+                            <Button variant="outline" asChild>
+                                <a
+                                    href={versionInfo.checksums_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <DownloadIcon />
+                                    Download Checksums
+                                </a>
+                            </Button>
+                        )}
+                        <div className="verification-command">
+                            <pre><code>sha256sum -c checksums.txt</code></pre>
+                        </div>
+                    </section>
+                </>
+            )}
+        </div>
+    );
+}
+
+export default Downloads;

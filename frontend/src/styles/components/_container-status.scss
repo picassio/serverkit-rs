@@ -1,0 +1,72 @@
+// Aggregated container status pill + hover tooltip (ContainerStatusPill.jsx).
+// The pill itself reuses the .sk-pill design-system primitive; this file only
+// adds the hover-reveal tooltip that surfaces the healthy/total + reasons.
+
+.sk-cstatus {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+
+    // Always-visible secondary badge surfacing a degraded sub-state (e.g.
+    // "2 issues" or "2/3") so multi-container problems are readable without
+    // hovering for the tooltip. Subtle, amber-toned.
+    &__badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px $space-1;
+        border-radius: $radius-sm;
+        background: $warning-bg;
+        border: 1px solid $warning-border;
+        color: $warning;
+        font-size: $font-size-xs;
+        font-weight: $font-weight-medium;
+        line-height: 1.3;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    &__tip {
+        position: absolute;
+        bottom: calc(100% + #{$space-2});
+        left: 0;
+        z-index: $z-tooltip;
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+        min-width: 180px;
+        max-width: 280px;
+        padding: $space-2 $space-3;
+        background: $bg-elevated;
+        border: 1px solid $border-default;
+        border-radius: $radius-md;
+        box-shadow: $shadow-lg;
+        font-size: $font-size-xs;
+        line-height: 1.4;
+        color: $text-secondary;
+        white-space: normal;
+
+        // Hidden until hover/focus.
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY($space-1);
+        transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
+        pointer-events: none;
+    }
+
+    &:hover &__tip,
+    &:focus-within &__tip {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    &__tip-summary {
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+
+    &__tip-reason {
+        color: $text-secondary;
+    }
+}

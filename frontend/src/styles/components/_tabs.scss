@@ -1,0 +1,176 @@
+// ============================================
+// TAB COMPONENTS
+// ============================================
+
+.tabs-container {
+    overflow: hidden;
+}
+
+.tabs {
+    display: flex;
+    gap: $space-2;
+    border-bottom: 1px solid $border-subtle;
+    margin-bottom: $space-6;
+    overflow-x: auto;
+    scrollbar-width: none;
+    @include custom-scrollbar();
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+.tab {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    background: none;
+    border: none;
+    padding: $space-3 $space-5;
+    color: $text-secondary;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    @include transition();
+    white-space: nowrap;
+
+    &:hover {
+        color: $text-primary;
+    }
+
+    &.active,
+    &[data-state="active"] {
+        color: $accent-primary;
+        border-bottom-color: $accent-primary;
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    &:focus-visible {
+        outline: 2px solid $accent-primary;
+        outline-offset: 2px;
+        border-radius: $radius-sm;
+    }
+}
+
+.tab-content {
+    min-height: 400px;
+}
+
+// Overflow popover (added when tab strip can't fit)
+.tabs-overflow-trigger {
+    padding-left: $space-3;
+    padding-right: $space-3;
+    flex-shrink: 0;
+
+    &[data-state="open"] {
+        color: $accent-primary;
+    }
+}
+
+.tabs-overflow-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tabs-overflow-item {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    background: none;
+    border: none;
+    color: $text-secondary;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    text-align: left;
+    cursor: pointer;
+    border-radius: $radius-sm;
+    width: 100%;
+    @include transition();
+
+    &:hover {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+
+    &[data-state="active"] {
+        color: $accent-primary;
+        background: $bg-hover;
+    }
+
+    &:focus-visible {
+        outline: 2px solid $accent-primary;
+        outline-offset: -2px;
+    }
+}
+
+// tabs-nav variant (used by Servers, Domains, etc.)
+.tabs-nav {
+    display: flex;
+    gap: $space-1;
+    border-bottom: 1px solid $border-subtle;
+    margin-bottom: $space-6;
+
+    &.tabs-nav-scrollable {
+        overflow-x: auto;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+    }
+}
+
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    background: none;
+    border: none;
+    padding: $space-3 $space-5;
+    color: $text-secondary;
+    font-size: $font-size-base;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    @include transition();
+    white-space: nowrap;
+
+    &:hover {
+        color: $text-primary;
+    }
+
+    &.active {
+        color: $accent-primary;
+        border-bottom-color: $accent-primary;
+    }
+}
+
+// Hide nested page headers when a page component is embedded as a tab
+.tab-embedded {
+    > .page-container > .page-header,
+    > .page-header,
+    > .top-bar,
+    > div > .page-header,
+    > div > .top-bar {
+        display: none;
+    }
+
+    > [class*="-page"] > .page-header,
+    > [class*="-page"] > header.top-bar,
+    > [class*="-page"] > .top-bar {
+        display: none;
+    }
+}

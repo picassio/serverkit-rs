@@ -1,0 +1,53 @@
+// ============================================
+// TABLE COMPONENT
+// ============================================
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: $font-size-sm;
+
+    thead {
+        th {
+            padding: $space-3 $space-4;
+            text-align: left;
+            font-weight: $font-weight-semibold;
+            font-size: $font-size-xs + 1;
+            color: $text-tertiary;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            border-bottom: 1px solid $border-default;
+            white-space: nowrap;
+        }
+    }
+
+    tbody {
+        tr {
+            border-bottom: 1px solid $border-subtle;
+            @include transition(background);
+
+            &:hover {
+                background: $bg-hover;
+            }
+
+            &:last-child {
+                border-bottom: none;
+            }
+        }
+
+        td {
+            padding: $space-3 $space-4;
+            color: $text-primary;
+            vertical-align: middle;
+
+            code {
+                font-family: $font-mono;
+                font-size: $font-size-xs;
+                background: $bg-elevated;
+                padding: $space-1 $space-2;
+                border-radius: $radius-sm;
+                color: $text-secondary;
+            }
+        }
+    }
+}

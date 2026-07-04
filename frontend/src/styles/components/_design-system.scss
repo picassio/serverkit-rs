@@ -1,0 +1,495 @@
+// ============================================================
+// REDESIGN DESIGN-SYSTEM PRIMITIVES  (see docs/REDESIGN_MAP.md §3)
+// ============================================================
+// Shared, reusable building blocks for the new "infra console" look.
+// Namespaced with `sk-` so they NEVER collide with the live app's existing
+// generic classes (.card/.input/.switch/.tag/.modal/.empty/.row/.col …).
+// Consumers use the React components in src/components/ds/*, not raw classes.
+// All colors come from the var()-backed tokens in _theme-variables.scss.
+// ============================================================
+
+// ---- semantic tone helper map (used by Pill/MetricCard/Gauge tints) ----
+$sk-tones: ('accent', 'green', 'cyan', 'amber', 'red', 'violet');
+
+// ------------------------------------------------------------
+// Pill — status badge (dot + label)
+// ------------------------------------------------------------
+.sk-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 500;
+    font-family: var(--mono);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+
+    &__dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+    &--green { background: var(--green-bg); color: var(--green); .sk-pill__dot { background: var(--green); box-shadow: 0 0 6px var(--green); } }
+    &--amber { background: var(--amber-bg); color: var(--amber); .sk-pill__dot { background: var(--amber); box-shadow: 0 0 6px var(--amber); } }
+    &--red   { background: var(--red-bg);   color: var(--red);   .sk-pill__dot { background: var(--red); } }
+    &--cyan  { background: var(--cyan-bg);  color: var(--cyan);  .sk-pill__dot { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); } }
+    &--violet{ background: var(--violet-bg);color: var(--violet);.sk-pill__dot { background: var(--violet); box-shadow: 0 0 6px var(--violet); } }
+    &--gray  { background: var(--surface-3); color: var(--text-faint); .sk-pill__dot { background: var(--text-faint); } }
+}
+
+// ------------------------------------------------------------
+// State chip — mono uppercase micro-label on a semantic wash
+// (alert/incident states, severities, kind/type tags). One source of
+// truth for the shape: page-local chip classes (.mon-state, .sec-state,
+// .inc-state/.inc-impact, .git-chip, .bk-type) keep their names and
+// `@extend %sk-state;`, layering their own tone modifiers / sizing
+// deviations on top. New consumers use `.sk-state` directly (style
+// class like .sk-dtable, no ds/ component).
+// ------------------------------------------------------------
+%sk-state {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sk-state {
+    @extend %sk-state;
+
+    &--red    { color: var(--red);    background: var(--red-bg); }
+    &--amber  { color: var(--amber);  background: var(--amber-bg); }
+    &--green  { color: var(--green);  background: var(--green-bg); }
+    &--cyan   { color: var(--cyan);   background: var(--cyan-bg); }
+    &--violet { color: var(--violet); background: var(--violet-bg); }
+    &--accent { color: var(--accent-bright); background: var(--accent-bg); }
+    &--gray   { color: var(--text-faint);    background: var(--surface-3); }
+}
+
+// ------------------------------------------------------------
+// EnvTag — environment / category tag (PROD / DEV / STAGING …)
+// ------------------------------------------------------------
+.sk-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--border-strong);
+    color: var(--text-dim);
+    background: var(--surface-2);
+
+    &--prod    { color: var(--green);  border-color: rgba(61, 220, 151, 0.3); background: var(--green-bg); }
+    &--dev     { color: var(--cyan);   border-color: rgba(73, 199, 240, 0.3); background: var(--cyan-bg); }
+    &--staging { color: var(--amber);  border-color: rgba(245, 185, 69, 0.3); background: var(--amber-bg); }
+}
+
+// ------------------------------------------------------------
+// SegControl — segmented toggle (replaces native <select>/filter chips)
+// ------------------------------------------------------------
+.sk-seg {
+    display: inline-flex;
+    gap: 2px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 3px;
+
+    &__btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12.5px;
+        color: var(--text-faint);
+        font-weight: 500;
+        font-family: inherit;
+        background: none;
+        border: none;
+        cursor: pointer;
+        transition: 0.14s;
+
+        &:hover { color: var(--text-dim); }
+        &.is-on { background: var(--surface-3); color: var(--text); box-shadow: var(--shadow-sm); }
+
+        .sk-seg__count { font-family: var(--mono); font-size: 10.5px; opacity: 0.7; }
+    }
+}
+
+// ------------------------------------------------------------
+// MetricCard / KPI tile
+// ------------------------------------------------------------
+.sk-kpi {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 16px 17px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.15s;
+
+    &:hover { border-color: var(--border-strong); }
+
+    &__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    &__icon {
+        width: 32px; height: 32px; border-radius: 8px;
+        display: grid; place-items: center;
+        background: var(--surface-2); color: var(--text-dim);
+
+        &--accent { background: var(--accent-bg); color: var(--accent-bright); }
+        &--green  { background: var(--green-bg);  color: var(--green); }
+        &--cyan   { background: var(--cyan-bg);   color: var(--cyan); }
+        &--amber  { background: var(--amber-bg);  color: var(--amber); }
+        &--red    { background: var(--red-bg);    color: var(--red); }
+        &--violet { background: var(--violet-bg); color: var(--violet); }
+    }
+    &__val {
+        font-family: var(--mono); font-size: 27px; font-weight: 600;
+        letter-spacing: -0.02em; line-height: 1;
+        small { font-size: 14px; color: var(--text-faint); font-weight: 500; }
+    }
+    &__label { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; }
+    // Optional mono detail row beneath the value (e.g. "Total 32 · Cached 4").
+    &__sub {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-faint);
+        margin-top: 8px;
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    &__trend {
+        font-family: var(--mono); font-size: 11px;
+        display: flex; align-items: center; gap: 4px;
+        &--up { color: var(--green); }
+        &--down { color: var(--red); }
+        &--flat { color: var(--text-faint); }
+    }
+}
+
+// ------------------------------------------------------------
+// Gauge — thin inline meter bar (threshold-colored fill)
+// ------------------------------------------------------------
+.sk-gauge {
+    height: 5px;
+    border-radius: 3px;
+    background: var(--surface-3);
+    overflow: hidden;
+
+    &__fill { display: block; height: 100%; border-radius: 3px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+}
+
+// ------------------------------------------------------------
+// ServiceTile — gradient initial avatar
+// ------------------------------------------------------------
+.sk-tile {
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+// ------------------------------------------------------------
+// Sparkline / AreaChart — sizing wrappers (geometry is in the SVG)
+// ------------------------------------------------------------
+.sk-spark { display: block; overflow: visible; }
+.sk-area  { display: block; width: 100%; }
+
+// ------------------------------------------------------------
+// ScoreGauge — SVG ring (security / reputation posture)
+// ------------------------------------------------------------
+.sk-score {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+
+    &__svg { transform: rotate(-90deg); }
+    &__center { position: absolute; text-align: center; }
+    &__num { font-family: var(--mono); font-weight: 600; line-height: 1; }
+    &__label { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+}
+
+// ------------------------------------------------------------
+// Feed — activity list (colored dot + html text + time)
+// ------------------------------------------------------------
+.sk-feed {
+    &__item {
+        display: flex; gap: 13px; padding: 11px 0; position: relative;
+        & + .sk-feed__item { border-top: 1px solid var(--border-soft); }
+    }
+    &__dot {
+        width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+        display: grid; place-items: center; background: var(--surface-2);
+    }
+    &__body { flex: 1; min-width: 0; }
+    &__txt  { font-size: 13px; line-height: 1.45; b { font-weight: 600; color: var(--text); } }
+    &__time { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+}
+
+// ------------------------------------------------------------
+// DataTable — dense list table. Apply `.sk-dtable` to a <table>.
+// (kept as a style class, not a component, so pages stay flexible)
+// ------------------------------------------------------------
+.sk-dtable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    thead th {
+        text-align: left;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-weight: 600;
+        padding: 11px 16px;
+        border-bottom: 1px solid var(--border);
+    }
+    tbody td { padding: 13px 16px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+    tbody tr { transition: background 0.12s; }
+    tbody tr.is-clickable { cursor: pointer; }
+    tbody tr:hover { background: var(--surface-2); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr.is-selected { background: var(--accent-bg-soft); &:hover { background: var(--accent-bg); } }
+
+    .sk-cell-name { font-weight: 550; display: flex; align-items: center; gap: 11px; }
+    .sk-cell-mono { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+    .sk-cell-sub  { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
+
+    // Sortable column headers (used by the DataTable component).
+    .is-sortable { cursor: pointer; user-select: none; }
+    &__head-inner { display: inline-flex; align-items: center; gap: 5px; }
+    &__sort { display: inline-flex; color: var(--accent-bright); }
+    &__sort-placeholder { color: var(--text-faint); opacity: 0.35; }
+}
+
+.sk-dtable-wrap { overflow-x: auto; }
+.sk-dtable__loading {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 180px; color: var(--text-faint);
+}
+
+// ------------------------------------------------------------
+// PageTopbar — the demo's per-page top bar (icon + title + routed sub-nav +
+// actions). Replaces sidebar sub-menus for infra pages.
+// ------------------------------------------------------------
+.sk-topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 60px;
+    padding: 10px 4px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-soft);
+
+    &__ico { color: var(--accent-bright); display: inline-flex; flex-shrink: 0; }
+    &__titles { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+    &__title { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+    &__meta { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); }
+    &__spacer { flex: 1; }
+    &__actions { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+    // Routed sub-nav (the ex-sidebar sub-items). Grows to fill the bar so the
+    // overflow measurement in PageTopbar has a bounded width to fit against;
+    // overflow:hidden suppresses any flash before the first measurement.
+    &__tabs {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin-left: 6px;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+    }
+    &__tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 11px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 450;
+        color: var(--text-dim);
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background 0.14s, color 0.14s;
+
+        svg { width: 15px; height: 15px; }
+        &:hover { background: var(--surface-hover); color: var(--text); }
+        &.is-active { background: var(--accent-bg); color: var(--accent-bright); font-weight: 500; }
+    }
+    // Overflow ("More") trigger — a tab-styled button that never collapses.
+    &__more {
+        flex-shrink: 0;
+        border: none;
+        background: transparent;
+        font: inherit;
+        cursor: pointer;
+        &[data-state="open"] { background: var(--surface-hover); color: var(--text); }
+    }
+
+    @media (max-width: 768px) {
+        flex-wrap: wrap;
+        &__tabs { order: 3; width: 100%; margin-left: 0; }
+    }
+}
+
+// SSL-style pill with day count is just a Pill; provide the spec-card + ssl
+// helpers the domain drawer uses.
+.sk-spec-card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 14px 15px;
+
+    &__label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--mono); }
+    &__value { font-size: 15px; font-weight: 600; color: var(--text); margin-top: 8px; }
+    &__sub { font-family: var(--mono); font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+}
+
+// Key/value info row (drawer nameservers, details).
+.sk-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 11px 0;
+    border-top: 1px solid var(--border-soft);
+    font-size: 13px;
+    &:first-child { border-top: none; }
+    .k { color: var(--text-faint); font-family: var(--mono); font-size: 12px; }
+    .v { font-family: var(--mono); color: var(--text); text-align: right; font-size: 12.5px; overflow-wrap: anywhere; }
+}
+
+// ------------------------------------------------------------
+// Drawer — right-side slide-over header chrome (panel comes from ui/sheet).
+// ------------------------------------------------------------
+.sk-drawer {
+    &__head {
+        display: flex; align-items: center; gap: 12px;
+        padding: 15px 18px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
+    }
+    &__ico { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; background: var(--surface-2); color: var(--text-dim); }
+    &__title { font-weight: 600; font-size: 14.5px; }
+    &__sub { font-family: var(--mono); font-size: 11px; color: var(--text-faint); margin-top: 1px; }
+    &__body { flex: 1; overflow: auto; min-height: 0; }
+}
+
+// ------------------------------------------------------------
+// ResourceCard / ResourceList — consistent list item for servers,
+// apps, domains, containers, and other named resources.
+// ------------------------------------------------------------
+.sk-resource-list {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    background: var(--surface);
+    overflow: hidden;
+}
+
+.sk-resource-card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--surface);
+    transition: background 0.12s;
+
+    &:last-child { border-bottom: none; }
+    &.is-clickable { cursor: pointer; }
+    &.is-clickable:hover { background: var(--surface-2); }
+    &.is-selected { background: var(--accent-bg-soft); }
+
+    &__select { display: inline-flex; align-items: center; }
+    &__icon { color: var(--accent-bright); display: inline-flex; flex-shrink: 0; }
+    &__identity { min-width: 0; flex: 1 1 auto; }
+    &__title-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    &__title { font-weight: 550; font-size: 13.5px; color: var(--text); }
+    &__subtitle { font-family: var(--mono); font-size: 12px; color: var(--text-faint); }
+    &__meta { display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
+    &__meta-item { display: inline-flex; align-items: center; gap: 4px; }
+    &__meta-label { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); text-transform: uppercase; }
+    &__meta-value { font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); }
+    &__status { flex-shrink: 0; }
+    &__actions { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    &__chevron { color: var(--text-faint); flex-shrink: 0; margin-left: 4px; }
+}
+
+
+// ------------------------------------------------------------
+// ErrorState — consistent empty error panel.
+// ------------------------------------------------------------
+.sk-error-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 220px; padding: 32px; text-align: center;
+    border: 1px dashed var(--border); border-radius: 14px;
+    background: var(--surface);
+
+    &__icon { color: var(--danger); margin-bottom: 14px; }
+    &__title { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; }
+    &__message { font-size: 13px; color: var(--text-dim); max-width: 420px; margin: 0 0 16px; }
+}
+
+// ------------------------------------------------------------
+// SearchFilterBar — reusable search + filter + sort bar.
+// ------------------------------------------------------------
+.sk-search-filter-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+
+    &__search { position: relative; flex: 1 1 220px; min-width: 180px; }
+    &__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-faint); pointer-events: none; }
+    &__input { padding-left: 32px; }
+    &__clear { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); color: var(--text-faint); }
+
+    &__filters { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    &__chip {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 11px; border-radius: 7px;
+        font-size: 12.5px; font-weight: 450;
+        color: var(--text-dim); background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        cursor: pointer; transition: background 0.12s, color 0.12s, border-color 0.12s;
+
+        &:hover { background: var(--surface-3); }
+        &.is-active { color: var(--accent-bright); background: var(--accent-bg-soft); border-color: var(--accent-soft); }
+    }
+    &__count {
+        font-family: var(--mono); font-size: 10.5px; color: var(--text-faint);
+        .is-active & { color: var(--accent-bright); }
+    }
+
+    &__sort {
+        select {
+            appearance: none;
+            padding: 6px 24px 6px 10px;
+            border-radius: 7px;
+            border: 1px solid var(--border-soft);
+            background: var(--surface-2);
+            color: var(--text-dim);
+            font-size: 12.5px;
+            cursor: pointer;
+        }
+    }
+}
+
+// ------------------------------------------------------------
+// CopyButton — copy-to-clipboard with feedback.
+// ------------------------------------------------------------
+.copy-button {
+    &.is-copied { color: var(--green); }
+    &__label { margin-left: 6px; }
+}

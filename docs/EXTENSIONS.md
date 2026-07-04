@@ -1,0 +1,419 @@
+# Extension Author Guide
+
+ServerKit is a small core of primitives plus optional **extensions** installed
+from the Marketplace. This document is the honest, single reference for building
+one: the manifest schema, the contribution envelope, lifecycle hooks, the backend
+SDK, install sources, and — importantly — the constraints you will hit in
+production.
+
+> If you only remember one thing: **an extension's frontend must be compiled into
+> the panel's Vite bundle to render.** For builtin (in-repo) extensions we handle
+> this by pre-bundling (see [The production frontend constraint](#the-production-frontend-constraint)).
+> A third-party extension that ships only a backend works everywhere today; one
+> that ships a frontend needs the delivery mechanism tracked in Phase 3 of the
+> platform plan.
+
+---
+
+## Anatomy of an extension
+
+An extension is a folder (zipped for distribution) with this layout:
+
+```
+my-extension/
+  plugin.json          # manifest — the only required file
+  backend/             # optional: Flask blueprint + services + lifecycle hooks
+    blueprint.py
+    lifecycle.py
+  frontend/            # optional: React components exposed to the host UI
+    index.jsx          # entry module — named exports referenced by contributions
+    styles/
+      my-extension.scss
+```
+
+- `backend/` is extracted to `backend/app/plugins/<slug>/` on the panel host and
+  its blueprint is hot-loaded (no restart needed for install).
+- `frontend/` is extracted to `frontend/src/plugins/<slug>/`. For builtin
+  extensions this directory is **checked in** (a build artifact — see below).
+- Either half is optional. A pure-frontend extension (like `serverkit-git`, whose
+  backend API stays in core) declares only `contributions`; a pure-backend
+  extension declares an `entry_point` and no frontend.
+
+---
+
+## `plugin.json` manifest
+
+```jsonc
+{
+  "name": "serverkit-git",            // required — slug: ^[a-zA-Z0-9_-]+$
+  "display_name": "Git Server",       // required
+  "version": "1.0.0",                 // required — semver recommended
+  "description": "…",
+  "author": "ServerKit",
+  "homepage": "https://…",
+  "repository": "https://…",
+  "license": "MIT",
+  "category": "deployment",           // ai|monitoring|security|deployment|integration|ui|utility
+  "icon": "<svg…>",                   // optional — rendered on the marketplace detail view
+  "screenshots": ["https://…/1.png"], // optional — rendered on the detail view
+
+  "permissions": ["docker", "filesystem"],   // docker|filesystem|shell|network|db
+  "min_panel_version": "1.7.0",       // optional compat gate (enforced at install)
+  "max_panel_version": "2.0.0",       // optional
+
+  "entry_point": "blueprint:git_bp",  // backend: module:bp_var under app.plugins.<slug>
+  "url_prefix": "/api/v1/git",        // defaults to /api/v1/<slug>
+
+  "templates": ["gitea"],             // app-template ids to install alongside
+  "lifecycle": {                      // module:func hooks under app.plugins.<slug>
+    "install":   "lifecycle:on_install",
+    "uninstall": "lifecycle:on_uninstall",
+    "upgrade":   "lifecycle:on_upgrade"
+  },
+
+  "models": ["models:register"],      // optional — plugin-owned tables (see Data models)
+  "config_schema": { … },             // optional — rendered as a settings form
+
+  "contributions": { … }              // UI contributions — see below
+}
+```
+
+The authoritative, machine-readable contract is served at
+`GET /api/v1/plugins/manifest-spec` and mirrors what `plugin_service.py` actually
+consumes — keep them in sync when extending the schema.
+
+---
+
+## The `contributions` envelope
+
+Everything an extension adds to the host UI is declared here. Each entry is
+tagged at runtime with its source `plugin` slug so the frontend can resolve
+`component` strings against the right module.
+
+```jsonc
+"contributions": {
+  "nav": [
+    { "id": "git", "label": "Git", "route": "/git",
+      "category": "infrastructure", "icon": "<circle …/>",
+      "requiresCondition": "gpuAvailable" }          // optional runtime gate
+  ],
+  "routes": [
+    { "path": "git", "component": "GitExtensionPage" },
+    { "path": "git/:tab", "component": "GitExtensionPage", "layout": "padded" }
+  ],
+  "page_titles": { "/git": "Git Repositories" },
+  "command_palette": [
+    { "label": "Git", "path": "/git", "category": "Pages", "keywords": "repos deploy" }
+  ],
+  "widgets": [ { "slot": "dashboard.top", "component": "GitStatusWidget" } ],
+  "layouts": [ { "id": "my-fullscreen", "component": "MyLayout" } ],
+  "tabs": [
+    { "group": "files", "to": "/ftp", "label": "FTP Server", "icon": "<rect …/>" }
+  ],
+  "ai": {
+    "suggested_prompts": [ { "route": "/git", "label": "…", "prompt": "…" } ],
+    "tool_renderers":    [ { "tool": "git__list_branches", "component": "BranchList" } ]
+  }
+}
+```
+
+| Kind | Shape | Notes |
+|---|---|---|
+| `nav` | `{id,label,route,category,icon,requiresCondition?}` | `icon` is raw inner-SVG markup. `category`: overview/infrastructure/operations/system. Merged into the sidebar; deduped by `id`. |
+| `routes` | `{path,component,layout?,group?}` | `component` = a named export of the plugin's `index.{js,jsx}`. `layout`: `padded` (default) / `full` / `bare` / a custom layout id. `group` nests the route inside a core tab group instead — see [Tab-group contributions](#tab-group-contributions). |
+| `page_titles` | `{ "/path": "Title" }` | Sets `document.title`. |
+| `command_palette` | `{label,path,category,keywords}` | `category` defaults to `Extensions`. |
+| `widgets` | `{slot,component}` | Slots: `global` (renders inside DashboardLayout), plus the enrich-core slots (`dashboard.top`, `service.detail.tab`, `domain.drawer.panel`). |
+| `layouts` | `{id,component}` | Custom wrappers; the component must render `<Outlet/>`. Built-in ids `padded`/`full`/`bare` are reserved. |
+| `tabs` | `{group,to,label,icon?,end?,order?}` | Adds a tab to a core-owned tab group. `group` = the group id (`files` / `servers` / `monitoring`). See [Tab-group contributions](#tab-group-contributions). |
+| `ai` | `{suggested_prompts,tool_renderers}` | See [AI](#extending-the-ai-assistant). |
+
+### Route layouts
+
+- `padded` (default) — inside `DashboardLayout`, normal padding.
+- `full` — inside `DashboardLayout`, no padding (like `/files`, `/docker`).
+- `bare` — **outside** `DashboardLayout` (no sidebar), under the auth guard —
+  fullscreen authenticated pages.
+- `<custom-id>` — wrapped in a `layouts`-contributed component.
+
+### Tab-group contributions
+
+Some core surfaces are **tab groups** (one shared `PageTopbar` + routed tabs,
+rendered by `TabGroupLayout`). An extension can add a tab to one of these
+groups instead of contributing a standalone page, so its feature sits where
+users expect it (e.g. FTP as a tab of Files) and the group's chrome stays.
+
+Two halves, both required:
+
+```jsonc
+"tabs":   [ { "group": "files", "to": "/ftp", "label": "FTP Server",
+              "icon": "<rect …/>", "order": 1 } ],
+"routes": [ { "path": "ftp", "component": "FtpServerPage", "group": "files" },
+            { "path": "ftp/:tab", "component": "FtpServerPage", "group": "files" } ]
+```
+
+- The `tabs` entry puts the tab in the strip; the `group`-tagged routes render
+  the page **inside** that group's `TabGroupLayout` (a `group` route ignores
+  `layout`).
+- `group` ids match the group's **sidebar item id**: `files`, `servers`,
+  `monitoring`. The host also extends that sidebar item's highlight to the
+  contributed tab's path, so the group stays lit. (Other groups can accept
+  contributions later by passing `groupId` to their `TabGroupLayout` in
+  `App.jsx`.)
+- `icon` is raw inner-SVG markup (24×24 viewBox, stroked), like nav icons.
+  `order` is an optional insertion index; default appends after the core tabs.
+  Core tabs always win a `to` collision.
+- Pages rendered in a tab group must not render their own top bar; publish
+  actions via the `useTopbarActions()` outlet context like core tab pages do.
+
+---
+
+## The production frontend constraint
+
+`frontend/src/plugins/contributions.js` discovers plugin UI modules at **build
+time** via `import.meta.glob('../plugins/*/index.{js,jsx}')`. Two consequences you
+must design around:
+
+1. **Builtin (in-repo) extensions work in production** because their frontend
+   halves are checked into `frontend/src/plugins/<slug>/` and compiled into every
+   shipped bundle. "Install" just flips the runtime contribution envelope on.
+2. **A third-party extension that ships a frontend does *not* render on a
+   production panel** (the panel serves a pre-built bundle; `plugin_service` copies
+   files but nothing rebuilds Vite). Its **backend half loads fine.** Until the
+   Phase 3 frontend-delivery mechanism lands, third-party extensions should be
+   backend-only, or use a `bare`/custom layout escape hatch.
+
+### D5 — builtin frontends are pre-bundled (single source of truth)
+
+For an in-repo extension, `builtin-extensions/<slug>/frontend/` is the **source of
+truth**; `frontend/src/plugins/<slug>/` is a **generated artifact**. Never edit the
+artifact by hand. Regenerate it with:
+
+```bash
+node scripts/sync-builtin-frontends.mjs           # source → artifact
+node scripts/sync-builtin-frontends.mjs --check    # CI drift gate (fails on drift)
+```
+
+The `Extensions CI` workflow runs `--check` on every change to
+`builtin-extensions/**` or `frontend/src/plugins/**`, so the two can never
+silently diverge.
+
+---
+
+## Backend SDK (`app.plugins_sdk`)
+
+Depend on the SDK, not on host internals — as long as this surface is stable,
+core refactors won't break you.
+
+```python
+from flask import Blueprint, request, jsonify
+from app.plugins_sdk import (
+    db, jwt_required, current_user, audit, logger,
+    ai, queue, notify, jobs,
+)
+
+my_bp = Blueprint('my_ext', __name__)
+log = logger(__name__)
+
+@my_bp.route('/things', methods=['GET'])
+@jwt_required()
+def list_things():
+    user = current_user()
+    return jsonify({'ok': True})
+```
+
+| Name | What it is |
+|---|---|
+| `db` | SQLAlchemy handle (`db.session`, `db.Model`). |
+| `jwt_required`, `get_jwt`, `get_jwt_identity` | Flask-JWT-Extended re-exports. |
+| `current_user()` | Resolves the JWT identity to a `User` row (or `None`). |
+| `audit(action, target_type, …)` | Write an audit-log entry. |
+| `logger(name)` | Module-scoped logger. |
+| `ai` | Extend the core assistant (tools, context, prompts). |
+| `queue` | Queue Bus SDK (publish/consume). |
+| `notify` | Notifications SDK (`notify.send(event, to, data)`). |
+| `jobs` | Jobs SDK (schedule/enqueue background work). |
+| `sockets` | Register a status-guarded Socket.IO namespace (`/ext/<slug>`). |
+| `require_permission(slug, cap)` | Capability gate — raises `PermissionDenied` if `cap` isn't declared in `permissions`. |
+| `panel_version()` | The panel's version string (for in-plugin compat checks). |
+
+Errors follow the core convention: `return jsonify({'error': 'message'}), status`.
+
+### Blueprint registration & the disable guard
+
+`entry_point` (`module:bp_var`) is imported from `app.plugins.<slug>.<module>` and
+registered at `url_prefix`. A `before_request` guard is attached automatically:
+when the plugin's DB status isn't `active`, its routes return **503** — so
+disabling an extension actually stops serving it, even though Flask can't
+unregister a blueprint from a running app.
+
+Keep the same `/api/v1/<feature>` prefix when a feature moves from core into an
+extension (decision D9) so existing agents/scripts/UI keep working.
+
+---
+
+## Lifecycle hooks
+
+Declared under `lifecycle`; resolved as `module:func` under `app.plugins.<slug>`.
+Each hook receives the `InstalledPlugin` row as its single positional arg.
+
+- `install` — runs **after** files are extracted (e.g. seed default rows).
+- `upgrade` — runs when installing a version different from the installed one.
+- `uninstall` — runs **before** files are removed. Receives whether the caller
+  requested a data purge (see [Data policy](#data-models--policy)).
+
+Hook failures are logged and swallowed — hooks are convenience, not correctness.
+
+---
+
+## Data models & policy
+
+Raw `db` access works, but for tables you own, declare a `models` entry point so
+the platform can create/upgrade/clean them up:
+
+```python
+# app/plugins/<slug>/models.py
+def register(ctx):
+    """Return SQLAlchemy model classes owned by this extension.
+    Table names are prefixed ext_<slug>_ automatically."""
+    ...
+```
+
+- Install creates the tables; the `upgrade` hook runs on version change.
+- Uninstall offers **keep-data** vs **purge** (mirrors the installer's `--purge`
+  semantics); the choice is passed to the `uninstall` hook (`func(plugin, purge=...)`)
+  and, on purge, drops the `ext_<slug>_*` tables.
+
+## Background jobs & schedules
+
+Declare handlers and recurring jobs in the manifest; they wire into the Jobs SDK
+on install and **pause automatically when the plugin is disabled**:
+
+```jsonc
+"jobs":      [ { "kind": "myext.reindex", "handler": "jobs:reindex" } ],
+"schedules": [ { "name": "myext-nightly", "kind": "myext.reindex", "cron": "0 3 * * *" } ]
+```
+
+## Config (`config_schema`)
+
+Declare a `config_schema` in the manifest and the Marketplace renders a
+**Configure** form on the installed plugin (Installed tab). Values persist on
+the panel and your backend reads them with `plugins_sdk.config(slug)`:
+
+```jsonc
+"config_schema": {
+  "api_key":         { "type": "string", "secret": true, "description": "…" },
+  "refresh_seconds": { "type": "integer", "default": 60 },
+  "mode":            { "type": "string", "enum": ["fast", "thorough"] },
+  "enabled":         { "type": "boolean", "default": true }
+}
+```
+
+- Top-level keys are the field names (a JSON-schema-style `properties` wrapper
+  also works). Supported: `string` / `number` / `integer` / `boolean`, `enum`
+  (renders a select), `default`, `title`, `description`, and `secret: true`
+  (renders a password input).
+- Values may hold secrets, so they are **not** part of the plugin's public
+  dict — only the admin-gated `GET/PUT /api/v1/plugins/<id>/config` serves
+  them, and `plugins_sdk.config()` is read-only.
+
+```python
+from app.plugins_sdk import config
+key = config('my-extension').get('api_key')
+```
+
+## Real-time (Socket.IO)
+
+Declare `"socket_entry": "sockets:register"`; the function returns
+`{event: handler}` and the panel registers them on `/ext/<slug>`, status-guarded
+(a disabled plugin's namespace refuses new connections):
+
+```python
+# app/plugins/<slug>/sockets.py
+def register():
+    def on_connect():  ...
+    def on_subscribe(data):  ...
+    return {"connect": on_connect, "subscribe": on_subscribe}
+```
+
+## Permissions & compatibility
+
+- `permissions` is a consent step on install and is **enforced** by the SDK gate:
+  `require_permission(slug, "docker")` raises unless `docker` is declared. (This is
+  in-process, declaration-based enforcement — see ADR 0001 / plan #42 for the
+  sandboxing posture.)
+- `min_panel_version` / `max_panel_version` are enforced at install **and** update
+  for every source (URL/upload/local/builtin/registry).
+
+---
+
+## Extending the AI assistant
+
+The assistant is core (decision D7) — you never rebuild it, you extend it. Declare
+an `ai` block and ship `app/plugins/<slug>/ai.py`:
+
+```python
+from app.plugins_sdk import ai
+
+def register(reg):                       # reg is a PluginToolBinder
+    @reg.tool(rbac_feature="git", rbac_level="read")
+    def list_branches(repo: str) -> list:
+        """List branches in a repo. Args: repo: repository slug."""
+        from app.services.git_service import GitService
+        return GitService.list_branches(repo)
+```
+
+Tools are namespaced `<slug>__<name>`, RBAC-gated per tool, and write tools
+(`is_write=True`) always route through confirmation.
+
+---
+
+## Install sources
+
+| Source | How | Endpoint |
+|---|---|---|
+| Builtin (in-repo) | One-click from the Marketplace | `POST /api/v1/plugins/builtin/<slug>/install` |
+| GitHub / release / zip URL | Paste a URL | `POST /api/v1/plugins/install` |
+| Uploaded zip | Upload (≤ 50 MB) | `POST /api/v1/plugins/install-upload` |
+| Local path (dev) | Panel-host path | `POST /api/v1/plugins/install-local` |
+| Registry | Curated index (checksum-verified) — see [EXTENSIONS_REGISTRY.md](EXTENSIONS_REGISTRY.md) | via Marketplace Browse |
+
+All sources funnel through one install pipeline (`_install_from_buffer`) so
+behavior is identical. Zip-slip is rejected (absolute paths, `..`, escaping
+entries). Python `requirements.txt` is **not** installed unless the operator sets
+`SERVERKIT_ALLOW_PLUGIN_PIP=1` (installing runs pip with the backend's
+privileges).
+
+### Docker note
+
+A dockerized backend only sees `/app`, not the host's `frontend/` tree. To install
+an extension that ships a frontend on such a panel, bind-mount the host's
+`frontend/src/plugins` into the container and set
+`SERVERKIT_FRONTEND_PLUGINS_DIR`, or run the backend natively for development.
+
+---
+
+## Converting a core page into a builtin extension (recipe)
+
+Proven with `serverkit-git`; automated by the one-shot upgrade auto-install
+(so existing users never lose a page). Steps:
+
+1. Create `builtin-extensions/<slug>/plugin.json` with the `contributions`
+   (nav / routes / page_titles / command_palette) that reproduce the page.
+2. Create `builtin-extensions/<slug>/frontend/index.jsx` — usually a thin
+   re-export of the existing host page while the backend API stays in core:
+   ```jsx
+   import GpuMonitor from '../../pages/GpuMonitor';
+   export function GpuMonitorPage() { return <GpuMonitor />; }
+   ```
+3. Remove the hardcoded entries from `App.jsx` (import + `<Route>` + `PAGE_TITLES`),
+   `sidebarItems.js` (or the group `*Tabs.jsx`), and `CommandPalette.jsx`.
+4. Pre-bundle: `node scripts/sync-builtin-frontends.mjs`.
+5. Lint the manifest: `node scripts/new-extension.mjs --validate
+   builtin-extensions/<slug>` — the same shape rules are enforced at install
+   time, so catching a malformed contribution here saves a failed install.
+6. The backend API stays core for now (two-speed extraction, decision D2). Full
+   backend extraction happens only after the Phase 3 primitives exist.
+
+Existing panels auto-install converted builtins once on upgrade (a marker in
+settings) so nothing disappears; fresh installs see them in the Marketplace.

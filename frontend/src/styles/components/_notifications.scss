@@ -1,0 +1,272 @@
+// ============================================
+// NOTIFICATION SETTINGS STYLES
+// ============================================
+
+// Notification Tabs
+.notification-tabs {
+    display: flex;
+    gap: $space-2;
+    margin-bottom: $space-6;
+    padding-bottom: $space-4;
+    border-bottom: 1px solid $border-subtle;
+}
+
+.notification-tab {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-3 $space-4;
+    background: transparent;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    color: $text-secondary;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    svg {
+        stroke-width: 2;
+    }
+
+    &:hover {
+        background: $bg-hover;
+        border-color: $border-default;
+        color: $text-primary;
+    }
+
+    &.active {
+        background: $accent-glow;
+        border-color: $accent-primary;
+        color: $accent-primary;
+
+        svg {
+            stroke: $accent-primary;
+        }
+    }
+}
+
+// User Notification Preferences
+.user-notification-prefs {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+}
+
+.channel-toggles,
+.category-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-3;
+}
+
+.channel-toggle,
+.category-toggle {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    input[type="checkbox"] {
+        accent-color: $accent-primary;
+    }
+
+    span {
+        font-size: $font-size-sm;
+        color: $text-secondary;
+    }
+
+    &:hover {
+        background: $bg-hover;
+        border-color: $border-default;
+    }
+
+    &:has(input:checked) {
+        background: $accent-glow;
+        border-color: fade($accent-primary-raw, 40%);
+
+        span {
+            color: $text-primary;
+        }
+    }
+}
+
+.notification-channels {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+}
+
+.notification-channel-card {
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    background: $bg-card;
+    overflow: hidden;
+    transition: border-color 0.2s;
+
+    &.enabled {
+        border-color: fade($success, 40%);
+    }
+}
+
+.channel-header {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+    padding: $space-4 $space-6;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+        background: $bg-hover;
+    }
+}
+
+.channel-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $bg-hover;
+    border-radius: $radius-md;
+    flex-shrink: 0;
+
+    svg {
+        color: $text-secondary;
+    }
+
+    .notification-channel-card.enabled & svg {
+        color: $accent-primary;
+    }
+}
+
+.channel-info {
+    flex: 1;
+    min-width: 0;
+
+    h3 {
+        margin: 0 0 $space-1 0;
+        font-size: $font-size-md;
+    }
+
+    p {
+        margin: 0;
+        color: $text-secondary;
+        font-size: $font-size-sm;
+    }
+}
+
+.channel-status {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+}
+
+.expand-icon {
+    color: $text-tertiary;
+    transition: transform 0.2s;
+
+    &.expanded {
+        transform: rotate(180deg);
+    }
+}
+
+.channel-config {
+    padding: $space-6;
+    border-top: 1px solid $border-subtle;
+    background: $bg-body;
+}
+
+.toggle-switch-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    span {
+        font-weight: 500;
+    }
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+
+    @media (max-width: 600px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.severity-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+}
+
+.severity-toggle {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    padding: $space-1 $space-2;
+    border-radius: $radius-sm;
+    background: $bg-hover;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: $font-size-sm;
+
+    input {
+        display: none;
+    }
+
+    span {
+        padding: 2px $space-1;
+        border-radius: $radius-sm;
+    }
+
+    &.critical span {
+        background: fade($danger, 20%);
+        color: $danger;
+    }
+
+    &.warning span {
+        background: fade($warning, 20%);
+        color: $warning;
+    }
+
+    &.info span {
+        background: fade($accent-primary-raw, 20%);
+        color: $accent-primary;
+    }
+
+    &.success span {
+        background: fade($success, 20%);
+        color: $success;
+    }
+
+    input:checked + span {
+        font-weight: 600;
+    }
+
+    &:has(input:not(:checked)) {
+        opacity: 0.5;
+    }
+
+    &:hover {
+        opacity: 1;
+    }
+}
+
+.channel-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-2;
+    margin-top: $space-6;
+    padding-top: $space-4;
+    border-top: 1px solid $border-subtle;
+}

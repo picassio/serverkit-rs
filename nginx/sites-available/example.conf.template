@@ -1,0 +1,104 @@
+# Example Site Configuration Template
+# Copy this file and modify for each new domain/subdomain
+#
+# Usage:
+#   1. Copy: sudo cp example.conf.template /etc/nginx/sites-available/mysite.conf
+#   2. Edit: sudo nano /etc/nginx/sites-available/mysite.conf
+#   3. Enable: sudo ln -s /etc/nginx/sites-available/mysite.conf /etc/nginx/sites-enabled/
+#   4. Test: sudo nginx -t
+#   5. Reload: sudo systemctl reload nginx
+#
+# This template assumes Cloudflare OR standalone Let's Encrypt. Pick the
+# certificate option below that matches your setup.
+
+server {
+    listen 80;
+    server_name example.builditdesign.com;  # Change this to your domain
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.builditdesign.com;  # Change this to your domain
+
+    # Pick ONE certificate option:
+
+    # Option A: Let's Encrypt
+    ssl_certificate /etc/letsencrypt/live/example.builditdesign.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.builditdesign.com/privkey.pem;
+
+    # Option B: Cloudflare Origin CA (recommended with Cloudflare proxy + Full (strict))
+    # ssl_certificate /etc/nginx/ssl/cloudflare-origin-example.pem;
+    # ssl_certificate_key /etc/nginx/ssl/cloudflare-origin-example.key;
+
+    # Modern TLS
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_tickets off;
+
+    # OCSP stapling (optional; uncomment if using Let's Encrypt and set chain path)
+    # ssl_stapling on;
+    # ssl_stapling_verify on;
+    # ssl_trusted_certificate /etc/letsencrypt/live/example.builditdesign.com/chain.pem;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" always;
+
+    # Option 1: Proxy to a local app (Docker container, Node.js, etc.)
+    location / {
+        proxy_pass http://127.0.0.1:3000;  # Change port to your app's port
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Option 2: Serve static files (uncomment and modify)
+    # root /var/www/example.builditdesign.com;
+    # index index.html index.htm;
+    # location / {
+    #     try_files $uri $uri/ =404;
+    # }
+
+    # Option 3: PHP site (uncomment and modify)
+    # root /var/www/example.builditdesign.com;
+    # index index.php index.html;
+    # location / {
+    #     try_files $uri $uri/ /index.php?$query_string;
+    # }
+    # location ~ \.php$ {
+    #     fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+    #     fastcgi_index index.php;
+    #     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    #     include fastcgi_params;
+    # }
+
+    # Deny hidden/sensitive files
+    location ~ /\. {
+        deny all;
+    }
+
+    location ~* \.(env|git|gitignore|dockerignore)$ {
+        deny all;
+    }
+}

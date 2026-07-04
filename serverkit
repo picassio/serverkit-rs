@@ -1,0 +1,1464 @@
+#!/bin/bash
+#
+# ServerKit CLI - Management tool for ServerKit
+#
+# Architecture:
+#   - Backend: systemd service (runs directly on host)
+#   - Frontend: Docker container (nginx)
+#
+# Usage: serverkit <command> [options]
+#
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Truecolor ServerKit identity (degrades to plain text when not supported)
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
+    ESC=$'\033'
+    RST_TC="${ESC}[0m"; BLD_TC="${ESC}[1m"
+    paint() { printf '%s[38;2;%d;%d;%dm' "$ESC" "$1" "$2" "$3"; }
+else
+    RST_TC=''; BLD_TC=''
+    paint() { :; }
+fi
+
+V1="$(paint 196 181 253)"; V2="$(paint 167 139 250)"; V3="$(paint 139 92 246)"
+V4="$(paint 124 58 237)";  V5="$(paint 109 40 217)"
+PAPER_TC="$(paint 237 233 254)"; ASH_TC="$(paint 165 160 190)"; FOG_TC="$(paint 113 108 140)"
+HUE_OK_TC="$(paint 52 211 153)"; HUE_WARN_TC="$(paint 250 204 21)"; HUE_ERR_TC="$(paint 248 113 113)"; HUE_LINK_TC="$(paint 103 232 249)"
+
+# Configuration
+INSTALL_DIR="${SERVERKIT_DIR:-/opt/serverkit}"
+VENV_DIR="${SERVERKIT_VENV_DIR:-$INSTALL_DIR/venv}"
+NGINX_DIR="${SERVERKIT_NGINX_DIR:-/etc/nginx}"
+BACKEND_SERVICE="serverkit"
+FRONTEND_CONTAINER="serverkit-frontend"
+
+# Helper functions
+print_header() {
+    local ver
+    ver=$(get_local_version 2>/dev/null || echo "unknown")
+    printf '\n'
+    printf '  %s%s▖▌▌%s  %s%sServerKit%s  %sv%s%s  %s•%s %s%s%s\n' \
+        "${BLD_TC}" "${V2}" "${RST_TC}" "${BLD_TC}" "${PAPER_TC}" "${RST_TC}" "${FOG_TC}" "$ver" "${RST_TC}" \
+        "${HUE_OK_TC}" "${RST_TC}" "${ASH_TC}" "Stable" "${RST_TC}"
+    printf '  %s%s▌▖▌%s  %sSelf-hosted infrastructure, made simple.%s\n' \
+        "${BLD_TC}" "${V3}" "${RST_TC}" "${ASH_TC}" "${RST_TC}"
+    printf '  %s%s▌▌▖%s  %sWeb apps · Databases · Docker · Email · DNS · Security%s\n' \
+        "${BLD_TC}" "${V4}" "${RST_TC}" "${FOG_TC}" "${RST_TC}"
+    printf '  %s%s▘▘▘%s  %sPython + React, one command · serverkit.ai%s\n' \
+        "${BLD_TC}" "${V5}" "${RST_TC}" "${FOG_TC}" "${RST_TC}"
+    printf '\n'
+}
+
+print_success() { echo -e "${GREEN}✓ $1${NC}"; }
+print_error() { echo -e "${RED}✗ $1${NC}"; }
+print_warning() { echo -e "${YELLOW}! $1${NC}"; }
+print_info() { echo -e "${BLUE}→ $1${NC}"; }
+
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        print_error "This command requires root privileges. Run with sudo."
+        exit 1
+    fi
+}
+
+check_installed() {
+    if [ ! -d "$INSTALL_DIR" ]; then
+        print_error "ServerKit is not installed in $INSTALL_DIR"
+        print_info "Run the install script first"
+        exit 1
+    fi
+}
+
+require_venv() {
+    # If the expected virtual environment is missing, try to locate an existing
+    # one from legacy/alternative layouts before giving up.
+    if [ ! -f "$VENV_DIR/bin/activate" ] || [ ! -x "$VENV_DIR/bin/python" ]; then
+        print_warning "Virtual environment missing at $VENV_DIR"
+        local candidate found_venv=""
+        for candidate in "$INSTALL_DIR/venv" "$INSTALL_DIR/backend/venv" \
+                         "$INSTALL_DIR/backend/.venv" "$INSTALL_DIR/.venv"; do
+            if [ -f "$candidate/bin/activate" ] && [ -x "$candidate/bin/python" ]; then
+                found_venv="$candidate"
+                break
+            fi
+        done
+        if [ -n "$found_venv" ] && [ "$found_venv" != "$VENV_DIR" ]; then
+            print_info "Using virtual environment at $found_venv"
+            VENV_DIR="$found_venv"
+        else
+            print_error "No usable Python virtual environment found. Run serverkit update to rebuild it."
+            exit 1
+        fi
+    fi
+}
+
+run_cli() {
+    # Run CLI commands directly on host using the virtual environment
+    require_venv
+    cd "$INSTALL_DIR/backend"
+    source "$VENV_DIR/bin/activate"
+    python cli.py "$@"
+}
+
+# Version management
+VERSION_FILE="$INSTALL_DIR/VERSION"
+REMOTE_VERSION_URL="https://raw.githubusercontent.com/jhd3197/serverkit/main/VERSION"
+
+get_local_version() {
+    if [ -f "$VERSION_FILE" ]; then
+        cat "$VERSION_FILE" | tr -d '\n\r '
+    else
+        echo "unknown"
+    fi
+}
+
+get_remote_version() {
+    curl -sf "$REMOTE_VERSION_URL" 2>/dev/null | tr -d '\n\r ' || echo "unknown"
+}
+
+compare_versions() {
+    # Returns: 0 if equal, 1 if v1 > v2, 2 if v1 < v2
+    local v1="$1"
+    local v2="$2"
+
+    if [ "$v1" = "$v2" ]; then
+        return 0
+    fi
+
+    # Unparsable versions used to compare as "equal" (every [ -gt ] probe below
+    # failed silently under 2>/dev/null), reporting "up to date" on a box with
+    # a missing or corrupt VERSION file. Treat them as "older" instead so
+    # check-update points the operator at `serverkit update`, which re-validates.
+    local vre='^[0-9]+\.[0-9]+(\.[0-9]+)?$'
+    if ! [[ "$v1" =~ $vre ]] || ! [[ "$v2" =~ $vre ]]; then
+        return 2
+    fi
+
+    # Compare version components
+    local v1_major=$(echo "$v1" | cut -d. -f1)
+    local v1_minor=$(echo "$v1" | cut -d. -f2)
+    local v1_patch=$(echo "$v1" | cut -d. -f3)
+
+    local v2_major=$(echo "$v2" | cut -d. -f1)
+    local v2_minor=$(echo "$v2" | cut -d. -f2)
+    local v2_patch=$(echo "$v2" | cut -d. -f3)
+
+    # X.Y versions carry no patch component — compare it as 0.
+    v1_patch="${v1_patch:-0}"
+    v2_patch="${v2_patch:-0}"
+
+    if [ "$v1_major" -gt "$v2_major" ] 2>/dev/null; then return 1; fi
+    if [ "$v1_major" -lt "$v2_major" ] 2>/dev/null; then return 2; fi
+    if [ "$v1_minor" -gt "$v2_minor" ] 2>/dev/null; then return 1; fi
+    if [ "$v1_minor" -lt "$v2_minor" ] 2>/dev/null; then return 2; fi
+    if [ "$v1_patch" -gt "$v2_patch" ] 2>/dev/null; then return 1; fi
+    if [ "$v1_patch" -lt "$v2_patch" ] 2>/dev/null; then return 2; fi
+
+    return 0
+}
+
+cmd_version() {
+    local version=$(get_local_version)
+    echo "ServerKit version $version"
+}
+
+cmd_check_update() {
+    print_info "Checking for updates..."
+
+    local local_version=$(get_local_version)
+    local remote_version=$(get_remote_version)
+
+    echo ""
+    echo "  Installed version: $local_version"
+    echo "  Latest version:    $remote_version"
+    echo ""
+
+    if [ "$remote_version" = "unknown" ]; then
+        print_warning "Could not check remote version (network error?)"
+        return 1
+    fi
+
+    set +e  # Temporarily disable exit on error
+    compare_versions "$local_version" "$remote_version"
+    local result=$?
+    set -e  # Re-enable exit on error
+
+    if [ $result -eq 2 ]; then
+        print_success "Update available! Run 'sudo serverkit update' to upgrade."
+        return 0
+    elif [ $result -eq 0 ]; then
+        print_success "You are running the latest version."
+        return 0
+    else
+        print_info "You are running a newer version than released."
+        return 0
+    fi
+}
+
+# Commands
+cmd_help() {
+    print_header
+    echo ""
+    echo "Usage: serverkit <command> [options]"
+    echo ""
+    echo "Service Commands:"
+    echo "  start             Start all services"
+    echo "  stop              Stop all services"
+    echo "  restart           Restart all services"
+    echo "  status            Show service status"
+    echo "  logs [service]    View logs (backend, frontend, or all)"
+    echo "  update [options]  Update ServerKit"
+    echo "                      --branch <name>  Switch to specific branch (e.g., dev)"
+    echo "                      --release [vX.Y.Z]  Update from release tarball"
+    echo "                      --force          Force update even if already latest"
+    echo "                      --dry-run        Show what would change without applying"
+    echo "  branch            Show current branch"
+    echo "  uninstall         Uninstall ServerKit (preserves data by default)"
+    echo "                      --purge / --delete-volumes  also delete volumes, DB, data"
+    echo "                      --keep-data                 also keep /etc/serverkit"
+    echo "                      --yes                       skip the confirmation prompt"
+    echo "                      --dry-run                   show actions without changing anything"
+    echo ""
+    echo "User Management:"
+    echo "  create-admin      Create a new admin user"
+    echo "  reset-password    Reset a user's password"
+    echo "  unlock-user       Unlock a locked user account"
+    echo "  list-users        List all users"
+    echo "  make-admin        Promote user to admin"
+    echo "  deactivate-user   Deactivate a user account"
+    echo "  activate-user     Activate a user account"
+    echo ""
+    echo "Database Commands:"
+    echo "  init-db           Initialize the database"
+    echo "  migrate-db        Apply database migrations"
+    echo "  backup-db         Backup the database"
+    echo "  restore-db        Restore database from backup"
+    echo ""
+    echo "Cleanup Commands:"
+    echo "  cleanup-apps      Delete all apps and containers"
+    echo "  factory-reset     Complete reset (delete everything)"
+    echo ""
+    echo "App Management:"
+    echo "  create-app        Show how to create apps (via web UI)"
+    echo "  deploy-template   Deploy a template to local or remote server"
+    echo "  list-servers      List deployment target servers"
+    echo "  deployment-status Show deployment job status and logs"
+    echo "  list-apps [--all] List deployed apps (--all shows Docker containers)"
+    echo "  start-app         Start an app"
+    echo "  stop-app          Stop an app"
+    echo "  app-logs          View app logs"
+    echo ""
+    echo "Site Management:"
+    echo "  setup-proxy       Setup host nginx as reverse proxy (run once)"
+    echo "  add-site          Add a new site/domain"
+    echo "  list-sites        List all configured sites"
+    echo "  remove-site       Remove a site"
+    echo ""
+    echo "Version Commands:"
+    echo "  version           Show current version"
+    echo "  check-update      Check if updates are available"
+    echo ""
+    echo "Diagnostics:"
+    echo "  doctor            Check for common issues"
+    echo "  doctor --fix      Auto-fix detected issues"
+    echo ""
+    echo "Utility Commands:"
+    echo "  generate-keys     Generate secure keys for .env"
+    echo "  config            Edit configuration"
+    echo ""
+    echo "Examples:"
+    echo "  sudo serverkit start"
+    echo "  sudo serverkit create-admin"
+    echo "  sudo serverkit add-site test.mysite.com 3000"
+    echo "  serverkit logs backend"
+    echo ""
+}
+
+cmd_start() {
+    check_root
+    check_installed
+    print_info "Starting ServerKit..."
+
+    # Start backend (systemd) — a partial install / non-systemd box must get a
+    # readable warning, not a raw set -e abort.
+    systemctl start $BACKEND_SERVICE || print_warning "Could not start backend service '$BACKEND_SERVICE' (is systemd available?)"
+
+    # Start frontend (Docker)
+    cd "$INSTALL_DIR"
+    docker compose up -d || print_warning "Could not start frontend container (is Docker running?)"
+
+    sleep 3
+    print_success "ServerKit started"
+    cmd_status_brief
+}
+
+cmd_stop() {
+    check_root
+    check_installed
+    print_info "Stopping ServerKit..."
+
+    # Stop backend (systemd)
+    systemctl stop $BACKEND_SERVICE || true
+
+    # Stop frontend (Docker)
+    cd "$INSTALL_DIR"
+    docker compose down || true
+
+    print_success "ServerKit stopped"
+}
+
+cmd_restart() {
+    check_root
+    check_installed
+    print_info "Restarting ServerKit..."
+
+    # Restart backend (systemd) — mirror cmd_stop's guards: a failing service
+    # manager is reported, never a raw abort.
+    systemctl restart $BACKEND_SERVICE || print_warning "Could not restart backend service '$BACKEND_SERVICE' (is systemd available?)"
+
+    # Restart frontend (Docker)
+    cd "$INSTALL_DIR"
+    docker compose restart || print_warning "Could not restart frontend container (is Docker running?)"
+
+    sleep 3
+    print_success "ServerKit restarted"
+    cmd_status_brief
+}
+
+cmd_status_brief() {
+    # Quick status check
+    echo ""
+
+    # Backend status
+    if systemctl is-active --quiet $BACKEND_SERVICE; then
+        print_success "Backend: running"
+    else
+        print_error "Backend: stopped"
+    fi
+
+    # Frontend status
+    if docker ps --format '{{.Names}}' | grep -q $FRONTEND_CONTAINER; then
+        print_success "Frontend: running"
+    else
+        print_error "Frontend: stopped"
+    fi
+
+    # API health
+    if curl -s http://127.0.0.1:5000/api/v1/system/health > /dev/null 2>&1; then
+        print_success "API: healthy"
+    else
+        print_warning "API: not responding"
+    fi
+}
+
+cmd_status() {
+    check_installed
+    print_header
+    echo ""
+
+    echo "Backend Service (systemd):"
+    echo "─────────────────────────────"
+    systemctl status $BACKEND_SERVICE --no-pager -l 2>/dev/null || print_warning "Backend service not found"
+
+    echo ""
+    echo "Frontend Container (Docker):"
+    echo "─────────────────────────────"
+    cd "$INSTALL_DIR"
+    docker compose ps 2>/dev/null || print_warning "Frontend container not found"
+
+    echo ""
+    cmd_status_brief
+}
+
+cmd_logs() {
+    check_installed
+    service="${1:-all}"
+
+    case "$service" in
+        backend)
+            if command -v journalctl >/dev/null 2>&1; then
+                journalctl -u $BACKEND_SERVICE -f || print_warning "Could not read the backend journal (is journald running?)"
+            else
+                print_warning "journalctl not found — cannot stream backend logs on this system"
+            fi
+            ;;
+        frontend)
+            cd "$INSTALL_DIR"
+            docker compose logs -f || print_warning "Could not read frontend container logs (is Docker running?)"
+            ;;
+        all|*)
+            print_info "Showing backend logs (Ctrl+C to switch to frontend)..."
+            echo ""
+            # Show both in split view isn't easy in bash, so show backend first.
+            # A journal-less box must still fall through to the Docker logs
+            # below instead of dying here.
+            if command -v journalctl >/dev/null 2>&1; then
+                journalctl -u $BACKEND_SERVICE -n 50 --no-pager || print_warning "Could not read the backend journal"
+            else
+                print_warning "journalctl not found — skipping backend logs"
+            fi
+            echo ""
+            print_info "Showing frontend logs..."
+            echo ""
+            cd "$INSTALL_DIR"
+            docker compose logs --tail=50 || print_warning "Could not read frontend container logs (is Docker running?)"
+            echo ""
+            print_info "For live logs, use: serverkit logs backend OR serverkit logs frontend"
+            ;;
+    esac
+}
+
+cmd_branch() {
+    check_installed
+    cd "$INSTALL_DIR"
+
+    local current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    local current_commit=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+    echo ""
+    echo "  Current branch: $current_branch"
+    echo "  Current commit: $current_commit"
+    echo "  Version:        $(get_local_version)"
+    echo ""
+
+    # Show available remote branches
+    print_info "Available branches:"
+    git branch -r 2>/dev/null | grep -v HEAD | sed 's/origin\//    /' | head -10
+    echo ""
+}
+
+cmd_update() {
+    local update_args=()
+
+    # Parse arguments and forward them to the canonical update script.
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --force|-f)
+                update_args+=("--force")
+                shift
+                ;;
+            --branch|-b)
+                # A missing value used to make `shift 2` fail and exit the CLI
+                # silently under set -e. Guard it like --release below.
+                if [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^- ]]; then
+                    update_args+=("--branch" "$2")
+                    shift 2
+                else
+                    print_error "--branch requires a branch name (e.g. --branch dev)"
+                    exit 1
+                fi
+                ;;
+            --release|-r)
+                update_args+=("--release")
+                if [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^- ]]; then
+                    update_args+=("$2")
+                    shift 2
+                else
+                    shift
+                fi
+                ;;
+            --dry-run|-n)
+                update_args+=("--dry-run")
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    check_root
+    check_installed
+    print_header
+    echo ""
+
+    if [ ! -x "$INSTALL_DIR/scripts/update.sh" ]; then
+        print_error "Updater not found at $INSTALL_DIR/scripts/update.sh"
+        exit 1
+    fi
+
+    SERVERKIT_DIR="$INSTALL_DIR" SERVERKIT_VENV_DIR="$VENV_DIR" \
+        bash "$INSTALL_DIR/scripts/update.sh" "${update_args[@]}"
+}
+
+cmd_uninstall() {
+    check_root
+
+    # Flags mirror uninstall.sh so both entry points accept the same options.
+    local purge=0 keep_data=0 assume_yes=0 dry_run=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --purge|--delete-volumes) purge=1; shift ;;
+            --keep-data)              keep_data=1; shift ;;
+            --yes|-y)                 assume_yes=1; shift ;;
+            --dry-run|-n)             dry_run=1; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    print_header
+    echo ""
+    if [ "$purge" = "1" ]; then
+        print_warning "This will remove ServerKit AND delete all data (volumes, database, backups)."
+    else
+        print_warning "This will remove ServerKit. User data (volumes, /var/lib, backups) is preserved."
+        echo "  Use --purge to also delete data, or --keep-data to also keep /etc/serverkit."
+    fi
+    [ "$dry_run" = "1" ] && print_warning "DRY RUN — nothing will actually be changed."
+    echo ""
+
+    if [ "$assume_yes" != "1" ]; then
+        # EOF (no tty / piped input) must not abort under set -e; an empty
+        # REPLY falls through to the safe "No" path below.
+        read -p "Are you sure? (y/N) " -n 1 -r || true
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_warning "Uninstall cancelled"
+            return 0
+        fi
+    fi
+
+    local lib="$INSTALL_DIR/scripts/lib/uninstall.sh"
+    if [ ! -f "$lib" ]; then
+        # Remnants-only box: the install tree (and the shared lib) is gone but
+        # traces remain. Don't duplicate the teardown here — point at the
+        # standalone uninstaller, which carries its own inline fallback.
+        print_error "Canonical uninstall routine not found at $lib"
+        echo ""
+        if [ -f "$INSTALL_DIR/uninstall.sh" ]; then
+            print_info "Run the standalone uninstaller instead:"
+            echo "  sudo bash $INSTALL_DIR/uninstall.sh"
+        else
+            print_info "Fetch and run the standalone uninstaller instead:"
+            echo "  curl -fsSL https://raw.githubusercontent.com/jhd3197/serverkit/main/uninstall.sh | sudo bash"
+            echo "  (pass flags with: ... | sudo bash -s -- --purge --yes)"
+        fi
+        exit 1
+    fi
+
+    # Source the shared routine into memory *before* it starts deleting the
+    # install tree (which is where the file lives), then step out of that tree.
+    # shellcheck source=/dev/null
+    source "$lib"
+    cd /tmp 2>/dev/null || cd / || true
+
+    export SERVERKIT_DIR="$INSTALL_DIR"
+    export SERVERKIT_PURGE="$purge"
+    export SERVERKIT_KEEP_DATA="$keep_data"
+    export SERVERKIT_UNINSTALL_DRY_RUN="$dry_run"
+    serverkit_uninstall_core
+
+    print_success "ServerKit uninstalled"
+    echo ""
+    echo "Note: System packages (Docker, Node.js, nginx, Python) were NOT removed."
+    echo "Remove them manually if no longer needed."
+    echo ""
+    echo "To reinstall, run:"
+    echo "  cd ~ && curl -fsSL https://serverkit.ai/install.sh | sudo bash"
+}
+
+cmd_create_admin() {
+    check_installed
+    print_info "Creating admin user..."
+    run_cli create-admin
+}
+
+cmd_reset_password() {
+    check_installed
+    print_info "Resetting password..."
+    run_cli reset-password
+}
+
+cmd_unlock_user() {
+    check_installed
+    run_cli unlock-user
+}
+
+cmd_list_users() {
+    check_installed
+    run_cli list-users
+}
+
+cmd_make_admin() {
+    check_installed
+    run_cli make-admin
+}
+
+cmd_deactivate_user() {
+    check_installed
+    run_cli deactivate-user
+}
+
+cmd_activate_user() {
+    check_installed
+    run_cli activate-user
+}
+
+cmd_init_db() {
+    check_installed
+    run_cli init-db
+}
+
+cmd_migrate_db() {
+    check_installed
+    run_cli migrate-db
+}
+
+cmd_cleanup_apps() {
+    check_root
+    check_installed
+
+    DELETE_VOLUMES=""
+    KEEP_DB=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --delete-volumes|-v)
+                DELETE_VOLUMES="--delete-volumes"
+                shift
+                ;;
+            --keep-db|-k)
+                KEEP_DB="--keep-db"
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    run_cli cleanup-apps $DELETE_VOLUMES $KEEP_DB
+}
+
+cmd_factory_reset() {
+    check_root
+    check_installed
+    run_cli factory-reset
+}
+
+cmd_backup_db() {
+    check_installed
+    BACKUP_DIR="$INSTALL_DIR/backups"
+    BACKUP_FILE="$BACKUP_DIR/serverkit-$(date +%Y%m%d-%H%M%S).db"
+    DB_FILE="$INSTALL_DIR/backend/instance/serverkit.db"
+
+    mkdir -p "$BACKUP_DIR"
+
+    if [ -f "$DB_FILE" ]; then
+        cp "$DB_FILE" "$BACKUP_FILE"
+        print_success "Database backed up to $BACKUP_FILE"
+    else
+        print_error "Database file not found: $DB_FILE"
+        exit 1
+    fi
+}
+
+cmd_restore_db() {
+    check_root
+    check_installed
+    BACKUP_DIR="$INSTALL_DIR/backups"
+    DB_FILE="$INSTALL_DIR/backend/instance/serverkit.db"
+
+    if [ -z "$1" ]; then
+        echo "Available backups:"
+        ls -la "$BACKUP_DIR"/*.db 2>/dev/null || echo "No backups found"
+        echo ""
+        read -p "Enter backup file path: " BACKUP_FILE || true
+    else
+        BACKUP_FILE="$1"
+    fi
+
+    if [ ! -f "$BACKUP_FILE" ]; then
+        print_error "Backup file not found: $BACKUP_FILE"
+        exit 1
+    fi
+
+    print_warning "This will overwrite the current database!"
+    read -p "Continue? (y/N) " -n 1 -r || true
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Stop backend before restore
+        systemctl stop $BACKEND_SERVICE
+
+        cp "$BACKUP_FILE" "$DB_FILE"
+
+        # Restart backend
+        systemctl start $BACKEND_SERVICE
+
+        print_success "Database restored"
+    fi
+}
+
+cmd_generate_keys() {
+    print_header
+    echo ""
+    echo "Add these to your .env file:"
+    echo ""
+    SECRET_KEY=$(openssl rand -hex 32)
+    JWT_SECRET_KEY=$(openssl rand -hex 32)
+    SERVERKIT_ENCRYPTION_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')
+    echo "SECRET_KEY=$SECRET_KEY"
+    echo "JWT_SECRET_KEY=$JWT_SECRET_KEY"
+    echo "SERVERKIT_ENCRYPTION_KEY=$SERVERKIT_ENCRYPTION_KEY"
+    echo ""
+}
+
+cmd_config() {
+    check_installed
+    ${EDITOR:-nano} "$INSTALL_DIR/.env"
+    print_info "Restart ServerKit to apply changes: sudo serverkit restart"
+}
+
+cmd_setup_proxy() {
+    check_root
+    check_installed
+    print_info "Setting up host nginx as reverse proxy..."
+
+    if [ -f "$INSTALL_DIR/scripts/setup-nginx-proxy.sh" ]; then
+        chmod +x "$INSTALL_DIR/scripts/setup-nginx-proxy.sh"
+        "$INSTALL_DIR/scripts/setup-nginx-proxy.sh"
+    else
+        print_error "Setup script not found. Run 'serverkit update' first."
+        exit 1
+    fi
+}
+
+cmd_create_app() {
+    print_header
+    echo ""
+    echo "To create a new app, use the ServerKit web interface:"
+    echo ""
+    echo "  1. Open ServerKit in your browser"
+    echo "  2. Go to Templates in the sidebar"
+    echo "  3. Choose from 60+ available templates:"
+    echo "     - PHP Application (custom PHP projects)"
+    echo "     - Python Application (Flask, FastAPI, Django)"
+    echo "     - Node.js Application (Express, Next.js)"
+    echo "     - WordPress, Ghost, Nextcloud, and many more"
+    echo "  4. Click Install and configure your app"
+    echo ""
+    echo "The web interface provides:"
+    echo "  ✓ One-click installation"
+    echo "  ✓ Automatic port assignment"
+    echo "  ✓ Configuration UI"
+    echo "  ✓ Update management"
+    echo ""
+}
+
+cmd_deploy_template() {
+    check_installed
+    shift
+    run_cli deploy-template "$@"
+}
+
+cmd_list_servers() {
+    check_installed
+    run_cli list-servers
+}
+
+cmd_deployment_status() {
+    check_installed
+    shift
+    run_cli deployment-status "$@"
+}
+
+cmd_list_apps() {
+    check_installed
+    # Pass --all flag if provided
+    if [ "$1" = "--all" ] || [ "$1" = "-a" ]; then
+        run_cli list-apps --all
+    else
+        run_cli list-apps
+    fi
+}
+
+cmd_start_app() {
+    check_root
+    NAME="$1"
+
+    if [ -z "$NAME" ]; then
+        echo "Usage: serverkit start-app <name>"
+        cmd_list_apps
+        exit 1
+    fi
+
+    APP_DIR="/var/www/$NAME"
+    if [ ! -d "$APP_DIR" ]; then
+        print_error "App not found: $NAME"
+        exit 1
+    fi
+
+    print_info "Starting $NAME..."
+    cd "$APP_DIR"
+    docker compose up -d
+    print_success "$NAME started"
+}
+
+cmd_stop_app() {
+    check_root
+    NAME="$1"
+
+    if [ -z "$NAME" ]; then
+        echo "Usage: serverkit stop-app <name>"
+        cmd_list_apps
+        exit 1
+    fi
+
+    APP_DIR="/var/www/$NAME"
+    if [ ! -d "$APP_DIR" ]; then
+        print_error "App not found: $NAME"
+        exit 1
+    fi
+
+    print_info "Stopping $NAME..."
+    cd "$APP_DIR"
+    docker compose down
+    print_success "$NAME stopped"
+}
+
+cmd_app_logs() {
+    NAME="$1"
+
+    if [ -z "$NAME" ]; then
+        echo "Usage: serverkit app-logs <name>"
+        cmd_list_apps
+        exit 1
+    fi
+
+    APP_DIR="/var/www/$NAME"
+    if [ ! -d "$APP_DIR" ]; then
+        print_error "App not found: $NAME"
+        exit 1
+    fi
+
+    cd "$APP_DIR"
+    docker compose logs -f
+}
+
+# Resolve the nginx vhost layout: Debian-style sites-available/sites-enabled
+# when present, otherwise the conf.d layout used by the RHEL family. Sets
+# SITE_FILE (where the vhost lives) and SITE_LINK (the sites-enabled symlink;
+# empty in conf.d layouts, where the vhost file itself is live).
+resolve_site_paths() {
+    local domain="$1"
+    if [ -d "$NGINX_DIR/sites-available" ]; then
+        SITE_FILE="$NGINX_DIR/sites-available/${domain}.conf"
+        SITE_LINK="$NGINX_DIR/sites-enabled/${domain}.conf"
+    else
+        SITE_FILE="$NGINX_DIR/conf.d/${domain}.conf"
+        SITE_LINK=""
+    fi
+}
+
+# Reload nginx if we can; on non-systemd or stopped-nginx boxes this is an
+# observation, not a fatal error — the config is already on disk either way.
+reload_nginx_or_warn() {
+    if systemctl reload nginx 2>/dev/null || nginx -s reload 2>/dev/null; then
+        return 0
+    fi
+    print_warning "Could not reload nginx — apply the change manually: systemctl reload nginx (or nginx -s reload)"
+}
+
+cmd_add_site() {
+    check_root
+
+    DOMAIN="$1"
+    PORT="${2:-3000}"
+
+    if [ -z "$DOMAIN" ]; then
+        echo "Usage: serverkit add-site <domain> [port]"
+        echo ""
+        echo "Examples:"
+        echo "  serverkit add-site test.builditdesign.com"
+        echo "  serverkit add-site myapp.builditdesign.com 3000"
+        exit 1
+    fi
+
+    resolve_site_paths "$DOMAIN"
+
+    if [ -f "$SITE_FILE" ]; then
+        print_warning "Site config already exists: $SITE_FILE"
+        read -p "Overwrite? (y/N) " -n 1 -r || true
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 0
+        fi
+    fi
+
+    print_info "Creating site config for $DOMAIN..."
+    mkdir -p "$(dirname "$SITE_FILE")"
+
+    cat > "$SITE_FILE" << EOF
+# Site: $DOMAIN
+# Created: $(date)
+
+server {
+    listen 80;
+    server_name $DOMAIN;
+
+    location / {
+        proxy_pass http://127.0.0.1:$PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+EOF
+
+    # Enable the site (Debian layout only — conf.d configs are live as written)
+    if [ -n "$SITE_LINK" ]; then
+        mkdir -p "$(dirname "$SITE_LINK")"
+        ln -sf "$SITE_FILE" "$SITE_LINK"
+    fi
+
+    # Test and reload nginx. A stopped nginx (or a non-systemd box) must not
+    # raw-abort here — the site file is already written and valid.
+    if nginx -t 2>/dev/null; then
+        reload_nginx_or_warn
+        print_success "Site added: $DOMAIN → localhost:$PORT"
+        echo ""
+        echo "Next steps:"
+        echo "  1. Add DNS record in Cloudflare:"
+        echo "     Type: A, Name: ${DOMAIN%%.*}, Content: $(curl -s ifconfig.me)"
+        echo "  2. Start your app on port $PORT"
+        echo ""
+    else
+        print_error "Nginx config error. Check: $SITE_FILE"
+        if [ -n "$SITE_LINK" ]; then
+            rm -f "$SITE_LINK"
+        elif mv -f "$SITE_FILE" "${SITE_FILE}.disabled" 2>/dev/null; then
+            # conf.d layouts have no enabled/available split — park the broken
+            # file so it can't poison an unrelated nginx reload.
+            print_info "Broken config parked at: ${SITE_FILE}.disabled"
+        else
+            print_warning "Remove or fix $SITE_FILE before reloading nginx"
+        fi
+        exit 1
+    fi
+}
+
+cmd_list_sites() {
+    print_header
+    echo ""
+    echo "Configured Sites:"
+    echo "─────────────────────────────────────────"
+
+    # Debian layout lists sites-enabled; conf.d layouts (RHEL family) list conf.d.
+    local sites_dir="$NGINX_DIR/sites-enabled"
+    if [ ! -d "$sites_dir" ]; then
+        sites_dir="$NGINX_DIR/conf.d"
+    fi
+
+    if [ -d "$sites_dir" ]; then
+        for site in "$sites_dir"/*.conf; do
+            if [ -f "$site" ]; then
+                # `|| true`: a vhost without server_name/proxy_pass is data,
+                # not an error — never abort the listing under set -e/pipefail.
+                DOMAIN=$(grep -m1 "server_name" "$site" | awk '{print $2}' | tr -d ';' || true)
+                # Portable port extraction (GNU-only `grep -oP` broke busybox)
+                PORT=$(grep -m1 "proxy_pass" "$site" | sed -n 's/.*:\([0-9][0-9]*\).*/\1/p' || true)
+                if [ -z "$PORT" ]; then
+                    PORT="static"
+                fi
+                ENABLED="✓"
+                printf "  %s %-35s → port %s\n" "$ENABLED" "$DOMAIN" "$PORT"
+            fi
+        done
+    else
+        echo "  No sites configured. Run 'serverkit setup-proxy' first."
+    fi
+    echo ""
+}
+
+cmd_doctor() {
+    check_installed
+    print_header
+    echo ""
+    print_info "Running diagnostics..."
+    echo ""
+
+    ISSUES=0
+    FIXED=0
+    FIX_MODE="${1:-}"  # --fix to auto-fix
+
+    if [ "$FIX_MODE" = "--fix" ]; then
+        check_root
+    fi
+
+    doctor_issue() {
+        ISSUES=$((ISSUES + 1))
+        print_error "$1"
+    }
+
+    doctor_ok() {
+        print_success "$1"
+    }
+
+    doctor_fixed() {
+        FIXED=$((FIXED + 1))
+        print_success "FIXED: $1"
+    }
+
+    doctor_skip() {
+        print_warning "SKIP: $1 (run with --fix to auto-fix)"
+    }
+
+    # ── 1. Backend service ──────────────────────────────────────
+    echo "Backend"
+    echo "───────────────────────────────────────"
+
+    if systemctl is-active --quiet $BACKEND_SERVICE 2>/dev/null; then
+        doctor_ok "systemd service is running"
+    else
+        doctor_issue "systemd service is not running"
+        if [ "$FIX_MODE" = "--fix" ]; then
+            systemctl start $BACKEND_SERVICE 2>/dev/null && doctor_fixed "Started backend service" || print_error "  Could not start service"
+        else
+            doctor_skip "systemctl start $BACKEND_SERVICE"
+        fi
+    fi
+
+    if curl -sf http://127.0.0.1:5000/api/v1/system/health > /dev/null 2>&1; then
+        doctor_ok "API responding on port 5000"
+    else
+        if systemctl is-active --quiet $BACKEND_SERVICE 2>/dev/null; then
+            doctor_issue "Service running but API not responding on port 5000"
+            echo "         Check logs: journalctl -u serverkit -n 30"
+        else
+            doctor_issue "API not responding (service is down)"
+        fi
+    fi
+
+    echo ""
+
+    # ── 2. Frontend container ───────────────────────────────────
+    FRONTEND_RUNNING=false
+    FRONTEND_PORT=""
+
+    if command -v docker >/dev/null 2>&1; then
+        echo "Frontend"
+        echo "───────────────────────────────────────"
+
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "$FRONTEND_CONTAINER"; then
+            FRONTEND_RUNNING=true
+            # Get the actual host port the container is mapped to
+            FRONTEND_PORT=$(docker port "$FRONTEND_CONTAINER" 80 2>/dev/null | head -1 | sed -n 's/.*:\([0-9][0-9]*\).*/\1/p' || true)
+            doctor_ok "Container running (port $FRONTEND_PORT)"
+        else
+            doctor_issue "Container '$FRONTEND_CONTAINER' is not running"
+            if [ "$FIX_MODE" = "--fix" ]; then
+                cd "$INSTALL_DIR"
+                docker compose up -d 2>/dev/null && {
+                    sleep 3
+                    FRONTEND_PORT=$(docker port "$FRONTEND_CONTAINER" 80 2>/dev/null | head -1 | sed -n 's/.*:\([0-9][0-9]*\).*/\1/p' || true)
+                    FRONTEND_RUNNING=true
+                    doctor_fixed "Started frontend container (port $FRONTEND_PORT)"
+                } || print_error "  Could not start container"
+            else
+                doctor_skip "docker compose up -d"
+            fi
+        fi
+
+        if [ "$FRONTEND_RUNNING" = true ] && [ -n "$FRONTEND_PORT" ]; then
+            if curl -sf "http://127.0.0.1:$FRONTEND_PORT" > /dev/null 2>&1; then
+                doctor_ok "Frontend responding on port $FRONTEND_PORT"
+            else
+                doctor_issue "Container running but not responding on port $FRONTEND_PORT"
+            fi
+        fi
+    else
+        echo "Frontend"
+        echo "───────────────────────────────────────"
+        doctor_issue "Docker not installed or not in PATH; skipping frontend checks"
+    fi
+
+    echo ""
+
+    # ── 3. Nginx ────────────────────────────────────────────────
+    echo "Nginx"
+    echo "───────────────────────────────────────"
+
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+        doctor_ok "nginx is running"
+    else
+        doctor_issue "nginx is not running"
+        if [ "$FIX_MODE" = "--fix" ]; then
+            systemctl start nginx 2>/dev/null && doctor_fixed "Started nginx" || print_error "  Could not start nginx"
+        else
+            doctor_skip "systemctl start nginx"
+        fi
+    fi
+
+    if nginx -t 2>/dev/null; then
+        doctor_ok "nginx config syntax OK"
+    else
+        doctor_issue "nginx config has errors"
+        echo "         Run: nginx -t"
+    fi
+
+    # Scan ALL enabled nginx configs for competing server_name _
+    # Only serverkit.conf should use server_name _ (the catch-all panel block)
+    for SITE_CONF in "$NGINX_DIR/sites-enabled"/*; do
+        [ -f "$SITE_CONF" ] || continue
+        SITE_NAME=$(basename "$SITE_CONF")
+        # Skip all ServerKit-managed configs
+        case "$SITE_NAME" in serverkit-*|serverkit.conf) continue ;; esac
+
+        if grep -Eq 'server_name[[:space:]]+_;' "$SITE_CONF" 2>/dev/null; then
+            doctor_issue "'$SITE_NAME' uses server_name _ (conflicts with panel, can hijack all traffic)"
+            if [ "$FIX_MODE" = "--fix" ]; then
+                rm -f "$NGINX_DIR/sites-enabled/$SITE_NAME"
+                rm -f "$NGINX_DIR/sites-available/$SITE_NAME"
+                doctor_fixed "Removed conflicting '$SITE_NAME'"
+            else
+                doctor_skip "Remove conflicting '$SITE_NAME' from sites-enabled"
+            fi
+        fi
+    done
+
+    # Ensure serverkit-locations directory exists
+    if [ ! -d "$NGINX_DIR/serverkit-locations" ]; then
+        print_warning "Missing $NGINX_DIR/serverkit-locations directory"
+        if [ "$FIX_MODE" = "--fix" ]; then
+            mkdir -p "$NGINX_DIR/serverkit-locations"
+            doctor_fixed "Created $NGINX_DIR/serverkit-locations"
+        else
+            doctor_skip "mkdir -p $NGINX_DIR/serverkit-locations"
+        fi
+    fi
+
+    # Check for port mismatch between nginx and frontend container
+    NGINX_CONF="$NGINX_DIR/sites-available/serverkit.conf"
+    if [ -f "$NGINX_CONF" ]; then
+        NGINX_FRONTEND_PORT=$(grep -m1 'proxy_pass.*127.0.0.1' "$NGINX_CONF" | head -1 | sed -n 's/.*:\([0-9][0-9]*\).*/\1/p' || true)
+
+        if [ -n "$FRONTEND_PORT" ] && [ -n "$NGINX_FRONTEND_PORT" ]; then
+            if [ "$NGINX_FRONTEND_PORT" = "$FRONTEND_PORT" ]; then
+                doctor_ok "nginx proxy port ($NGINX_FRONTEND_PORT) matches frontend container ($FRONTEND_PORT)"
+            else
+                doctor_issue "PORT MISMATCH: nginx proxies to :$NGINX_FRONTEND_PORT but frontend is on :$FRONTEND_PORT"
+                if [ "$FIX_MODE" = "--fix" ]; then
+                    sed -i "s|proxy_pass http://127.0.0.1:${NGINX_FRONTEND_PORT}|proxy_pass http://127.0.0.1:${FRONTEND_PORT}|" "$NGINX_CONF"
+                    if nginx -t 2>/dev/null; then
+                        nginx -s reload 2>/dev/null
+                        doctor_fixed "Updated nginx to proxy to port $FRONTEND_PORT"
+                    else
+                        print_error "  nginx config broken after edit — reverting"
+                        sed -i "s|proxy_pass http://127.0.0.1:${FRONTEND_PORT}|proxy_pass http://127.0.0.1:${NGINX_FRONTEND_PORT}|" "$NGINX_CONF"
+                    fi
+                else
+                    doctor_skip "Update nginx proxy_pass from :$NGINX_FRONTEND_PORT to :$FRONTEND_PORT"
+                fi
+            fi
+        fi
+
+        # Check API proxy port
+        NGINX_API_PORT=$(grep -A1 'location /api' "$NGINX_CONF" | grep proxy_pass | sed -n 's/.*:\([0-9][0-9]*\).*/\1/p' | head -1 || true)
+        if [ -n "$NGINX_API_PORT" ]; then
+            if ss -tlnp 2>/dev/null | grep -q ":${NGINX_API_PORT}.*gunicorn\|:${NGINX_API_PORT}.*python"; then
+                doctor_ok "nginx API proxy port ($NGINX_API_PORT) has backend listening"
+            else
+                doctor_issue "nginx proxies API to :$NGINX_API_PORT but nothing is listening there"
+            fi
+        fi
+    else
+        doctor_issue "nginx config not found: $NGINX_CONF"
+    fi
+
+    echo ""
+
+    # ── 4. Docker ───────────────────────────────────────────────
+    echo "Docker"
+    echo "───────────────────────────────────────"
+
+    if command -v docker &>/dev/null; then
+        doctor_ok "Docker installed"
+    else
+        doctor_issue "Docker not found"
+    fi
+
+    if docker info &>/dev/null; then
+        doctor_ok "Docker daemon running"
+    else
+        doctor_issue "Docker daemon not running"
+        if [ "$FIX_MODE" = "--fix" ]; then
+            systemctl start docker 2>/dev/null && doctor_fixed "Started Docker daemon" || print_error "  Could not start Docker"
+        else
+            doctor_skip "systemctl start docker"
+        fi
+    fi
+
+    echo ""
+
+    # ── 5. Disk space ───────────────────────────────────────────
+    echo "System"
+    echo "───────────────────────────────────────"
+
+    DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
+    if [ "$DISK_USAGE" -lt 90 ]; then
+        doctor_ok "Disk usage: ${DISK_USAGE}%"
+    elif [ "$DISK_USAGE" -lt 95 ]; then
+        print_warning "Disk usage high: ${DISK_USAGE}%"
+    else
+        doctor_issue "Disk almost full: ${DISK_USAGE}%"
+    fi
+
+    RAM_AVAIL=$(free -m | awk '/Mem:/ {print $7}')
+    if [ "$RAM_AVAIL" -gt 100 ]; then
+        doctor_ok "Available RAM: ${RAM_AVAIL}MB"
+    else
+        doctor_issue "Low RAM: ${RAM_AVAIL}MB available"
+    fi
+
+    # Check swap
+    SWAP_TOTAL=$(free -m | awk '/^Swap:/ {print $2}')
+    if [ "$SWAP_TOTAL" -gt 0 ]; then
+        doctor_ok "Swap: ${SWAP_TOTAL}MB"
+    else
+        print_warning "No swap configured (recommended for low-RAM servers)"
+    fi
+
+    echo ""
+
+    # ── 6. Database ─────────────────────────────────────────────
+    echo "Database"
+    echo "───────────────────────────────────────"
+
+    DB_FILE="$INSTALL_DIR/backend/instance/serverkit.db"
+    if [ -f "$DB_FILE" ]; then
+        DB_SIZE=$(du -h "$DB_FILE" | cut -f1)
+        doctor_ok "SQLite database exists ($DB_SIZE)"
+    else
+        doctor_issue "Database file not found: $DB_FILE"
+    fi
+
+    echo ""
+
+    # ── 7. Connectivity ─────────────────────────────────────────
+    echo "Connectivity"
+    echo "───────────────────────────────────────"
+
+    if curl -sf http://127.0.0.1 > /dev/null 2>&1; then
+        doctor_ok "localhost:80 responding"
+    else
+        doctor_issue "localhost:80 not responding (nginx → frontend broken)"
+    fi
+
+    if curl -sf http://127.0.0.1/api/v1/system/health > /dev/null 2>&1; then
+        doctor_ok "localhost:80/api proxying to backend"
+    else
+        doctor_issue "localhost:80/api not reaching backend"
+    fi
+
+    echo ""
+
+    # ── Summary ─────────────────────────────────────────────────
+    echo "───────────────────────────────────────"
+    if [ "$ISSUES" -eq 0 ]; then
+        print_success "All checks passed!"
+    else
+        if [ "$FIX_MODE" = "--fix" ]; then
+            echo -e "${YELLOW}Found $ISSUES issue(s), fixed $FIXED${NC}"
+            REMAINING=$((ISSUES - FIXED))
+            if [ "$REMAINING" -gt 0 ]; then
+                echo "$REMAINING issue(s) need manual attention"
+            fi
+        else
+            echo -e "${RED}Found $ISSUES issue(s)${NC}"
+            echo "Run 'sudo serverkit doctor --fix' to auto-fix"
+        fi
+    fi
+    echo ""
+
+    # Meaningful exit code so doctor can gate scripts: non-zero while issues
+    # remain (with --fix, only the ones that could not be auto-fixed count).
+    local remaining="$ISSUES"
+    if [ "$FIX_MODE" = "--fix" ]; then
+        remaining=$((ISSUES - FIXED))
+    fi
+    if [ "$remaining" -gt 0 ]; then
+        return 1
+    fi
+    return 0
+}
+
+cmd_remove_site() {
+    check_root
+
+    DOMAIN="$1"
+
+    if [ -z "$DOMAIN" ]; then
+        echo "Usage: serverkit remove-site <domain>"
+        cmd_list_sites
+        exit 1
+    fi
+
+    resolve_site_paths "$DOMAIN"
+
+    if [ ! -f "$SITE_FILE" ]; then
+        print_error "Site not found: $DOMAIN"
+        exit 1
+    fi
+
+    print_warning "This will remove the site config for $DOMAIN"
+    read -p "Continue? (y/N) " -n 1 -r || true
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [ -n "$SITE_LINK" ]; then
+            rm -f "$SITE_LINK"
+        fi
+        rm -f "$SITE_FILE"
+        reload_nginx_or_warn
+        print_success "Site removed: $DOMAIN"
+    fi
+}
+
+# Main
+#
+# Sourcing this file (e.g. from scripts/test/test_cli.sh) exposes every
+# function above for unit testing without dispatching a command — the same
+# pattern as scripts/update.sh. Only direct execution runs the dispatch below.
+[ "${BASH_SOURCE[0]}" = "${0}" ] || return 0
+
+case "${1:-help}" in
+    help|--help|-h)
+        cmd_help
+        ;;
+    start)
+        cmd_start
+        ;;
+    stop)
+        cmd_stop
+        ;;
+    restart)
+        cmd_restart
+        ;;
+    status)
+        cmd_status
+        ;;
+    logs)
+        cmd_logs "$2"
+        ;;
+    update)
+        shift
+        cmd_update "$@"
+        ;;
+    branch)
+        cmd_branch
+        ;;
+    version|--version|-v)
+        cmd_version
+        ;;
+    check-update)
+        cmd_check_update
+        ;;
+    uninstall)
+        shift
+        cmd_uninstall "$@"
+        ;;
+    create-admin)
+        cmd_create_admin
+        ;;
+    reset-password)
+        cmd_reset_password
+        ;;
+    unlock-user)
+        cmd_unlock_user
+        ;;
+    list-users)
+        cmd_list_users
+        ;;
+    make-admin)
+        cmd_make_admin
+        ;;
+    deactivate-user)
+        cmd_deactivate_user
+        ;;
+    activate-user)
+        cmd_activate_user
+        ;;
+    init-db)
+        cmd_init_db
+        ;;
+    migrate-db)
+        cmd_migrate_db
+        ;;
+    cleanup-apps)
+        shift
+        cmd_cleanup_apps "$@"
+        ;;
+    factory-reset)
+        cmd_factory_reset
+        ;;
+    backup-db)
+        cmd_backup_db
+        ;;
+    restore-db)
+        cmd_restore_db "$2"
+        ;;
+    generate-keys)
+        cmd_generate_keys
+        ;;
+    config)
+        cmd_config
+        ;;
+    setup-proxy)
+        cmd_setup_proxy
+        ;;
+    create-app)
+        cmd_create_app "$2" "$3" "$4"
+        ;;
+    deploy-template)
+        cmd_deploy_template "$@"
+        ;;
+    list-servers)
+        cmd_list_servers
+        ;;
+    deployment-status)
+        cmd_deployment_status "$@"
+        ;;
+    list-apps)
+        cmd_list_apps "$2"
+        ;;
+    start-app)
+        cmd_start_app "$2"
+        ;;
+    stop-app)
+        cmd_stop_app "$2"
+        ;;
+    app-logs)
+        cmd_app_logs "$2"
+        ;;
+    add-site)
+        cmd_add_site "$2" "$3"
+        ;;
+    list-sites)
+        cmd_list_sites
+        ;;
+    remove-site)
+        cmd_remove_site "$2"
+        ;;
+    doctor)
+        cmd_doctor "$2"
+        ;;
+    *)
+        print_error "Unknown command: $1"
+        echo "Run 'serverkit help' for usage"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,36 @@
+{
+    "name": "ServerKit",
+    "short_name": "ServerKit",
+    "description": "Server control panel for managing web applications, databases, and infrastructure",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#4f46e5",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["utilities", "productivity"],
+    "shortcuts": [
+        {
+            "name": "Dashboard",
+            "url": "/",
+            "description": "View server dashboard"
+        },
+        {
+            "name": "Services",
+            "url": "/services",
+            "description": "Manage services"
+        },
+        {
+            "name": "Terminal",
+            "url": "/terminal",
+            "description": "Open terminal"
+        }
+    ]
+}

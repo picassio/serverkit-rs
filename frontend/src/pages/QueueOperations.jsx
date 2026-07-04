@@ -1,0 +1,604 @@
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+    Layers,
+    Inbox,
+    Send,
+    Trash2,
+    RefreshCw,
+    Plus,
+    Search,
+    Activity,
+    Folder,
+    Server,
+    AlertCircle,
+} from 'lucide-react';
+import api from '../services/api';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../hooks/useConfirm';
+import EmptyState from '../components/EmptyState';
+import Modal from '@/components/Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { MetricCard, Pill } from '@/components/ds';
+
+const STATUS_KINDS = {
+    pending: 'blue',
+    in_flight: 'yellow',
+    completed: 'green',
+    failed: 'red',
+    dead_letter: 'gray',
+};
+
+const STATUS_LABELS = {
+    pending: 'Pending',
+    in_flight: 'In Flight',
+    completed: 'Completed',
+    failed: 'Failed',
+    dead_letter: 'Dead Letter',
+};
+
+const STATUS_ORDER = ['pending', 'in_flight', 'completed', 'failed', 'dead_letter'];
+
+const POLL_INTERVAL = 3000;
+
+const QueueOperations = () => {
+    const toast = useToast();
+    const { confirm } = useConfirm();
+
+    const [loading, setLoading] = useState(true);
+    const [groups, setGroups] = useState([]);
+    const [queues, setQueues] = useState([]);
+    const [stats, setStats] = useState(null);
+
+    const [selectedGroup, setSelectedGroup] = useState('');
+    const [messageFilter, setMessageFilter] = useState('all');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const [showGroupModal, setShowGroupModal] = useState(false);
+    const [groupForm, setGroupForm] = useState({ name: '', description: '' });
+
+    const [showQueueModal, setShowQueueModal] = useState(false);
+    const [queueForm, setQueueForm] = useState({ name: '', description: '', config: '{}' });
+
+    const [sendTarget, setSendTarget] = useState(null);
+    const [sendForm, setSendForm] = useState({ payload: '{}', priority: 0, delay_ms: 0 });
+
+    const pollRef = useRef(null);
+    const navigate = useNavigate();
+
+    const loadData = useCallback(async () => {
+        try {
+            const [groupsRes, statsRes] = await Promise.all([
+                api.getQueueGroups(),
+                api.getGlobalQueueStats(),
+            ]);
+            setGroups(groupsRes.groups || []);
+            setStats(statsRes);
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [toast]);
+
+    const loadQueues = useCallback(async (groupSlug) => {
+        try {
+            if (groupSlug) {
+                const res = await api.getQueues(groupSlug);
+                setQueues(res.queues || []);
+                return;
+            }
+            // All groups: fan out and merge.
+            const lists = await Promise.all(
+                groups.map(g => api.getQueues(g.slug).then(r => r.queues || []).catch(() => []))
+            );
+            setQueues(lists.flat());
+        } catch (err) {
+            toast.error(err.message);
+        }
+    }, [groups, toast]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    useEffect(() => {
+        loadQueues(selectedGroup);
+        pollRef.current = setInterval(() => {
+            loadData();
+            loadQueues(selectedGroup);
+        }, POLL_INTERVAL);
+        return () => {
+            if (pollRef.current) clearInterval(pollRef.current);
+        };
+    }, [selectedGroup, loadData, loadQueues]);
+
+    const totalQueues = useMemo(
+        () => groups.reduce((acc, g) => acc + (g.stats?.queues || 0), 0),
+        [groups]
+    );
+
+    const totalMessages = useMemo(
+        () => (stats ? Object.values(stats.messages || {}).reduce((a, b) => a + b, 0) : 0),
+        [stats]
+    );
+
+    const statusCounts = useMemo(() => stats?.messages || {}, [stats]);
+
+    const filteredQueues = useMemo(() => {
+        const q = searchTerm.trim().toLowerCase();
+        return queues.filter(queue => {
+            const matchesSearch = !q ||
+                queue.name?.toLowerCase().includes(q) ||
+                queue.slug?.toLowerCase().includes(q) ||
+                queue.group_slug?.toLowerCase().includes(q);
+            const matchesStatus = messageFilter === 'all' || (queue.stats?.[messageFilter] || 0) > 0;
+            return matchesSearch && matchesStatus;
+        });
+    }, [queues, searchTerm, messageFilter]);
+
+    const activeGroup = useMemo(
+        () => groups.find(g => g.slug === selectedGroup),
+        [groups, selectedGroup]
+    );
+
+    // System-owned groups are read-only: their queues can be viewed but not
+    // mutated (the backend enforces this too). Used to hide destructive actions.
+    const systemGroupSlugs = useMemo(
+        () => new Set(groups.filter(g => g.owner_type === 'system').map(g => g.slug)),
+        [groups]
+    );
+
+    const handleCreateGroup = async (e) => {
+        e.preventDefault();
+        try {
+            await api.createQueueGroup({
+                name: groupForm.name,
+                description: groupForm.description,
+            });
+            toast.success('Queue group created');
+            setShowGroupModal(false);
+            setGroupForm({ name: '', description: '' });
+            loadData();
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    const handleCreateQueue = async (e) => {
+        e.preventDefault();
+        const groupSlug = queueForm.groupSlug || selectedGroup;
+        if (!groupSlug) {
+            toast.error('Select a group for the queue');
+            return;
+        }
+        let config = {};
+        try {
+            config = JSON.parse(queueForm.config);
+        } catch {
+            toast.error('Config must be valid JSON');
+            return;
+        }
+        try {
+            await api.createQueue(groupSlug, {
+                name: queueForm.name,
+                description: queueForm.description,
+                config,
+            });
+            toast.success('Queue created');
+            setShowQueueModal(false);
+            setQueueForm({ name: '', description: '', config: '{}' });
+            loadQueues(selectedGroup);
+            loadData();
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    const handleDeleteQueue = async (queue) => {
+        const confirmed = await confirm({
+            title: 'Delete Queue',
+            message: `Are you sure you want to delete "${queue.name || queue.slug}" and all its messages?`,
+            variant: 'danger',
+        });
+        if (!confirmed) return;
+        try {
+            await api.deleteQueue(queue.group_slug, queue.slug);
+            toast.success('Queue deleted');
+            loadQueues(selectedGroup);
+            loadData();
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    const openSendModal = (queue) => {
+        setSendTarget(queue);
+        setSendForm({ payload: '{}', priority: 0, delay_ms: 0 });
+    };
+
+    const handleSendMessage = async (e) => {
+        e.preventDefault();
+        const queue = sendTarget;
+        if (!queue?.group_slug || !queue?.slug) {
+            toast.error('Select a destination queue');
+            return;
+        }
+        let payload = {};
+        try {
+            payload = JSON.parse(sendForm.payload);
+        } catch {
+            toast.error('Payload must be valid JSON');
+            return;
+        }
+        try {
+            await api.sendMessage(queue.group_slug, queue.slug, payload, {
+                priority: parseInt(sendForm.priority, 10) || 0,
+                delay_ms: parseInt(sendForm.delay_ms, 10) || 0,
+            });
+            toast.success('Message sent');
+            setSendTarget(null);
+            loadQueues(selectedGroup);
+            loadData();
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    const openQueue = (queue) => {
+        navigate(`/queue/${encodeURIComponent(queue.group_slug)}/${encodeURIComponent(queue.slug)}`);
+    };
+
+    const hasActiveFilters = selectedGroup !== '' || messageFilter !== 'all' || Boolean(searchTerm);
+
+    const activeStatusLabel = messageFilter === 'all'
+        ? 'All queues'
+        : `${STATUS_LABELS[messageFilter]} queues`;
+    const activeGroupLabel = activeGroup ? activeGroup.name : 'All groups';
+
+    if (loading) {
+        return (
+            <div className="queue-page queue-page--loading">
+                <div className="queue-loading-card">
+                    <Layers size={24} />
+                    <span>Loading queue bus...</span>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="queue-page queue-page--ops">
+            <div className="queue-ops-workspace">
+                <aside className="queue-fleet-rail">
+                    <section className="queue-rail-section queue-rail-section--overview">
+                        <div className="queue-rail-section-header">
+                            <Activity size={14} />
+                            <span>Overview</span>
+                        </div>
+                        <div className="queue-rail-overview">
+                            <MetricCard label="Groups" value={groups.length} />
+                            <MetricCard label="Queues" value={totalQueues} />
+                            <MetricCard label="Messages" value={totalMessages} />
+                            <MetricCard label="Dead Letter" value={statusCounts.dead_letter || 0} kind="danger" />
+                        </div>
+                    </section>
+
+                    <section className="queue-rail-section">
+                        <div className="queue-rail-section-header queue-rail-section-header--split">
+                            <span><Folder size={14} /> Groups</span>
+                            <button type="button" onClick={() => setShowGroupModal(true)}>New</button>
+                        </div>
+                        <div className="queue-group-nav">
+                            <button
+                                type="button"
+                                className={`queue-group-nav-item ${selectedGroup === '' ? 'active' : ''}`}
+                                onClick={() => setSelectedGroup('')}
+                            >
+                                <Server size={14} />
+                                <span>All groups</span>
+                                <b>{totalQueues}</b>
+                            </button>
+                            {groups.map(group => (
+                                <button
+                                    type="button"
+                                    key={group.id}
+                                    className={`queue-group-nav-item ${selectedGroup === group.slug ? 'active' : ''}`}
+                                    onClick={() => setSelectedGroup(group.slug)}
+                                >
+                                    <Folder size={14} />
+                                    <span>{group.name}</span>
+                                    {group.owner_type === 'system' && (
+                                        <span className="queue-group-badge">system</span>
+                                    )}
+                                    <b>{group.stats?.queues || 0}</b>
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+
+                    <section className="queue-rail-section">
+                        <div className="queue-rail-section-header">
+                            <AlertCircle size={14} />
+                            <span>Message Status</span>
+                        </div>
+                        <div className="queue-status-nav">
+                            <button
+                                type="button"
+                                className={`queue-status-nav-item ${messageFilter === 'all' ? 'active' : ''}`}
+                                onClick={() => setMessageFilter('all')}
+                            >
+                                <span><strong>All</strong><small>Any status</small></span>
+                                <b>{totalMessages}</b>
+                            </button>
+                            {STATUS_ORDER.map(status => (
+                                <button
+                                    type="button"
+                                    key={status}
+                                    className={`queue-status-nav-item queue-status-nav-item--${status} ${messageFilter === status ? 'active' : ''}`}
+                                    onClick={() => setMessageFilter(status)}
+                                >
+                                    <span>
+                                        <strong>{STATUS_LABELS[status]}</strong>
+                                        <small>{status}</small>
+                                    </span>
+                                    <b>{statusCounts[status] || 0}</b>
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+                </aside>
+
+                <main className="queue-main">
+                    <div className="queue-workbar">
+                        <div className="queue-workbar-title">
+                            <span>Queue Bus</span>
+                            <h1>{activeGroupLabel}</h1>
+                            <em>{activeStatusLabel} · {filteredQueues.length} visible</em>
+                        </div>
+                        <div className="queue-workbar-actions">
+                            <Button variant="outline" onClick={() => setShowGroupModal(true)}>
+                                <Folder size={16} /> Group
+                            </Button>
+                            <Button variant="outline" onClick={() => setShowQueueModal(true)}>
+                                <Plus size={16} /> Queue
+                            </Button>
+                            <Button variant="outline" onClick={() => { loadData(); loadQueues(selectedGroup); }}>
+                                <RefreshCw size={16} /> Refresh
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="queue-command-bar">
+                        <div className="queue-toolbar">
+                            <label className="search-box">
+                                <Search size={16} />
+                                <Input
+                                    type="text"
+                                    placeholder="Search queues by name or slug..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </label>
+                            <select
+                                className="queue-select"
+                                value={selectedGroup}
+                                onChange={(e) => setSelectedGroup(e.target.value)}
+                            >
+                                <option value="">All groups</option>
+                                {groups.map(g => <option key={g.id} value={g.slug}>{g.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="queue-results-summary">
+                            <strong>{filteredQueues.length}</strong>
+                            <span>{filteredQueues.length === 1 ? 'queue' : 'queues'}</span>
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    className="queue-clear-filters"
+                                    onClick={() => {
+                                        setSelectedGroup('');
+                                        setMessageFilter('all');
+                                        setSearchTerm('');
+                                    }}
+                                >
+                                    Clear filters
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {filteredQueues.length === 0 ? (
+                        <EmptyState
+                            icon={Layers}
+                            title={queues.length === 0 ? 'No queues yet' : 'No queues match these filters'}
+                            description={queues.length === 0
+                                ? 'Create a queue group and queue to start sending messages.'
+                                : 'Adjust the filters or search query to see your queues.'}
+                            action={queues.length === 0 ? (
+                                <Button onClick={() => setShowGroupModal(true)}>
+                                    <Plus size={16} /> Create Group
+                                </Button>
+                            ) : (
+                                <Button variant="outline" onClick={() => {
+                                    setSelectedGroup('');
+                                    setMessageFilter('all');
+                                    setSearchTerm('');
+                                }}>
+                                    Clear filters
+                                </Button>
+                            )}
+                        />
+                    ) : (
+                        <div className="queue-table-wrap">
+                            <table className="queue-table">
+                                <thead>
+                                    <tr>
+                                        <th>Queue</th>
+                                        <th>Group</th>
+                                        <th>Messages</th>
+                                        <th>Created</th>
+                                        <th className="col-actions" aria-label="Actions" />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredQueues.map(queue => (
+                                        <tr
+                                            key={queue.id}
+                                            className="is-clickable"
+                                            onClick={() => openQueue(queue)}
+                                        >
+                                            <td>
+                                                <div className="queue-row-name">
+                                                    <span className="queue-row-title">{queue.name}</span>
+                                                    <code className="queue-row-sub">/{queue.slug}</code>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {queue.group_slug && (
+                                                    <span className="queue-row-group">
+                                                        <Folder size={12} /> {queue.group_slug}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td onClick={e => e.stopPropagation()}>
+                                                <div className="queue-row-counts">
+                                                    {STATUS_ORDER.filter(s => (queue.stats?.[s] || 0) > 0).map(status => (
+                                                        <Pill key={status} kind={STATUS_KINDS[status]}>
+                                                            {STATUS_LABELS[status]} {queue.stats[status]}
+                                                        </Pill>
+                                                    ))}
+                                                    {(queue.stats?.total || 0) === 0 && (
+                                                        <span className="muted">Empty</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td>{new Date(queue.created_at).toLocaleString()}</td>
+                                            <td className="col-actions" onClick={e => e.stopPropagation()}>
+                                                <div className="queue-actions">
+                                                    {!systemGroupSlugs.has(queue.group_slug) && (
+                                                        <Button variant="ghost" size="sm" onClick={() => openSendModal(queue)} title="Send message">
+                                                            <Send size={14} />
+                                                        </Button>
+                                                    )}
+                                                    <Button variant="ghost" size="sm" onClick={() => openQueue(queue)} title="View messages">
+                                                        <Inbox size={14} />
+                                                    </Button>
+                                                    {!systemGroupSlugs.has(queue.group_slug) && (
+                                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteQueue(queue)} title="Delete queue">
+                                                            <Trash2 size={14} />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </main>
+            </div>
+
+            {/* Create Group Modal */}
+            <Modal open={showGroupModal} onClose={() => setShowGroupModal(false)} title="Create Queue Group">
+                        <form onSubmit={handleCreateGroup}>
+                                <div className="form-group">
+                                    <Label htmlFor="group-name">Name</Label>
+                                    <Input id="group-name" value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} required />
+                                </div>
+                                <div className="form-group">
+                                    <Label htmlFor="group-description">Description</Label>
+                                    <Input id="group-description" value={groupForm.description} onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })} />
+                                </div>
+                            <div className="modal-actions">
+                                <Button type="button" variant="outline" onClick={() => setShowGroupModal(false)}>Cancel</Button>
+                                <Button type="submit">Create Group</Button>
+                            </div>
+                        </form>
+            </Modal>
+
+            {/* Create Queue Modal */}
+            <Modal open={showQueueModal} onClose={() => setShowQueueModal(false)} title="Create Queue">
+                        <form onSubmit={handleCreateQueue}>
+                                <div className="form-group">
+                                    <Label htmlFor="queue-group">Group</Label>
+                                    <select
+                                        id="queue-group"
+                                        className="queue-select queue-select--full"
+                                        value={queueForm.groupSlug || selectedGroup || ''}
+                                        onChange={(e) => setQueueForm({ ...queueForm, groupSlug: e.target.value })}
+                                        required
+                                    >
+                                        <option value="">Select group</option>
+                                        {groups.map(g => <option key={g.id} value={g.slug}>{g.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <Label htmlFor="queue-name">Name</Label>
+                                    <Input id="queue-name" value={queueForm.name} onChange={(e) => setQueueForm({ ...queueForm, name: e.target.value })} required />
+                                </div>
+                                <div className="form-group">
+                                    <Label htmlFor="queue-description">Description</Label>
+                                    <Input id="queue-description" value={queueForm.description} onChange={(e) => setQueueForm({ ...queueForm, description: e.target.value })} />
+                                </div>
+                                <div className="form-group">
+                                    <Label htmlFor="queue-config">Config (JSON)</Label>
+                                    <Textarea id="queue-config" value={queueForm.config} onChange={(e) => setQueueForm({ ...queueForm, config: e.target.value })} rows={4} />
+                                </div>
+                            <div className="modal-actions">
+                                <Button type="button" variant="outline" onClick={() => setShowQueueModal(false)}>Cancel</Button>
+                                <Button type="submit">Create Queue</Button>
+                            </div>
+                        </form>
+            </Modal>
+
+            {/* Send Message Modal */}
+            <Modal open={!!sendTarget} onClose={() => setSendTarget(null)} title="Send Message">
+                        {sendTarget && (
+                        <form onSubmit={handleSendMessage}>
+                                <div className="queue-send-destination">
+                                    <div>
+                                        <Label>Group</Label>
+                                        <div className="queue-send-readonly">{sendTarget.group_slug}</div>
+                                    </div>
+                                    <div>
+                                        <Label>Queue</Label>
+                                        <div className="queue-send-readonly">{sendTarget.slug}</div>
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <Label htmlFor="payload">Payload (JSON)</Label>
+                                    <Textarea
+                                        id="payload"
+                                        value={sendForm.payload}
+                                        onChange={(e) => setSendForm({ ...sendForm, payload: e.target.value })}
+                                        rows={6}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <Label htmlFor="priority">Priority</Label>
+                                        <Input id="priority" type="number" value={sendForm.priority} onChange={(e) => setSendForm({ ...sendForm, priority: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <Label htmlFor="delay_ms">Delay (ms)</Label>
+                                        <Input id="delay_ms" type="number" value={sendForm.delay_ms} onChange={(e) => setSendForm({ ...sendForm, delay_ms: e.target.value })} />
+                                    </div>
+                                </div>
+                            <div className="modal-actions">
+                                <Button type="button" variant="outline" onClick={() => setSendTarget(null)}>Cancel</Button>
+                                <Button type="submit"><Send size={14} className="mr-2" /> Send Message</Button>
+                            </div>
+                        </form>
+                        )}
+            </Modal>
+        </div>
+    );
+};
+
+export default QueueOperations;

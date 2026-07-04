@@ -1,0 +1,123 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+
+function arraysEqual(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+}
+
+/**
+ * Tracks which child items overflow a container and should be collapsed into a
+ * "More" menu. Items are greedily fit left-to-right; the active item is always
+ * kept visible by rebuilding the visible set around it.
+ *
+ * @param {Object} options
+ * @param {number} options.count - Number of items to measure.
+ * @param {React.MutableRefObject<(HTMLElement|null)[]>} [options.itemRefs] - Optional external ref array for the items. Useful when the caller needs to read from the refs (e.g. to detect active state).
+ * @param {number} [options.gap=8] - Gap between items in pixels.
+ * @param {number} [options.moreWidth=36] - Estimated width of the "More" trigger.
+ * @param {() => number} [options.getActiveIndex=() => -1] - Returns the index of the item that must stay visible.
+ * @param {React.DependencyList} [options.deps=[]] - Additional dependencies that should trigger a recompute.
+ *
+ * @returns {{
+ *   containerRef: React.RefObject<HTMLElement>,
+ *   itemRefs: React.MutableRefObject<(HTMLElement|null)[]>,
+ *   moreBtnRef: React.RefObject<HTMLElement>,
+ *   hiddenIndices: number[],
+ *   hiddenSet: Set<number>,
+ *   recompute: () => void
+ * }}
+ */
+export function useOverflowItems({ count, itemRefs: externalItemRefs, gap = 8, moreWidth = 36, getActiveIndex = () => -1, deps = [] }) {
+    const containerRef = useRef(null);
+    const internalItemRefs = useRef([]);
+    const moreBtnRef = useRef(null);
+    const [hiddenIndices, setHiddenIndices] = useState([]);
+
+    const itemRefs = externalItemRefs || internalItemRefs;
+    itemRefs.current.length = count;
+
+    const recompute = useCallback(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const containerWidth = container.clientWidth;
+        if (containerWidth === 0) return;
+
+        // Measure each item's natural width (briefly un-hiding collapsed ones).
+        const widths = itemRefs.current.map((el) => {
+            if (!el) return 0;
+            const wasHidden = el.style.display === 'none';
+            if (wasHidden) el.style.display = '';
+            const w = el.offsetWidth;
+            if (wasHidden) el.style.display = 'none';
+            return w;
+        });
+
+        const activeIndex = getActiveIndex();
+        const actualMoreWidth = moreBtnRef.current?.offsetWidth || moreWidth;
+
+        // All fit?
+        const total = widths.reduce((s, w, i) => s + w + (i > 0 ? gap : 0), 0);
+        if (total <= containerWidth) {
+            setHiddenIndices((prev) => (prev.length === 0 ? prev : []));
+            return;
+        }
+
+        // Reserve space for the More button, then greedily fit left-to-right.
+        const budget = Math.max(0, containerWidth - actualMoreWidth - gap);
+        const visible = [];
+        let used = 0;
+        for (let i = 0; i < widths.length; i++) {
+            const cost = widths[i] + (visible.length > 0 ? gap : 0);
+            if (used + cost <= budget) {
+                visible.push(i);
+                used += cost;
+            } else {
+                break;
+            }
+        }
+
+        // The active item must stay visible — rebuild the visible set around it.
+        let visibleSet = visible;
+        if (activeIndex !== -1 && !visible.includes(activeIndex)) {
+            const others = [];
+            let othersUsed = widths[activeIndex];
+            for (let i = 0; i < widths.length; i++) {
+                if (i === activeIndex) continue;
+                const cost = widths[i] + (others.length === 0 ? gap : gap);
+                if (othersUsed + cost <= budget) {
+                    others.push(i);
+                    othersUsed += cost;
+                }
+            }
+            visibleSet = [...others, activeIndex].sort((a, b) => a - b);
+        }
+
+        const visibleSetObj = new Set(visibleSet);
+        const hidden = [];
+        for (let i = 0; i < widths.length; i++) {
+            if (!visibleSetObj.has(i)) hidden.push(i);
+        }
+        setHiddenIndices((prev) => (arraysEqual(prev, hidden) ? prev : hidden));
+    }, [count, gap, moreWidth, getActiveIndex, ...deps]);
+
+    // Initial measurement after first paint.
+    useEffect(() => {
+        recompute();
+    }, [recompute, count]);
+
+    // Re-fit on container resize.
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container || typeof ResizeObserver === 'undefined') return undefined;
+        const ro = new ResizeObserver(() => recompute());
+        ro.observe(container);
+        return () => ro.disconnect();
+    }, [recompute]);
+
+    const hiddenSet = new Set(hiddenIndices);
+
+    return { containerRef, itemRefs, moreBtnRef, hiddenIndices, hiddenSet, recompute };
+}
+
+export default useOverflowItems;

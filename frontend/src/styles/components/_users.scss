@@ -1,0 +1,832 @@
+// ============================================
+// USER MANAGEMENT STYLES
+// ============================================
+
+// --------------------------------------------
+// Setup Page
+// --------------------------------------------
+.setup-card {
+    max-width: 480px;
+}
+
+.setup-info {
+    display: flex;
+    gap: $space-4;
+    padding: $space-4;
+    background: fade($accent-primary-raw, 10%);
+    border-radius: $radius-md;
+    margin-bottom: $space-6;
+
+    .setup-info-icon {
+        flex-shrink: 0;
+        color: $accent-primary;
+    }
+
+    p {
+        margin: 0;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        line-height: 1.5;
+    }
+}
+
+.setup-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-2;
+    margin-top: $space-6;
+    padding-top: $space-6;
+    border-top: 1px solid $border-default;
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+
+    svg {
+        color: $success;
+    }
+}
+
+// --------------------------------------------
+// Users Tab
+// --------------------------------------------
+.users-tab {
+    .tab-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: $space-6;
+
+        .tab-header-content {
+            h3 {
+                margin: 0 0 $space-1 0;
+                font-size: $font-size-lg;
+                font-weight: 600;
+            }
+
+            p {
+                margin: 0;
+                color: $text-secondary;
+                font-size: $font-size-sm;
+            }
+        }
+    }
+}
+
+.users-table-container {
+    overflow-x: auto;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+        padding: $space-4;
+        text-align: left;
+        border-bottom: 1px solid $border-default;
+    }
+
+    th {
+        background: $bg-hover;
+        font-weight: 500;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    tr:hover td {
+        background: $bg-card;
+    }
+
+    tr.inactive {
+        opacity: 0.6;
+
+        td {
+            background: fade($warning, 5%);
+        }
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: $space-4;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: $accent-primary;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: $font-size-md;
+        flex-shrink: 0;
+    }
+
+    .user-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .username {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: $space-2;
+        }
+
+        .email {
+            font-size: $font-size-sm;
+            color: $text-secondary;
+        }
+    }
+
+    .you-badge {
+        font-size: $font-size-xs;
+        padding: 2px 6px;
+        background: $accent-primary;
+        color: #fff;
+        border-radius: $radius-sm;
+        font-weight: 500;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: $radius-full;
+        font-size: $font-size-xs;
+        font-weight: 500;
+
+        &.active {
+            background: fade($success, 15%);
+            color: $success;
+        }
+
+        &.inactive {
+            background: fade($warning, 15%);
+            color: $warning;
+        }
+    }
+
+    .date-cell {
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        white-space: nowrap;
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: $space-1;
+    }
+}
+
+// --------------------------------------------
+// User Modal Styles
+// --------------------------------------------
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+
+    @media (max-width: 600px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    cursor: pointer;
+
+    input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+
+    .checkbox-text {
+        font-weight: 400;
+    }
+}
+
+.form-help {
+    display: block;
+    margin-top: $space-1;
+    font-size: $font-size-xs;
+    color: $text-tertiary;
+}
+
+.role-descriptions {
+    margin-top: $space-6;
+    padding: $space-4;
+    background: $bg-hover;
+    border-radius: $radius-md;
+
+    h4 {
+        margin: 0 0 $space-4 0;
+        font-size: $font-size-sm;
+        font-weight: 600;
+        color: $text-secondary;
+    }
+
+    .role-item {
+        display: flex;
+        gap: $space-2;
+        padding: $space-2 0;
+
+        &:not(:last-child) {
+            border-bottom: 1px solid $border-default;
+        }
+
+        .role-name {
+            font-weight: 500;
+            min-width: 80px;
+            font-size: $font-size-sm;
+        }
+
+        .role-desc {
+            font-size: $font-size-sm;
+            color: $text-secondary;
+        }
+    }
+}
+
+// --------------------------------------------
+// Audit Log Tab
+// --------------------------------------------
+.audit-log-tab {
+    .tab-header {
+        margin-bottom: $space-6;
+
+        h3 {
+            margin: 0 0 $space-1 0;
+            font-size: $font-size-lg;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0;
+            color: $text-secondary;
+            font-size: $font-size-sm;
+        }
+    }
+}
+
+// NOTE: the audit-log / filters styles that previously lived here were a
+// stale duplicate (overridden by the definitions further down). Removed to
+// kill the dead code, including an orphaned colored left-border side-stripe.
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-4;
+    margin-top: $space-6;
+    padding-top: $space-6;
+    border-top: 1px solid $border-default;
+
+    .pagination-info {
+        font-size: $font-size-sm;
+        color: $text-secondary;
+    }
+}
+
+// --------------------------------------------
+// Settings Nav Divider
+// --------------------------------------------
+.settings-nav-divider {
+    padding: $space-3 $space-3 $space-1;
+    margin-top: $space-3;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    font-weight: $font-weight-medium;
+    color: var(--text-ghost);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+
+    &:first-child {
+        margin-top: 0;
+    }
+}
+
+.settings-nav-spacer {
+    flex: 1;
+    min-height: $space-4;
+}
+
+// --------------------------------------------
+// Loading & Empty States
+// --------------------------------------------
+.loading-state,
+.empty-state {
+    padding: $space-10;
+    text-align: center;
+    color: $text-secondary;
+}
+
+// --------------------------------------------
+// Button Variants
+// --------------------------------------------
+.btn.text-warning {
+    color: $warning;
+
+    &:hover {
+        background: fade($warning, 10%);
+    }
+}
+
+.btn.text-success {
+    color: $success;
+
+    &:hover {
+        background: fade($success, 10%);
+    }
+}
+
+.btn.text-danger {
+    color: $danger;
+
+    &:hover {
+        background: fade($danger, 10%);
+    }
+}
+
+// --------------------------------------------
+// Permission Editor
+// --------------------------------------------
+.permission-editor {
+    margin-top: $space-4;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.permission-header-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px;
+    gap: $space-2;
+    padding: $space-2 $space-4;
+    background: $bg-hover;
+    font-size: $font-size-xs;
+    font-weight: 600;
+    color: $text-secondary;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid $border-default;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.permission-level-label {
+    text-align: center;
+}
+
+.permission-group {
+    &:not(:last-child) {
+        border-bottom: 1px solid $border-default;
+    }
+}
+
+.permission-group-label {
+    padding: $space-2 $space-4;
+    font-size: $font-size-xs;
+    font-weight: 600;
+    color: $text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: fade($bg-hover-raw, 50%);
+}
+
+.permission-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 60px;
+    gap: $space-2;
+    align-items: center;
+    padding: $space-2 $space-4;
+
+    &:hover {
+        background: $bg-hover;
+    }
+}
+
+.permission-feature-name {
+    font-size: $font-size-sm;
+}
+
+.permission-checkbox {
+    display: flex;
+    justify-content: center;
+
+    input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+    }
+}
+
+.customize-permissions-section {
+    margin-top: $space-4;
+
+    > .btn {
+        margin-bottom: $space-2;
+    }
+}
+
+// --------------------------------------------
+// Invitations Section
+// --------------------------------------------
+.invitations-section {
+    margin-top: $space-8;
+    padding-top: $space-8;
+    border-top: 1px solid $border-default;
+
+    .tab-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: $space-4;
+
+        .tab-header-content {
+            h4 {
+                margin: 0 0 $space-1 0;
+                font-size: $font-size-md;
+                font-weight: 600;
+            }
+
+            p {
+                margin: 0;
+                color: $text-secondary;
+                font-size: $font-size-sm;
+            }
+        }
+    }
+}
+
+.invite-link-display {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-3;
+    background: $bg-hover;
+    border: 1px solid $border-default;
+    border-radius: $radius-md;
+    margin-top: $space-2;
+
+    code {
+        flex: 1;
+        font-family: $font-mono;
+        font-size: $font-size-sm;
+        word-break: break-all;
+        color: $text-primary;
+    }
+}
+
+.invitation-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: $radius-full;
+    font-size: $font-size-xs;
+    font-weight: 500;
+    text-transform: capitalize;
+
+    &.pending {
+        background: fade($accent-primary-raw, 15%);
+        color: $accent-primary;
+    }
+
+    &.accepted {
+        background: fade($success, 15%);
+        color: $success;
+    }
+
+    &.expired {
+        background: fade($text-tertiary-raw, 15%);
+        color: $text-tertiary;
+    }
+
+    &.revoked {
+        background: fade($danger, 15%);
+        color: $danger;
+    }
+}
+
+// --------------------------------------------
+// Activity Tab
+// --------------------------------------------
+.activity-tab {
+    .tab-header {
+        margin-bottom: $space-6;
+
+        h3 {
+            margin: 0 0 $space-1 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: $text-primary;
+        }
+
+        p {
+            margin: 0;
+            color: $text-secondary;
+            font-size: $font-size-md;
+        }
+    }
+}
+
+// Restrained readout strip (replaces the hero-metric stat cards). Reads like
+// the dashboard's server-identity line: mono numbers, muted labels, one row.
+.activity-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: $space-3 $space-6;
+    margin-bottom: $space-8;
+    padding-bottom: $space-5;
+    border-bottom: 1px solid $border-subtle;
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+
+    &__item {
+        display: inline-flex;
+        align-items: baseline;
+        gap: $space-2;
+    }
+
+    &__value {
+        font-family: $font-mono;
+        font-size: $font-size-lg;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+.most-active-users {
+    margin-bottom: $space-8;
+    padding: $space-6;
+    background: $bg-card;
+    border: 1px solid $border-default;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-sm;
+
+    h4 {
+        margin: 0 0 $space-6 0;
+        font-size: $font-size-lg;
+        font-weight: 600;
+        color: $text-primary;
+    }
+}
+
+.active-users-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+}
+
+.active-user-item {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+
+    .active-user-rank {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: $bg-hover;
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+    }
+
+    .active-user-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+    }
+
+    .active-user-name {
+        font-size: $font-size-sm;
+        font-weight: 600;
+        color: $text-primary;
+    }
+
+    .active-user-bar-wrapper {
+        height: 6px;
+        background: $bg-hover;
+        border-radius: $radius-full;
+        overflow: hidden;
+    }
+
+    .active-user-bar {
+        height: 100%;
+        background: linear-gradient(90deg, $accent-primary, $accent-hover);
+        border-radius: $radius-full;
+        transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .active-user-count {
+        font-size: $font-size-sm;
+        font-weight: 600;
+        color: $text-secondary;
+        white-space: nowrap;
+    }
+}
+
+.activity-feed-section {
+    margin-top: $space-8;
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-4;
+
+        h4 {
+            margin: 0;
+            font-size: $font-size-lg;
+            font-weight: 600;
+            color: $text-primary;
+        }
+    }
+}
+
+.filters-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-4;
+    align-items: flex-end;
+    margin-bottom: $space-6;
+    padding: $space-5;
+    background: $bg-hover;
+    border-radius: $radius-lg;
+    border: 1px solid $border-default;
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: $space-2;
+            font-size: $font-size-xs;
+            font-weight: 600;
+            color: $text-tertiary;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        select.form-control {
+            min-width: 200px;
+            height: 38px;
+            padding: 0 $space-3;
+            background: $bg-card;
+            border: 1px solid $border-default;
+            border-radius: $radius-md;
+            font-size: $font-size-sm;
+            color: $text-primary;
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+
+            &:focus {
+                outline: none;
+                border-color: $accent-primary;
+                box-shadow: 0 0 0 3px fade($accent-primary-raw, 10%);
+            }
+
+            &:hover {
+                border-color: $border-active;
+            }
+        }
+    }
+
+    .btn-clear {
+        height: 38px;
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        padding: 0 $space-4;
+        color: $text-tertiary;
+
+        &:hover {
+            color: $danger;
+            background: fade($danger, 10%);
+        }
+    }
+}
+
+// Dense, scannable audit log (journalctl-style), not a social feed. One row
+// per event inside a single bordered surface with hairline separators.
+.audit-log-list {
+    border: 1px solid $border-default;
+    border-radius: $radius-lg;
+    overflow: hidden;
+    background: $bg-card;
+}
+
+.log-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: $space-2 $space-3;
+    padding: $space-2 $space-4;
+    border-bottom: 1px solid $border-subtle;
+    font-size: $font-size-sm;
+    transition: background-color $transition-fast;
+
+    &:last-child { border-bottom: none; }
+
+    &:hover {
+        background: $bg-hover;
+    }
+
+    // Severity reads from the dot color AND the action text, never color alone.
+    .log-row__dot {
+        flex-shrink: 0;
+        align-self: center;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: $text-tertiary;
+    }
+
+    &.action-success .log-row__dot { background: $success; }
+    &.action-warning .log-row__dot { background: $warning; }
+    &.action-danger  .log-row__dot { background: $danger; }
+    &.action-info    .log-row__dot { background: $accent-primary; }
+
+    .log-row__time {
+        flex-shrink: 0;
+        width: 124px;
+        font-family: $font-mono;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .log-row__action {
+        font-family: $font-mono;
+        font-weight: $font-weight-medium;
+        color: $text-primary;
+    }
+
+    .log-row__user {
+        color: $accent-primary;
+        font-weight: $font-weight-medium;
+        white-space: nowrap;
+    }
+
+    .log-row__target {
+        color: $text-tertiary;
+        white-space: nowrap;
+    }
+
+    .log-row__meta {
+        margin-left: auto;
+        display: inline-flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: baseline;
+        gap: $space-1 $space-3;
+        min-width: 0;
+        font-family: $font-mono;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+    }
+
+    .log-row__detail {
+        color: $text-secondary;
+        max-width: 320px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .log-row__detail-key {
+        color: $text-tertiary;
+    }
+
+    .log-row__ip {
+        color: $text-tertiary;
+    }
+}

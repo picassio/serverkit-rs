@@ -1,0 +1,209 @@
+.app-map {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+
+    .sk-topbar {
+        flex: 0 0 auto;
+    }
+
+    &__viewmeta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0.75rem 0 0.5rem;
+        font-size: 0.82rem;
+        color: $text-secondary;
+
+        span {
+            flex: 1;
+        }
+    }
+
+    &__legend-toggle {
+        background: transparent;
+        border: 1px solid $border-subtle;
+        color: $text-secondary;
+        font-size: 0.75rem;
+        padding: 3px 10px;
+        border-radius: $radius-sm;
+        cursor: pointer;
+
+        &:hover {
+            background: $bg-hover;
+            color: $text-primary;
+        }
+    }
+
+    &__legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+        background: $bg-card;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        font-size: 0.75rem;
+        color: $text-secondary;
+    }
+
+    &__legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    &__legend-swatch {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 1px solid;
+        border-radius: 3px;
+    }
+
+    &__canvas {
+        flex: 1 1 auto;
+        min-height: 480px;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+        background: $bg-card;
+        overflow: hidden;
+        position: relative;
+
+        .react-flow__attribution {
+            display: none;
+        }
+    }
+}
+
+.documentation {
+    &__search {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 240px;
+        color: $text-secondary;
+
+        input {
+            min-width: 220px;
+        }
+    }
+
+    &__group {
+        margin-top: 1.25rem;
+    }
+
+    &__group-title {
+        font-size: 0.72rem;
+        font-weight: $font-weight-semibold;
+        color: $text-secondary;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 0.6rem;
+    }
+
+    &__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 0.5rem;
+
+        li {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 0.7rem 0.85rem;
+            border: 1px solid $border-subtle;
+            border-radius: $radius-md;
+            background: $bg-card;
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+
+            &:hover {
+                background: $bg-hover;
+                border-color: $border-hover;
+            }
+        }
+    }
+
+    &__link {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        text-decoration: none;
+        color: $text-primary;
+        font-size: 0.88rem;
+        line-height: 1.3;
+    }
+
+    &__icon {
+        display: inline-flex;
+        color: $text-secondary;
+    }
+
+    &__label {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__path {
+        font-family: $font-mono, monospace;
+        font-size: 0.72rem;
+        color: $text-tertiary;
+        background: $bg-elevated;
+        padding: 1px 6px;
+        border-radius: $radius-sm;
+    }
+
+    &__ext {
+        color: $text-tertiary;
+    }
+
+    &__note {
+        font-size: 0.75rem;
+        color: $text-secondary;
+    }
+
+    &__empty {
+        color: $text-secondary;
+        font-style: italic;
+        padding: 1rem;
+    }
+}
+
+// Dev Tools sidebar section: visually distinct.
+.sidebar .nav-category--dev {
+    margin-top: 1.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed $border-subtle;
+    color: $primary-color;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    &::before {
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: $primary-color;
+        box-shadow: 0 0 0 3px rgba($accent-primary-raw, 0.18);
+    }
+}
+
+.sidebar .nav-item--dev {
+    border: 1px dashed transparent;
+
+    &.active,
+    &:hover {
+        border-color: rgba($accent-primary-raw, 0.35);
+    }
+}

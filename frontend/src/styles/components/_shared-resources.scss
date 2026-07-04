@@ -1,0 +1,500 @@
+// ============================================
+// SHARED RESOURCES — tags + shared variable groups (facade layer)
+// ============================================
+
+// ---------- Tags panel ----------
+
+.shared-tags {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    &__list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+        align-items: center;
+    }
+
+    &__hint {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    &__add {
+        display: flex;
+        gap: $space-2;
+        align-items: center;
+    }
+
+    &__input {
+        max-width: 220px;
+    }
+}
+
+.shared-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    background: $bg-hover;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    padding: $space-1 $space-2;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+
+    &__label {
+        font-family: $font-mono;
+    }
+
+    &__remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        background: transparent;
+        border: none;
+        border-radius: $radius-sm;
+        color: $text-tertiary;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        transition: color 0.15s, background 0.15s;
+
+        &:hover {
+            color: $danger;
+            background: fade($danger, 18%);
+        }
+    }
+}
+
+// ---------- Resolved variables panel (read-mostly facade) ----------
+
+.shared-vars-panel {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    &--loading {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+        padding: $space-6;
+    }
+
+    &__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+
+        h3 {
+            margin: 0;
+        }
+    }
+
+    &__count {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    &__hint {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+        margin: 0;
+    }
+
+    &__filter input {
+        width: 100%;
+        padding: $space-2 $space-3;
+        background: $bg-body;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-sm;
+        color: $text-primary;
+        font-size: $font-size-sm;
+
+        &::placeholder {
+            color: $text-tertiary;
+        }
+    }
+
+    &__empty {
+        text-align: center;
+        padding: $space-8;
+        color: $text-tertiary;
+        background: $bg-card;
+        border: 1px dashed $border-subtle;
+        border-radius: $radius-md;
+        font-size: $font-size-sm;
+    }
+
+    &__hint--note {
+        color: $text-secondary;
+        border-left: 2px solid $warning-border;
+        background: $warning-bg;
+        padding: $space-2 $space-3;
+        border-radius: $radius-sm;
+    }
+}
+
+// ---------- Provenance / precedence ----------
+// A compact legend (workspace < project < environment < direct) plus a small
+// per-variable scope badge so users can see where each value comes from.
+
+.shared-vars-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-xs;
+    color: $text-tertiary;
+
+    &__label {
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 600;
+    }
+
+    &__item {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+    }
+
+    &__lt {
+        color: $text-tertiary;
+        font-family: $font-mono;
+    }
+
+    &__note {
+        color: $text-tertiary;
+    }
+}
+
+// Scope badge — one per provenance source. Colors map to the design-system
+// status tokens so they read consistently across themes.
+.scope-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px $space-2;
+    border-radius: $radius-sm;
+    font-size: $font-size-xs;
+    font-weight: 600;
+    line-height: 1.5;
+    border: 1px solid transparent;
+    text-transform: capitalize;
+
+    &--workspace {
+        color: $text-secondary;
+        background: $bg-hover;
+        border-color: $border-subtle;
+    }
+
+    &--project {
+        color: $info;
+        background: $info-bg;
+        border-color: $info-border;
+    }
+
+    &--environment {
+        color: $success;
+        background: $success-bg;
+        border-color: $success-border;
+    }
+
+    &--direct,
+    &--resource {
+        color: $accent-primary;
+        background: rgba($accent-primary-raw, 0.12);
+        border-color: rgba($accent-primary-raw, 0.22);
+    }
+}
+
+// Conflict badge — the resolved shared variable shares a key with the app's own
+// local env var, so the local value is what the container actually uses.
+.conflict-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: $space-2;
+    padding: 1px $space-2;
+    border-radius: $radius-sm;
+    font-family: $font-main;
+    font-size: $font-size-xs;
+    font-weight: 600;
+    line-height: 1.5;
+    color: $warning;
+    background: $warning-bg;
+    border: 1px solid $warning-border;
+    white-space: nowrap;
+    cursor: help;
+}
+
+// Shared variables table (used in the resolved panel and the group detail)
+
+.shared-vars-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: $font-size-sm;
+
+    th,
+    td {
+        text-align: left;
+        padding: $space-2 $space-3;
+        border-bottom: 1px solid $border-subtle;
+        vertical-align: middle;
+    }
+
+    th {
+        color: $text-tertiary;
+        font-weight: 600;
+        font-size: $font-size-xs;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    &__key {
+        font-family: $font-mono;
+        font-weight: 600;
+        color: $text-primary;
+    }
+
+    &__value {
+        font-family: $font-mono;
+        color: $text-secondary;
+        word-break: break-all;
+    }
+
+    &__target {
+        white-space: nowrap;
+    }
+
+    &__target-all {
+        color: $text-tertiary;
+        font-size: $font-size-xs;
+    }
+
+    &__group {
+        color: $text-tertiary;
+        white-space: nowrap;
+
+        .scope-badge {
+            margin-right: $space-2;
+        }
+    }
+
+    &__group-name {
+        color: $text-tertiary;
+    }
+
+    tr.is-secret &__key {
+        border-left: 2px solid $warning;
+        padding-left: $space-2;
+    }
+
+    // Row whose shared value is overridden by a local env var — dim the value
+    // since it is not the effective one for the container.
+    tr.has-conflict &__value {
+        color: $text-tertiary;
+        text-decoration: line-through;
+        text-decoration-color: $warning-border;
+    }
+}
+
+// ---------- Shared variable groups manager ----------
+
+.shared-groups {
+    &__layout {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: $space-4;
+        align-items: start;
+
+        @media (max-width: 720px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+    }
+
+    &__create {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+        padding: $space-3;
+        background: $bg-card;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+    }
+
+    &__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+    }
+
+    &__hint {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    &__item {
+        padding: $space-3;
+        background: $bg-card;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        cursor: pointer;
+        transition: border-color 0.15s;
+
+        &:hover {
+            border-color: $border-active;
+        }
+
+        &.is-active {
+            border-color: $accent-primary;
+        }
+
+        &-name {
+            font-weight: 600;
+            color: $text-primary;
+        }
+
+        &-meta {
+            color: $text-tertiary;
+            font-size: $font-size-xs;
+            margin-top: $space-1;
+        }
+    }
+
+    &__detail {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+        padding: $space-4;
+        background: $bg-card;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        min-height: 200px;
+    }
+
+    &__empty {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+        text-align: center;
+        padding: $space-8;
+    }
+
+    &__detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: $space-4;
+
+        h3 {
+            margin: 0;
+        }
+    }
+
+    &__desc {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+        margin: $space-1 0 0;
+    }
+
+    &__subhead {
+        margin: 0;
+        color: $text-secondary;
+        font-size: $font-size-sm;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    &__add-var,
+    &__attach {
+        display: flex;
+        gap: $space-2;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    &__var-key {
+        width: 160px;
+        font-family: $font-mono;
+        text-transform: uppercase;
+    }
+
+    &__var-value {
+        flex: 1;
+        min-width: 140px;
+    }
+
+    &__var-target {
+        width: 150px;
+        flex-shrink: 0;
+        font-family: $font-mono;
+    }
+
+    &__secret {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-1;
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+
+    &__attach-type,
+    &__attach-id {
+        padding: $space-2 $space-3;
+        background: $bg-body;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-sm;
+        color: $text-primary;
+        font-size: $font-size-sm;
+    }
+
+    &__attach-id {
+        flex: 1;
+        min-width: 140px;
+    }
+
+    &__attachments {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+    }
+
+    &__attachment {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: $space-2 $space-3;
+        background: $bg-hover;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-sm;
+
+        &-label {
+            font-family: $font-mono;
+            font-size: $font-size-sm;
+            color: $text-secondary;
+        }
+    }
+}
+
+// ---------- Embedded section (resource detail pages) ----------
+// Spacing for the reusable panels when dropped into a settings/overview
+// form-section (e.g. ServerDetail). The panels carry their own internal
+// layout; this just gives the section a sensible top gap.
+
+.shared-resources-section {
+    .shared-tags {
+        margin-top: $space-2;
+    }
+}

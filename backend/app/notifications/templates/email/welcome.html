@@ -1,0 +1,13 @@
+{% extends 'email/base.html' %}
+{% from 'email/partials/_macros.html' import button with context %}
+{% block content %}
+  <p style="margin:0 0 16px;">Hi{% if recipient.name %} {{ recipient.name }}{% endif %}, welcome to ServerKit — your account is ready to go.</p>
+  {% if data.summary %}
+  <p style="margin:0 0 16px;">{{ data.summary }}</p>
+  {% else %}
+  <p style="margin:0 0 16px;">From here you can deploy apps, manage databases and domains, watch your servers in real time, and wire up automations — all from one panel.</p>
+  {% endif %}
+  {% if action_url %}
+  <div style="margin-top:24px;">{{ button(action_url, action_label) }}</div>
+  {% endif %}
+{% endblock %}

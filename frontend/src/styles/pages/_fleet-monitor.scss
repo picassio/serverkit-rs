@@ -1,0 +1,168 @@
+// ============================================
+// FLEET PAGES (Agent Fleet + Fleet Monitor)
+// ============================================
+
+// KPI strip (MetricCard grid) on the Agent Fleet dashboard
+.fleet-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: $space-3;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+// Amber warning row (queued commands, forecast errors)
+.fleet-warnrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2;
+    padding: $space-3;
+    background: $warning-bg;
+    border: 1px solid $warning-border;
+    border-radius: $radius-md;
+    color: $warning;
+    font-size: $font-size-sm;
+}
+
+// Accent-washed icon chip (discovery cards)
+.fleet-ico {
+    display: inline-flex;
+    padding: $space-2;
+    border-radius: $radius-md;
+    background: var(--accent-bg);
+    color: var(--accent-bright);
+}
+
+// Small centered stat box (diagnostics, forecast)
+.fleet-statbox {
+    padding: $space-3;
+    background: $bg-elevated;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    text-align: center;
+
+    &.is-green { background: $success-bg; border-color: $success-border; }
+    &.is-red { background: $danger-bg; border-color: $danger-border; }
+    &.is-amber { background: $warning-bg; border-color: $warning-border; }
+}
+
+.fleet-statrow {
+    background: $bg-elevated;
+    border: 1px solid $border-subtle;
+}
+
+// Capacity-forecast prediction tiles
+.fleet-predbox {
+    padding: $space-4;
+    border-radius: $radius-lg;
+    border: 1px solid $border-default;
+
+    &.is-red { background: $danger-bg; border-color: $danger-border; }
+    &.is-amber { background: $warning-bg; border-color: $warning-border; }
+}
+
+// Diagnostics overlay panel (token home for the old bg-white modal)
+.fleet-modal {
+    background: $bg-elevated;
+    border: 1px solid $border-default;
+    border-radius: $radius-lg;
+    box-shadow: var(--shadow-lg);
+}
+
+.fleet-heatmap {
+    width: 100%;
+
+    &__header {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+        gap: $space-2;
+        padding: $space-2 $space-3;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: $text-secondary;
+        border-bottom: 1px solid $border-subtle;
+    }
+
+    &__row {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+        gap: $space-2;
+        padding: $space-2 $space-3;
+        align-items: center;
+        border-bottom: 1px solid $border-subtle;
+        transition: background 0.15s;
+
+        &:hover {
+            background: $bg-hover;
+        }
+
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+
+    &__server {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-weight: 500;
+        font-size: 0.875rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__cell {
+        text-align: center;
+        padding: $space-1 $space-2;
+        border-radius: $radius-sm;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        transition: background-color 0.3s;
+        background: var(--card-bg);
+
+        &.is-empty { background: var(--card-bg); color: inherit; }
+        &.is-low { background: var(--green); color: inherit; }
+        &.is-medium { background: var(--amber); color: inherit; }
+        &.is-high { background: #f97316; color: #fff; }
+        &.is-critical { background: var(--red); color: #fff; }
+    }
+
+    &__label {
+        text-align: center;
+    }
+
+    &__legend-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: $radius-sm;
+
+        &.is-low { background: var(--green); }
+        &.is-medium { background: var(--amber); }
+        &.is-high { background: #f97316; }
+        &.is-critical { background: var(--red); }
+    }
+}
+
+@media (max-width: $breakpoint-md) {
+    .fleet-heatmap {
+        &__header,
+        &__row {
+            grid-template-columns: 1.5fr 1fr 1fr 1fr;
+        }
+
+        // Hide containers and status columns on small screens
+        &__header > :nth-child(5),
+        &__header > :nth-child(6),
+        &__row > :nth-child(5),
+        &__row > :nth-child(6) {
+            display: none;
+        }
+    }
+}

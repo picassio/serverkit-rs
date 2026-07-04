@@ -1,0 +1,286 @@
+// In-app notification bell + dropdown (sk-notif namespace). Lives in the
+// sidebar footer (opens upward) and the mobile top bar (opens downward).
+
+.sk-notif {
+    position: relative;
+    display: flex;
+
+    &__bell {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border: 1px solid $border-subtle;
+        border-radius: 9px;
+        background: $bg-card;
+        color: $text-secondary;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+        &:hover {
+            background: $bg-hover;
+            color: $text-primary;
+            border-color: $border-default;
+        }
+    }
+
+    &__badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 17px;
+        height: 17px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: $danger;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 17px;
+        text-align: center;
+        box-shadow: 0 0 0 2px $bg-card;
+    }
+
+    &__panel {
+        position: absolute;
+        bottom: calc(100% + 10px); // open upward (sidebar footer)
+        left: 0;
+        right: auto;
+        width: 340px;
+        max-width: calc(100vw - 32px);
+        background: $bg-elevated;
+        border: 1px solid $border-default;
+        border-radius: 12px;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+        z-index: 1000;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        animation: skNotifPanelIn 0.18s ease-out;
+        transform-origin: bottom left;
+    }
+
+    &__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid $border-subtle;
+    }
+
+    &__heading {
+        font-weight: 600;
+        font-size: 14px;
+        color: $text-primary;
+    }
+
+    &__markall {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: $accent-primary;
+        font-size: 12px;
+        font-weight: 500;
+
+        &:hover { text-decoration: underline; }
+    }
+
+    &__list {
+        max-height: 380px;
+        overflow-y: auto;
+    }
+
+    &__empty {
+        padding: 28px 14px;
+        text-align: center;
+        color: $text-secondary;
+        font-size: 13px;
+    }
+
+    &__item {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        padding: 11px 14px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        text-align: left;
+        border-bottom: 1px solid $border-subtle;
+
+        &:hover { background: $bg-hover; }
+        &.is-unread { background: $accent-bg; }
+        &:last-child { border-bottom: none; }
+    }
+
+    &__dot {
+        flex: 0 0 auto;
+        width: 8px;
+        height: 8px;
+        margin-top: 6px;
+        border-radius: 50%;
+    }
+
+    &__content {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    &__title {
+        font-size: 13px;
+        font-weight: 600;
+        color: $text-primary;
+    }
+
+    &__text {
+        font-size: 12px;
+        color: $text-secondary;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    &__time {
+        font-size: 11px;
+        color: $text-secondary;
+        opacity: 0.8;
+    }
+
+    // System-notice rows are a div (clickable hit area + a dismiss button) rather
+    // than a single button, so they can carry a "Fix" action and an X to dismiss.
+    &__item.is-notice { cursor: default; }
+
+    &__hit {
+        display: flex;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+        padding: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+        text-align: left;
+        color: inherit;
+    }
+
+    &__dismiss {
+        flex: 0 0 auto;
+        align-self: flex-start;
+        margin-top: 2px;
+        padding: 2px;
+        border: none;
+        background: none;
+        border-radius: 6px;
+        cursor: pointer;
+        color: $text-secondary;
+        line-height: 0;
+
+        &:hover { background: $bg-hover; color: $text-primary; }
+    }
+
+    &__seeall {
+        padding: 11px 14px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: $accent-primary;
+        font-size: 13px;
+        font-weight: 500;
+        border-top: 1px solid $border-subtle;
+
+        &:hover { background: $bg-hover; }
+    }
+}
+
+// In the sidebar footer, keep the user menu and notification bell on one row
+// so the footer feels like a single control strip instead of a floating icon.
+.sidebar-footer__row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+
+    .user-mini {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sk-notif {
+        display: flex;
+        align-items: stretch;
+    }
+
+    .sk-notif__bell {
+        width: 38px;
+        height: auto;
+        min-height: 34px;
+        align-self: stretch;
+    }
+}
+
+// In the mobile top bar the bell sits at the top, so the panel opens downward.
+.mobile-topbar__actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+.mobile-topbar .sk-notif__panel {
+    top: calc(100% + 10px);
+    bottom: auto;
+    left: auto;
+    right: 8px;
+    transform-origin: top right;
+}
+
+@keyframes skNotifPanelIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+// Top bar layout: the bell sits at the far right, so the panel opens downward
+// and extends to the left so it stays inside the viewport.
+@media (min-width: ($breakpoint-md + 1)) {
+    [data-layout="topbar"] .sk-notif__panel {
+        top: calc(100% + 10px);
+        bottom: auto;
+        left: auto;
+        right: 0;
+        transform-origin: top right;
+    }
+}
+
+// Compact rail layout: when collapsed there isn't room for the bell beside the
+// avatar, so stack them vertically.
+@media (min-width: ($breakpoint-md + 1)) {
+    [data-layout="rail"] .sidebar:not(:hover):not(:focus-within) .sidebar-footer__row {
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+
+        .user-mini {
+            flex: 0 0 auto;
+            width: auto;
+        }
+
+        .sk-notif__bell {
+            width: 34px;
+            min-height: 34px;
+            align-self: center;
+        }
+    }
+}

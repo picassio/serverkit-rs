@@ -1,0 +1,736 @@
+// ============================================
+// STATUS PAGES (redesign — infra console look)
+// Sibling of _monitoring.scss: mono eyebrows, quiet surface panels,
+// .comp-dots component strip + .inc-state incident chips (prototype
+// view_monitoring.jsx status/incidents tabs).
+// ============================================
+
+.status-pages-page {
+    .status-layout {
+        display: grid;
+        grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+        gap: $space-5;
+        margin-top: $space-4;
+        align-items: start;
+
+        @media (max-width: 960px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    // ── pages rail ──────────────────────────────────────────
+    .status-pages-list {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+        min-width: 0;
+    }
+
+    .status-page-item {
+        width: 100%;
+        padding: 13px 14px;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        color: var(--text);
+        cursor: pointer;
+        display: grid;
+        gap: 6px;
+        text-align: left;
+        transition: border-color $transition-fast, background $transition-fast;
+
+        &:hover {
+            background: var(--surface-hover);
+            border-color: var(--border-strong);
+        }
+
+        &.active {
+            background: var(--accent-bg-soft);
+            border-color: var(--accent-dim);
+        }
+
+        &__top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: $space-2;
+            min-width: 0;
+        }
+
+        &__name {
+            font-size: 13px;
+            font-weight: $font-weight-semibold;
+            @include truncate();
+        }
+
+        .sk-pill {
+            padding: 1px 7px;
+            font-size: 10px;
+        }
+
+        &__slug {
+            color: var(--text-faint);
+            font-family: var(--mono);
+            font-size: 11px;
+            @include truncate();
+        }
+
+        &__meta {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--text-faint);
+            font-family: var(--mono);
+            font-size: 10.5px;
+
+            svg {
+                color: var(--text-ghost);
+                flex-shrink: 0;
+            }
+        }
+    }
+
+    .status-pages-list .empty-state {
+        min-height: 160px;
+    }
+
+    // ── detail panel ────────────────────────────────────────
+    .status-detail-panel {
+        min-width: 0;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        padding: $space-5;
+
+        &--empty {
+            min-height: 320px;
+            display: grid;
+            place-items: center;
+            align-content: center;
+            gap: $space-3;
+            color: var(--text-faint);
+        }
+    }
+
+    .status-detail-panel__hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 400px);
+        gap: $space-5;
+        align-items: stretch;
+        margin-bottom: $space-5;
+
+        h2 {
+            margin: $space-3 0 $space-1;
+            font-size: 19px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: -0.01em;
+            line-height: 1.15;
+        }
+
+        p {
+            margin: 0;
+            color: var(--text-dim);
+            font-size: 13px;
+            max-width: 760px;
+        }
+
+        @media (max-width: 1100px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .status-overall-pill {
+        font-size: 12px;
+        padding: 4px 11px;
+    }
+
+    // Component status dot strip (prototype .comp-dots)
+    .comp-dots {
+        display: flex;
+        gap: 3px;
+        flex-wrap: wrap;
+        margin-top: $space-3;
+
+        i {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            background: var(--green);
+
+            &.degraded { background: var(--amber); }
+            &.down { background: var(--red); }
+            &.maintenance { background: var(--cyan); }
+        }
+    }
+
+    .status-url-card {
+        display: grid;
+        gap: $space-3;
+        align-content: start;
+        padding: $space-4;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+
+        > span {
+            color: var(--text-faint);
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        code {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 12.5px;
+            line-height: 1.5;
+        }
+
+        > div {
+            display: flex;
+            flex-wrap: wrap;
+            gap: $space-2;
+        }
+    }
+
+    // KPI trio (sk-spec-card; surface-2 so the tiles read inside the panel)
+    .status-detail-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: $space-3;
+        margin-bottom: $space-4;
+
+        .sk-spec-card {
+            background: var(--surface-2);
+        }
+
+        .sk-spec-card__value {
+            font-family: var(--mono);
+            font-size: 19px;
+            letter-spacing: -0.01em;
+        }
+
+        @media (max-width: 720px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .status-actions-bar {
+        display: flex;
+        justify-content: flex-end;
+        margin: $space-4 0;
+    }
+
+    .components-list,
+    .incidents-list {
+        display: grid;
+        gap: $space-4;
+    }
+
+    // ── component groups (mono eyebrow + joined dense rows) ─
+    .component-group {
+        min-width: 0;
+        padding: $space-4;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+
+        h3 {
+            margin: 0 0 $space-2;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+    }
+
+    .component-row {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) minmax(260px, auto) auto;
+        gap: $space-4;
+        align-items: center;
+        padding: 12px 0;
+
+        &:last-child {
+            padding-bottom: 0;
+        }
+
+        & + & {
+            border-top: 1px solid var(--border-soft);
+        }
+
+        &__info {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: $space-3;
+
+            > div {
+                min-width: 0;
+                display: grid;
+                gap: 3px;
+            }
+
+            strong {
+                font-size: 13.5px;
+                font-weight: 550;
+                @include truncate();
+            }
+
+            span {
+                font-family: var(--mono);
+                font-size: 11.5px;
+                color: var(--text-faint);
+                @include truncate();
+            }
+        }
+
+        &__stats {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: $space-3;
+
+            > span {
+                font-family: var(--mono);
+                font-size: 11px;
+                color: var(--text-faint);
+                white-space: nowrap;
+            }
+        }
+
+        &__actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: $space-2;
+        }
+
+        @media (max-width: 1180px) {
+            grid-template-columns: 1fr;
+
+            &__stats,
+            &__actions {
+                justify-content: flex-start;
+            }
+        }
+    }
+
+    // Component status dot (mon-sev style rounded square)
+    .status-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 3px;
+        flex: 0 0 auto;
+
+        &--success {
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+        }
+
+        &--warning {
+            background: var(--amber);
+            box-shadow: 0 0 6px var(--amber);
+        }
+
+        &--danger {
+            background: var(--red);
+        }
+
+        &--info {
+            background: var(--cyan);
+        }
+    }
+
+    // ── incidents ───────────────────────────────────────────
+    .incident-row {
+        display: grid;
+        gap: $space-3;
+        padding: $space-4;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+
+        &--investigating { border-color: rgba(251, 111, 111, 0.3); }
+        &--identified { border-color: rgba(245, 185, 69, 0.3); }
+        &--monitoring { border-color: rgba(73, 199, 240, 0.3); }
+        &--resolved { border-color: var(--border-soft); }
+
+        &__header {
+            display: flex;
+            justify-content: space-between;
+            gap: $space-3;
+
+            > div:first-child {
+                min-width: 0;
+
+                strong {
+                    display: block;
+                    margin-bottom: 3px;
+                    font-size: 13.5px;
+                    font-weight: 550;
+                }
+
+                span {
+                    color: var(--text-faint);
+                    font-family: var(--mono);
+                    font-size: 11px;
+                }
+            }
+        }
+
+        &__badges {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            align-items: flex-start;
+            gap: $space-2;
+        }
+
+        p {
+            margin: 0;
+            color: var(--text-dim);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        &__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: $space-2;
+        }
+    }
+
+    // Incident state + impact chips (prototype .inc-state) — shape from
+    // the shared %sk-state primitive (_design-system.scss)
+    .inc-state,
+    .inc-impact {
+        @extend %sk-state;
+    }
+
+    .inc-state {
+        &--investigating { color: var(--red); background: var(--red-bg); }
+        &--identified { color: var(--amber); background: var(--amber-bg); }
+        &--monitoring { color: var(--cyan); background: var(--cyan-bg); }
+        &--resolved { color: var(--green); background: var(--green-bg); }
+    }
+
+    .inc-impact {
+        color: var(--text-faint);
+        background: var(--surface-3);
+
+        &--minor { color: var(--cyan); background: var(--cyan-bg); }
+        &--major { color: var(--amber); background: var(--amber-bg); }
+        &--critical { color: var(--red); background: var(--red-bg); }
+    }
+
+    .incident-timeline {
+        display: grid;
+        gap: $space-3;
+        padding-left: $space-3;
+        border-left: 1px solid var(--border);
+
+        > div {
+            display: grid;
+            gap: 2px;
+        }
+
+        span {
+            color: var(--text-faint);
+            font-family: var(--mono);
+            font-size: 10.5px;
+        }
+
+        strong {
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        p {
+            font-size: 12.5px;
+        }
+    }
+
+    // ── page settings tab ───────────────────────────────────
+    .status-page-settings {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+        gap: $space-3;
+        align-items: center;
+        margin-top: $space-4;
+
+        > div {
+            min-height: 72px;
+            padding: 14px 15px;
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius);
+            background: var(--surface-2);
+        }
+
+        > div > span:first-child {
+            display: block;
+            color: var(--text-faint);
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        > div > strong {
+            display: block;
+            margin-top: $space-2;
+            font-family: var(--mono);
+            font-size: 13px;
+            overflow-wrap: anywhere;
+        }
+
+        > div > .sk-pill {
+            margin-top: $space-2;
+        }
+
+        @media (max-width: 960px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+}
+
+// Status-page modal chrome. Hoisted OUT of .status-pages-page: the shared Modal
+// renders through a portal on <body>, so page-scoped rules would never reach it.
+// Surface chrome comes from .sk-modal; these only add the eyebrow form labels
+// and the two-column grid.
+.status-modal {
+    .form-group label {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    .form-help {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+    }
+}
+
+.status-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $space-4;
+
+    @media (max-width: 640px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.public-status-page {
+    min-height: 100vh;
+    padding: clamp(24px, 4vw, 56px);
+    background: $bg-body;
+    color: $text-primary;
+
+    .public-status-hero,
+    .public-status-summary,
+    .public-status-section,
+    .public-status-shell {
+        width: min(1040px, 100%);
+        margin: 0 auto;
+    }
+
+    .public-status-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: $space-5;
+        padding: $space-6;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+        background: $bg-card;
+
+        h1 {
+            margin: 0;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            line-height: 1;
+        }
+
+        p {
+            margin: $space-3 0 0;
+            color: $text-secondary;
+            max-width: 720px;
+        }
+
+        @media (max-width: 700px) {
+            flex-direction: column;
+        }
+    }
+
+    .public-status-badge {
+        min-height: 34px;
+        padding: 8px $space-3;
+    }
+
+    .public-status-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: $space-3;
+        margin-top: $space-4;
+
+        > div {
+            padding: $space-4;
+            border: 1px solid $border-subtle;
+            border-radius: $radius-md;
+            background: $bg-card;
+        }
+
+        span {
+            display: block;
+            color: $text-tertiary;
+            font-size: $font-size-xs;
+            font-weight: $font-weight-semibold;
+            text-transform: uppercase;
+        }
+
+        strong {
+            display: block;
+            margin-top: $space-2;
+            font-size: $font-size-xl;
+        }
+
+        @media (max-width: 700px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .public-status-section {
+        margin-top: $space-5;
+
+        > header {
+            margin-bottom: $space-3;
+        }
+
+        h2,
+        h3 {
+            margin: 0;
+        }
+    }
+
+    .public-component-groups,
+    .public-component-list,
+    .public-incident-list {
+        display: grid;
+        gap: $space-3;
+    }
+
+    .public-component-group {
+        display: grid;
+        gap: $space-2;
+
+        > h3 {
+            color: $text-secondary;
+            font-size: $font-size-sm;
+        }
+    }
+
+    .public-component-row,
+    .public-incident,
+    .public-status-empty,
+    .public-status-shell {
+        padding: $space-4;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        background: $bg-card;
+    }
+
+    .public-component-row {
+        display: flex;
+        justify-content: space-between;
+        gap: $space-4;
+        align-items: center;
+
+        > div:first-child {
+            display: flex;
+            align-items: center;
+            gap: $space-3;
+            min-width: 0;
+
+            span {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+
+        &__meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: $space-2;
+            color: $text-secondary;
+            font-size: $font-size-xs;
+        }
+
+        @media (max-width: 760px) {
+            align-items: flex-start;
+            flex-direction: column;
+
+            &__meta {
+                justify-content: flex-start;
+            }
+        }
+    }
+
+    .public-incident {
+        display: grid;
+        gap: $space-3;
+
+        &--active {
+            border-color: fade($warning, 45%);
+        }
+
+        > div {
+            display: flex;
+            justify-content: space-between;
+            gap: $space-3;
+        }
+
+        h3 {
+            font-size: $font-size-base;
+        }
+
+        span {
+            display: block;
+            margin-top: 3px;
+            color: $text-tertiary;
+            font-size: $font-size-xs;
+        }
+
+        p {
+            margin: 0;
+            color: $text-secondary;
+        }
+    }
+
+    .public-status-empty,
+    .public-status-shell--empty {
+        display: grid;
+        place-items: center;
+        gap: $space-2;
+        min-height: 180px;
+        color: $text-tertiary;
+        text-align: center;
+    }
+}

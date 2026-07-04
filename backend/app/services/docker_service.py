@@ -1,0 +1,1313 @@
+import logging
+import subprocess
+import json
+import os
+import shlex
+import yaml
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+class DockerService:
+    """Service for managing Docker containers, images, and compose stacks."""
+
+    _compose_cmd = None
+
+    @classmethod
+    def _get_compose_cmd(cls):
+        """Detect whether to use 'docker compose' (v2) or 'docker-compose' (v1)."""
+        if cls._compose_cmd is not None:
+            return cls._compose_cmd
+        try:
+            result = subprocess.run(
+                ['docker', 'compose', 'version'],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                cls._compose_cmd = ['docker', 'compose']
+                return cls._compose_cmd
+        except Exception as e:
+            logger.error(f"Failed to detect docker compose v2: {e}")
+        # Fallback to docker-compose (v1)
+        cls._compose_cmd = ['docker-compose']
+        return cls._compose_cmd
+
+    @staticmethod
+    def is_docker_installed():
+        """Check if Docker is installed and running."""
+        try:
+            result = subprocess.run(
+                ['docker', 'version', '--format', 'json'],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'installed': True, 'info': json.loads(result.stdout)}
+            return {'installed': False, 'error': result.stderr}
+        except FileNotFoundError:
+            return {'installed': False, 'error': 'Docker not found'}
+        except Exception as e:
+            return {'installed': False, 'error': str(e)}
+
+    @staticmethod
+    def get_docker_info():
+        """Get Docker system information."""
+        try:
+            result = subprocess.run(
+                ['docker', 'info', '--format', '{{json .}}'],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return json.loads(result.stdout)
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get Docker info: {e}")
+            return None
+
+    # ==================== CONTAINER MANAGEMENT ====================
+
+    # ServerKit's own infrastructure containers run the panel itself, so their
+    # lifecycle must never be controllable from the Docker page — stopping,
+    # restarting or removing one would take ServerKit offline. Matched as a
+    # substring (case-insensitive) so both compose project names and the bare
+    # service names ('serverkit-backend', 'serverkit_frontend', ...) are caught.
+    PROTECTED_CONTAINER_NAMES = (
+        'serverkit-frontend', 'serverkit_frontend',
+        'serverkit-backend', 'serverkit_backend',
+        'serverkit',
+    )
+
+    @staticmethod
+    def is_protected_name(name):
+        """True if a container name belongs to ServerKit's own infrastructure."""
+        if not name:
+            return False
+        normalized = str(name).lower().replace('/', '')
+        return any(p in normalized for p in DockerService.PROTECTED_CONTAINER_NAMES)
+
+    @staticmethod
+    def is_protected_container(container_id):
+        """Resolve a container id/name to its real name and check protection.
+
+        Accepts either an id or a name. Uses `docker inspect`, whose top-level
+        ``Name`` key is the canonical name (e.g. ``/serverkit-backend``).
+        """
+        container = DockerService.get_container(container_id)
+        name = (container or {}).get('Name', '') if container else ''
+        # Fall back to the id itself when the user passed a name directly.
+        return DockerService.is_protected_name(name) or DockerService.is_protected_name(container_id)
+
+    @staticmethod
+    def list_containers(all_containers=True):
+        """List Docker containers."""
+        try:
+            cmd = ['docker', 'ps', '--format', '{{json .}}']
+            if all_containers:
+                cmd.insert(2, '-a')
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                return []
+
+            containers = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    container = json.loads(line)
+                    name = container.get('Names')
+                    containers.append({
+                        'id': container.get('ID'),
+                        'name': name,
+                        'image': container.get('Image'),
+                        'status': container.get('Status'),
+                        'state': container.get('State'),
+                        'ports': container.get('Ports'),
+                        'created': container.get('CreatedAt'),
+                        'size': container.get('Size'),
+                        # Flag ServerKit's own containers so the UI can hide
+                        # lifecycle controls; the API rejects them regardless.
+                        'protected': DockerService.is_protected_name(name),
+                    })
+            return containers
+        except Exception as e:
+            logger.error(f"Failed to list containers: {e}")
+            return []
+
+    @staticmethod
+    def get_container(container_id):
+        """Get detailed container information."""
+        try:
+            result = subprocess.run(
+                ['docker', 'inspect', container_id],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                if data:
+                    return data[0]
+            return None
+        except Exception as e:
+            logger.error(f"Failed to inspect container {container_id}: {e}")
+            return None
+
+    @staticmethod
+    def create_container(image, name=None, ports=None, volumes=None, env=None,
+                         network=None, restart_policy='unless-stopped', command=None):
+        """Create a new container."""
+        try:
+            cmd = ['docker', 'create']
+
+            if name:
+                cmd.extend(['--name', name])
+
+            if ports:
+                for port in ports:
+                    cmd.extend(['-p', port])
+
+            if volumes:
+                for volume in volumes:
+                    cmd.extend(['-v', volume])
+
+            if env:
+                for key, value in env.items():
+                    cmd.extend(['-e', f'{key}={value}'])
+
+            if network:
+                cmd.extend(['--network', network])
+
+            if restart_policy:
+                cmd.extend(['--restart', restart_policy])
+
+            cmd.append(image)
+
+            if command:
+                cmd.extend(shlex.split(command))
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                container_id = result.stdout.strip()
+                return {'success': True, 'container_id': container_id}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def run_container(image, name=None, ports=None, volumes=None, env=None,
+                      network=None, restart_policy='unless-stopped', command=None, detach=True):
+        """Run a new container (create and start)."""
+        try:
+            cmd = ['docker', 'run']
+
+            if detach:
+                cmd.append('-d')
+
+            if name:
+                cmd.extend(['--name', name])
+
+            if ports:
+                for port in ports:
+                    cmd.extend(['-p', port])
+
+            if volumes:
+                for volume in volumes:
+                    cmd.extend(['-v', volume])
+
+            if env:
+                for key, value in env.items():
+                    cmd.extend(['-e', f'{key}={value}'])
+
+            if network:
+                cmd.extend(['--network', network])
+
+            if restart_policy:
+                cmd.extend(['--restart', restart_policy])
+
+            cmd.append(image)
+
+            if command:
+                cmd.extend(shlex.split(command))
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                container_id = result.stdout.strip()
+                return {'success': True, 'container_id': container_id}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def start_container(container_id):
+        """Start a container."""
+        try:
+            result = subprocess.run(
+                ['docker', 'start', container_id],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def stop_container(container_id, timeout=10):
+        """Stop a container."""
+        try:
+            result = subprocess.run(
+                ['docker', 'stop', '-t', str(timeout), container_id],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                try:
+                    from app.services.workflow_engine import WorkflowEventBus
+                    WorkflowEventBus.emit('app_stopped', {
+                        'container_id': container_id
+                    })
+                except Exception as e:
+                    logger.error(f"Failed to emit app_stopped event: {e}")
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def restart_container(container_id, timeout=10):
+        """Restart a container."""
+        try:
+            result = subprocess.run(
+                ['docker', 'restart', '-t', str(timeout), container_id],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def remove_container(container_id, force=False, volumes=False):
+        """Remove a container."""
+        try:
+            cmd = ['docker', 'rm']
+            if force:
+                cmd.append('-f')
+            if volumes:
+                cmd.append('-v')
+            cmd.append(container_id)
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def get_container_logs(container_id, tail=100, since=None, timestamps=True):
+        """Get container logs."""
+        try:
+            cmd = ['docker', 'logs']
+            if tail:
+                cmd.extend(['--tail', str(tail)])
+            if since:
+                cmd.extend(['--since', since])
+            if timestamps:
+                cmd.append('-t')
+            cmd.append(container_id)
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            # Docker logs go to both stdout and stderr
+            logs = result.stdout + result.stderr
+            return {'success': True, 'logs': logs}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def stream_container_logs(container_id, tail=100, since=None, timestamps=True):
+        """Start streaming container logs in real-time.
+
+        Args:
+            container_id: Docker container ID or name
+            tail: Number of existing lines to fetch first (default: 100)
+            since: Only logs since this timestamp or duration (e.g., '10m', '1h')
+            timestamps: Include timestamps in output (default: True)
+
+        Returns:
+            subprocess.Popen object for the streaming process, or None on error
+        """
+        try:
+            cmd = ['docker', 'logs', '--follow']
+            if tail:
+                cmd.extend(['--tail', str(tail)])
+            if since:
+                cmd.extend(['--since', since])
+            if timestamps:
+                cmd.append('-t')
+            cmd.append(container_id)
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            return process
+        except Exception as e:
+            logger.error(f"Failed to start log stream for container {container_id}: {e}")
+            return None
+
+    @staticmethod
+    def _app_attr(app, name):
+        """Read an attribute from a model instance or dict."""
+        if isinstance(app, dict):
+            return app.get(name)
+        return getattr(app, name, None)
+
+    @classmethod
+    def get_app_container_id(cls, app):
+        """Get the main container ID for an application.
+
+        For apps with container_id set, use that directly.
+        For compose apps, query docker compose ps to find container.
+
+        Args:
+            app: Application model instance (or dict with container_id, root_path, compose_file)
+
+        Returns:
+            str: Container ID or name, or None if not found
+        """
+        container_id = cls._app_attr(app, 'container_id')
+        root_path = cls._app_attr(app, 'root_path')
+        compose_file = cls._app_attr(app, 'compose_file')
+
+        if container_id:
+            return container_id
+
+        if root_path:
+            containers = cls.compose_ps(root_path, compose_file=compose_file)
+            if containers:
+                return containers[0].get('ID') or containers[0].get('Name') or containers[0].get('id')
+
+        return None
+
+    @classmethod
+    def get_all_app_containers(cls, app):
+        """Get all container IDs for a compose application.
+
+        Args:
+            app: Application model instance (or dict with root_path, compose_file)
+
+        Returns:
+            list: List of container info dicts with 'id', 'name', 'service', 'state'
+        """
+        root_path = cls._app_attr(app, 'root_path')
+        compose_file = cls._app_attr(app, 'compose_file')
+
+        if not root_path:
+            container_id = cls._app_attr(app, 'container_id')
+            if container_id:
+                return [{'id': container_id, 'name': container_id, 'service': 'main', 'state': 'unknown'}]
+            return []
+
+        containers = cls.compose_ps(root_path, compose_file=compose_file)
+        result = []
+        for c in containers:
+            result.append({
+                'id': c.get('ID') or c.get('id'),
+                'name': c.get('Name') or c.get('name') or c.get('Names'),
+                'service': c.get('Service') or c.get('service'),
+                'state': c.get('State') or c.get('state') or c.get('Status', '').split()[0].lower()
+            })
+        return result
+
+    @staticmethod
+    def parse_log_line(line):
+        """Parse a Docker log line into structured format.
+
+        Docker logs with timestamps look like:
+        2024-01-15T10:30:45.123456789Z Log message here
+
+        Args:
+            line: Raw log line string
+
+        Returns:
+            dict: {
+                'timestamp': '2024-01-15T10:30:45.123456789Z' or None,
+                'message': 'Log message here',
+                'level': 'info' | 'warn' | 'error' | 'debug'
+            }
+        """
+        import re
+
+        if not line:
+            return {'timestamp': None, 'message': '', 'level': 'info'}
+
+        # Docker timestamp pattern: 2024-01-15T10:30:45.123456789Z
+        timestamp_pattern = r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s+'
+        match = re.match(timestamp_pattern, line)
+
+        timestamp = None
+        message = line
+
+        if match:
+            timestamp = match.group(1)
+            message = line[match.end():]
+
+        # Detect log level from message content
+        message_lower = message.lower()
+        level = 'info'
+
+        if any(x in message_lower for x in ['error', 'err:', 'fatal', 'exception', 'traceback']):
+            level = 'error'
+        elif any(x in message_lower for x in ['warn', 'warning']):
+            level = 'warn'
+        elif any(x in message_lower for x in ['debug', 'dbg:']):
+            level = 'debug'
+
+        return {
+            'timestamp': timestamp,
+            'message': message,
+            'level': level
+        }
+
+    @staticmethod
+    def parse_logs_to_lines(logs_text):
+        """Parse raw logs text into structured lines.
+
+        Args:
+            logs_text: Raw logs string with newlines
+
+        Returns:
+            list: List of parsed log line dicts
+        """
+        if not logs_text:
+            return []
+
+        lines = []
+        for line in logs_text.split('\n'):
+            if line.strip():
+                lines.append(DockerService.parse_log_line(line))
+        return lines
+
+    @staticmethod
+    def get_container_state(container_id):
+        """Get the current state of a container.
+
+        Args:
+            container_id: Docker container ID or name
+
+        Returns:
+            dict: {'running': bool, 'state': str, 'status': str} or None if not found
+        """
+        info = DockerService.get_container(container_id)
+        if not info:
+            return None
+
+        state = info.get('State', {})
+        return {
+            'running': state.get('Running', False),
+            'state': state.get('Status', 'unknown'),
+            'status': state.get('Status', 'unknown'),
+            'started_at': state.get('StartedAt'),
+            'finished_at': state.get('FinishedAt')
+        }
+
+    @staticmethod
+    def get_container_stats(container_id):
+        """Get container resource usage stats."""
+        try:
+            result = subprocess.run(
+                ['docker', 'stats', '--no-stream', '--format', '{{json .}}', container_id],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return json.loads(result.stdout.strip())
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get stats for container {container_id}: {e}")
+            return None
+
+    @staticmethod
+    def get_containers_stats(container_ids):
+        """Get resource usage stats for multiple containers in one Docker call."""
+        if not container_ids:
+            return {}
+
+        try:
+            cleaned_ids = [str(container_id) for container_id in container_ids if container_id]
+            if not cleaned_ids:
+                return {}
+
+            result = subprocess.run(
+                ['docker', 'stats', '--no-stream', '--format', '{{json .}}', *cleaned_ids],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                logger.error(f"Failed to get container stats: {result.stderr.strip()}")
+                return {}
+
+            stats_map = {}
+            for line in result.stdout.splitlines():
+                if not line.strip():
+                    continue
+                stats = json.loads(line)
+                for key in (stats.get('ID'), stats.get('Container'), stats.get('Name')):
+                    if key:
+                        stats_map[key] = stats
+            return stats_map
+        except Exception as e:
+            logger.error(f"Failed to get bulk container stats: {e}")
+            return {}
+
+    @staticmethod
+    def exec_command(container_id, command, interactive=False, tty=False):
+        """Execute a command in a running container."""
+        try:
+            cmd = ['docker', 'exec']
+            if interactive:
+                cmd.append('-i')
+            if tty:
+                cmd.append('-t')
+            cmd.append(container_id)
+            cmd.extend(shlex.split(command))
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            return {
+                'success': result.returncode == 0,
+                'stdout': result.stdout,
+                'stderr': result.stderr,
+                'return_code': result.returncode
+            }
+        except subprocess.TimeoutExpired:
+            return {'success': False, 'error': 'Command timed out'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    # ==================== IMAGE MANAGEMENT ====================
+
+    @staticmethod
+    def list_images():
+        """List Docker images."""
+        try:
+            result = subprocess.run(
+                ['docker', 'images', '--format', '{{json .}}'],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return []
+
+            images = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    image = json.loads(line)
+                    images.append({
+                        'id': image.get('ID'),
+                        'repository': image.get('Repository'),
+                        'tag': image.get('Tag'),
+                        'size': image.get('Size'),
+                        'created': image.get('CreatedAt'),
+                    })
+            return images
+        except Exception as e:
+            logger.error(f"Failed to list images: {e}")
+            return []
+
+    @staticmethod
+    def pull_image(image_name, tag='latest', registry=None):
+        """Pull an image from a registry.
+
+        When ``registry`` (a ``ContainerRegistry``) is provided, ``docker login``
+        runs first and ``docker logout`` after, so private images pull with the
+        stored credentials. Login/pull/logout is wrapped in ``try/finally`` so we
+        always log out — even when the pull fails. The signature stays
+        backward-compatible: ``registry=None`` is an anonymous pull (today's
+        behavior).
+        """
+        full_name = f'{image_name}:{tag}' if tag else image_name
+        logged_in = False
+        try:
+            if registry is not None:
+                from app.services.container_registry_service import ContainerRegistryService
+                login = ContainerRegistryService.login(registry)
+                if not login.get('success'):
+                    return {'success': False,
+                            'error': f"Registry login failed: {login.get('error')}"}
+                logged_in = True
+
+            result = subprocess.run(
+                ['docker', 'pull', full_name],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True, 'output': result.stdout}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+        finally:
+            if logged_in and registry is not None:
+                from app.services.container_registry_service import ContainerRegistryService
+                ContainerRegistryService.logout(registry.login_host())
+
+    @staticmethod
+    def remove_image(image_id, force=False):
+        """Remove an image."""
+        try:
+            cmd = ['docker', 'rmi']
+            if force:
+                cmd.append('-f')
+            cmd.append(image_id)
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def build_image(path, tag, dockerfile='Dockerfile', no_cache=False):
+        """Build an image from Dockerfile."""
+        try:
+            cmd = ['docker', 'build', '-t', tag]
+            if dockerfile != 'Dockerfile':
+                cmd.extend(['-f', dockerfile])
+            if no_cache:
+                cmd.append('--no-cache')
+            cmd.append(path)
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return {'success': True, 'output': result.stdout}
+            return {'success': False, 'error': result.stderr, 'output': result.stdout}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def tag_image(source, target):
+        """Tag an image."""
+        try:
+            result = subprocess.run(
+                ['docker', 'tag', source, target],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    # ==================== NETWORK MANAGEMENT ====================
+
+    @staticmethod
+    def list_networks():
+        """List Docker networks."""
+        try:
+            result = subprocess.run(
+                ['docker', 'network', 'ls', '--format', '{{json .}}'],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return []
+
+            networks = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    network = json.loads(line)
+                    networks.append({
+                        'id': network.get('ID'),
+                        'name': network.get('Name'),
+                        'driver': network.get('Driver'),
+                        'scope': network.get('Scope'),
+                    })
+            return networks
+        except Exception as e:
+            logger.error(f"Failed to list networks: {e}")
+            return []
+
+    @staticmethod
+    def create_network(name, driver='bridge'):
+        """Create a Docker network."""
+        try:
+            result = subprocess.run(
+                ['docker', 'network', 'create', '--driver', driver, name],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True, 'network_id': result.stdout.strip()}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def remove_network(network_id):
+        """Remove a Docker network."""
+        try:
+            result = subprocess.run(
+                ['docker', 'network', 'rm', network_id],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    # ==================== VOLUME MANAGEMENT ====================
+
+    @staticmethod
+    def list_volumes():
+        """List Docker volumes."""
+        try:
+            result = subprocess.run(
+                ['docker', 'volume', 'ls', '--format', '{{json .}}'],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return []
+
+            volumes = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    volume = json.loads(line)
+                    volumes.append({
+                        'name': volume.get('Name'),
+                        'driver': volume.get('Driver'),
+                        'mountpoint': volume.get('Mountpoint'),
+                    })
+            return volumes
+        except Exception as e:
+            logger.error(f"Failed to list volumes: {e}")
+            return []
+
+    @staticmethod
+    def create_volume(name, driver='local'):
+        """Create a Docker volume."""
+        try:
+            result = subprocess.run(
+                ['docker', 'volume', 'create', '--driver', driver, name],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True, 'volume_name': result.stdout.strip()}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def remove_volume(volume_name, force=False):
+        """Remove a Docker volume."""
+        try:
+            cmd = ['docker', 'volume', 'rm']
+            if force:
+                cmd.append('-f')
+            cmd.append(volume_name)
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def inspect_volume(name):
+        """Live state of a named volume: {'present', 'mountpoint', 'driver'}."""
+        try:
+            result = subprocess.run(
+                ['docker', 'volume', 'inspect', name],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return {'present': False, 'mountpoint': None, 'driver': None}
+            data = json.loads(result.stdout or '[]')
+            info = data[0] if data else {}
+            return {'present': True, 'mountpoint': info.get('Mountpoint'),
+                    'driver': info.get('Driver')}
+        except Exception:
+            return {'present': False, 'mountpoint': None, 'driver': None}
+
+    @staticmethod
+    def containers_using_volume(name, running_only=False):
+        """Names of containers referencing a volume. ``running_only`` limits it to
+        currently-running containers (the guard for a safe wipe)."""
+        try:
+            cmd = ['docker', 'ps']
+            if not running_only:
+                cmd.append('-a')
+            cmd += ['--filter', f'volume={name}', '--format', '{{.Names}}']
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                return []
+            return [n for n in result.stdout.strip().split('\n') if n]
+        except Exception:
+            return []
+
+    # ==================== DOCKER COMPOSE ====================
+
+    @classmethod
+    def _compose_base_cmd(cls, compose_file=None):
+        """Build the base docker compose command, optionally targeting a
+        specific compose file. The file path may be absolute or relative to
+        the project directory."""
+        cmd = cls._get_compose_cmd()
+        if compose_file:
+            cmd = cmd + ['-f', compose_file]
+        return cmd
+
+    @classmethod
+    def _compose_cmd_with_overlay(cls, project_path, compose_file=None):
+        """Base compose command, including the ServerKit env override when one
+        applies.
+
+        For a managed compose app this regenerates ``docker-compose.serverkit.yml``
+        (the app's effective env: shared variable groups under its own local env
+        vars) and adds it as a second ``-f`` so those values reach the containers.
+        For non-app dirs (e.g. a proxy stack) or apps with no effective env it
+        falls back to the plain base command unchanged. Best-effort — never raises.
+        """
+        try:
+            from app.services.compose_env_service import ComposeEnvService
+            override = ComposeEnvService.refresh_for_project(project_path, compose_file)
+            if override:
+                base = ComposeEnvService.find_base_compose(project_path, compose_file)
+                if base:
+                    return cls._get_compose_cmd() + ['-f', base, '-f', override]
+        except Exception as e:  # pragma: no cover - defensive
+            logger.debug('compose overlay command build failed for %s: %s', project_path, e)
+        return cls._compose_base_cmd(compose_file)
+
+    @classmethod
+    def compose_list(cls):
+        """List Docker Compose projects known to the Docker CLI."""
+        try:
+            result = subprocess.run(
+                cls._get_compose_cmd() + ['ls', '--format', 'json'],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                output = result.stdout.strip()
+                try:
+                    parsed = json.loads(output)
+                    if isinstance(parsed, list):
+                        return parsed
+                    if isinstance(parsed, dict):
+                        return [parsed]
+                except json.JSONDecodeError:
+                    projects = []
+                    for line in output.split('\n'):
+                        line = line.strip()
+                        if not line or line.startswith('time=') or line.startswith('WARN'):
+                            continue
+                        try:
+                            parsed = json.loads(line)
+                            if isinstance(parsed, list):
+                                projects.extend(parsed)
+                            elif isinstance(parsed, dict):
+                                projects.append(parsed)
+                        except json.JSONDecodeError:
+                            continue
+                    return projects
+
+            return DockerService._compose_list_from_container_labels()
+        except Exception as e:
+            logger.error(f"Failed to list compose projects: {e}")
+            return []
+
+    @staticmethod
+    def _compose_list_from_container_labels():
+        """Fallback for older compose binaries without `compose ls --format json`."""
+        try:
+            result = subprocess.run(
+                ['docker', 'ps', '-a', '--format', '{{json .}}'],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return []
+
+            projects = {}
+            for line in result.stdout.strip().split('\n'):
+                if not line:
+                    continue
+                container = json.loads(line)
+                labels = {}
+                for label in (container.get('Labels') or '').split(','):
+                    if '=' in label:
+                        key, value = label.split('=', 1)
+                        labels[key] = value
+
+                project = labels.get('com.docker.compose.project')
+                if not project:
+                    continue
+
+                entry = projects.setdefault(project, {
+                    'Name': project,
+                    'Status': '',
+                    'ConfigFiles': labels.get('com.docker.compose.project.config_files', ''),
+                    'Running': 0,
+                    'Containers': 0
+                })
+                entry['Containers'] += 1
+                if (container.get('State') or '').lower() == 'running':
+                    entry['Running'] += 1
+
+            for project in projects.values():
+                running = project.pop('Running', 0)
+                total = project.pop('Containers', 0)
+                stopped = max(total - running, 0)
+                status_parts = []
+                if running:
+                    status_parts.append(f'running({running})')
+                if stopped:
+                    status_parts.append(f'exited({stopped})')
+                project['Status'] = ', '.join(status_parts) or 'unknown'
+
+            return list(projects.values())
+        except Exception as e:
+            logger.error(f"Failed to build compose project fallback list: {e}")
+            return []
+
+    @classmethod
+    def compose_up(cls, project_path, detach=True, build=False, compose_file=None):
+        """Start Docker Compose services.
+
+        Injects the managed env override (shared variable groups + the app's own
+        local env vars) for managed compose apps via ``_compose_cmd_with_overlay``.
+        ``up -d`` recreates containers whose merged config changed, so updated env
+        takes effect on the next deploy.
+        """
+        try:
+            cmd = cls._compose_cmd_with_overlay(project_path, compose_file) + ['up']
+            if detach:
+                cmd.append('-d')
+            if build:
+                cmd.append('--build')
+
+            result = subprocess.run(
+                cmd, cwd=project_path,
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True, 'output': result.stdout}
+            return {'success': False, 'error': result.stderr, 'output': result.stdout}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @classmethod
+    def compose_down(cls, project_path, volumes=False, remove_orphans=True, compose_file=None):
+        """Stop Docker Compose services."""
+        try:
+            cmd = cls._compose_base_cmd(compose_file) + ['down']
+            if volumes:
+                cmd.append('-v')
+            if remove_orphans:
+                cmd.append('--remove-orphans')
+
+            result = subprocess.run(
+                cmd, cwd=project_path,
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True, 'output': result.stdout}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @classmethod
+    def compose_ps(cls, project_path, compose_file=None):
+        """List Docker Compose services.
+
+        Handles multiple output formats from docker compose ps --format json:
+        - NDJSON: One JSON object per line (common in newer versions)
+        - JSON Array: Single line with array of objects
+        - Mixed: Warning messages (time=...) mixed with JSON
+
+        Returns a list of container dictionaries.
+        """
+        try:
+            result = subprocess.run(
+                cls._compose_base_cmd(compose_file) + ['ps', '--format', 'json'],
+                cwd=project_path,
+                capture_output=True, text=True
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                containers = []
+                for line in result.stdout.strip().split('\n'):
+                    line = line.strip()
+                    # Skip empty lines and warning messages (e.g., "time=..." from docker)
+                    if not line or line.startswith('time=') or line.startswith('WARN'):
+                        continue
+                    try:
+                        parsed = json.loads(line)
+                        # Handle both single object and array cases
+                        if isinstance(parsed, list):
+                            # JSON array on single line
+                            containers.extend(parsed)
+                        elif isinstance(parsed, dict):
+                            # Single JSON object (NDJSON format)
+                            containers.append(parsed)
+                        # Skip if neither dict nor list (shouldn't happen)
+                    except json.JSONDecodeError:
+                        continue
+                return containers
+            return []
+        except Exception as e:
+            logger.error(f"Failed to list compose services: {e}")
+            return []
+
+    @classmethod
+    def compose_logs(cls, project_path, service=None, tail=100, compose_file=None):
+        """Get Docker Compose logs."""
+        try:
+            cmd = cls._compose_base_cmd(compose_file) + ['logs', '--tail', str(tail)]
+            if service:
+                cmd.append(service)
+
+            result = subprocess.run(
+                cmd, cwd=project_path,
+                capture_output=True, text=True
+            )
+            return {'success': True, 'logs': result.stdout + result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @classmethod
+    def compose_restart(cls, project_path, service=None, compose_file=None):
+        """Restart Docker Compose services."""
+        try:
+            cmd = cls._compose_base_cmd(compose_file) + ['restart']
+            if service:
+                cmd.append(service)
+
+            result = subprocess.run(
+                cmd, cwd=project_path,
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @classmethod
+    def compose_pull(cls, project_path, service=None, compose_file=None):
+        """Pull Docker Compose images."""
+        try:
+            cmd = cls._compose_base_cmd(compose_file) + ['pull']
+            if service:
+                cmd.append(service)
+
+            result = subprocess.run(
+                cmd, cwd=project_path,
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True, 'output': result.stdout}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @classmethod
+    def validate_compose_file(cls, project_path, compose_file=None):
+        """Validate a Docker Compose file."""
+        try:
+            result = subprocess.run(
+                cls._compose_base_cmd(compose_file) + ['config', '--quiet'],
+                cwd=project_path,
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'valid': True}
+            return {'valid': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @classmethod
+    def get_compose_config(cls, project_path, compose_file=None):
+        """Get parsed Docker Compose configuration."""
+        try:
+            result = subprocess.run(
+                cls._compose_base_cmd(compose_file) + ['config'],
+                cwd=project_path,
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                return {'success': True, 'config': yaml.safe_load(result.stdout)}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    # ==================== UTILITY ====================
+
+    @staticmethod
+    def prune_system(all_unused=False, volumes=False):
+        """Remove unused Docker resources."""
+        try:
+            cmd = ['docker', 'system', 'prune', '-f']
+            if all_unused:
+                cmd.append('-a')
+            if volumes:
+                cmd.append('--volumes')
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return {'success': True, 'output': result.stdout}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def get_disk_usage():
+        """Get Docker disk usage."""
+        try:
+            result = subprocess.run(
+                ['docker', 'system', 'df', '--format', '{{json .}}'],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return []
+
+            usage = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    usage.append(json.loads(line))
+            return usage
+        except Exception as e:
+            logger.error(f"Failed to get Docker disk usage: {e}")
+            return []
+
+    @staticmethod
+    def create_docker_app(app_path, app_name, image, ports=None, volumes=None, env=None,
+                          named_volumes=None):
+        """Create a Docker-based application with docker-compose.
+
+        ``named_volumes`` is a list of managed Docker volume names to declare as
+        top-level (``external: false``) volumes — Compose requires the top-level
+        declaration for any named volume referenced by a service. Callers pass the
+        matching ``name:/mount`` specs in ``volumes`` (see AppVolume.mount_spec).
+        """
+        try:
+            os.makedirs(app_path, exist_ok=True)
+
+            # Create docker-compose.yml
+            compose = {
+                'version': '3.8',
+                'services': {
+                    app_name: {
+                        'image': image,
+                        'container_name': app_name,
+                        'restart': 'unless-stopped',
+                    }
+                }
+            }
+
+            if ports:
+                compose['services'][app_name]['ports'] = ports
+
+            if volumes:
+                compose['services'][app_name]['volumes'] = volumes
+
+            if env:
+                compose['services'][app_name]['environment'] = env
+
+            if named_volumes:
+                # Top-level named volumes so a redeploy reuses the same volume
+                # instead of a fresh anonymous one.
+                compose['volumes'] = {name: {} for name in named_volumes}
+
+            compose_path = os.path.join(app_path, 'docker-compose.yml')
+            with open(compose_path, 'w') as f:
+                yaml.dump(compose, f, default_flow_style=False)
+
+            # Create .env file
+            if env:
+                env_path = os.path.join(app_path, '.env')
+                with open(env_path, 'w') as f:
+                    for key, value in env.items():
+                        f.write(f'{key}={value}\n')
+
+            return {
+                'success': True,
+                'app_path': app_path,
+                'compose_file': compose_path
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    # ==================== DIAGNOSTICS ====================
+
+    @staticmethod
+    def check_port_accessible(port: int, host: str = '127.0.0.1') -> dict:
+        """Check if a port is accessible (something is listening).
+
+        Args:
+            port: The port number to check
+            host: The host address to check (default: 127.0.0.1)
+
+        Returns:
+            Dict with 'accessible' boolean and additional info
+        """
+        import socket
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            result = sock.connect_ex((host, port))
+            sock.close()
+            return {
+                'accessible': result == 0,
+                'port': port,
+                'host': host
+            }
+        except Exception as e:
+            return {'accessible': False, 'port': port, 'host': host, 'error': str(e)}
+
+    @staticmethod
+    def get_container_port_bindings(container_name: str) -> dict:
+        """Get port bindings for a container.
+
+        Args:
+            container_name: Name or ID of the container
+
+        Returns:
+            Dict with 'success' boolean and 'ports' mapping
+        """
+        try:
+            result = subprocess.run(
+                ['docker', 'inspect', '--format', '{{json .NetworkSettings.Ports}}', container_name],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                ports = json.loads(result.stdout.strip())
+                return {'success': True, 'ports': ports}
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    @staticmethod
+    def get_container_network_info(container_name: str) -> dict:
+        """Get network information for a container.
+
+        Args:
+            container_name: Name or ID of the container
+
+        Returns:
+            Dict with network settings including IP addresses and ports
+        """
+        try:
+            result = subprocess.run(
+                ['docker', 'inspect', '--format', '{{json .NetworkSettings}}', container_name],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                network_settings = json.loads(result.stdout.strip())
+                return {
+                    'success': True,
+                    'ip_address': network_settings.get('IPAddress'),
+                    'ports': network_settings.get('Ports'),
+                    'networks': network_settings.get('Networks'),
+                    'gateway': network_settings.get('Gateway')
+                }
+            return {'success': False, 'error': result.stderr}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}

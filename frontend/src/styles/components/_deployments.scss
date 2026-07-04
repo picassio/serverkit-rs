@@ -1,0 +1,295 @@
+// ============================================
+// DEPLOYMENT TIMELINE + CONFIG DIFF
+// ============================================
+// Vertical snapshot timeline and the config diff modal in an app's Deploy tab.
+// Themed via design-system tokens (no inline styles).
+
+// ---------------------------------------------------------------- Timeline
+.deploy-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    &--empty {
+        align-items: center;
+        gap: $space-2;
+        padding: $space-8;
+        color: $text-secondary;
+        text-align: center;
+        background: $bg-card;
+        border: 1px dashed $border-subtle;
+        border-radius: $radius-lg;
+
+        svg {
+            color: $text-tertiary;
+        }
+    }
+
+    &__loading {
+        color: $text-secondary;
+        padding: $space-4 0;
+    }
+
+    &__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        position: relative;
+    }
+
+    // The vertical spine that connects markers.
+    &__item {
+        position: relative;
+        padding-left: $space-8;
+        padding-bottom: $space-4;
+
+        &::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: $border-subtle;
+        }
+
+        &:last-child::before {
+            bottom: auto;
+            height: 16px;
+        }
+    }
+
+    &__marker {
+        position: absolute;
+        left: 0;
+        top: 4px;
+        width: 16px;
+        height: 16px;
+        border-radius: $radius-full;
+        background: $bg-elevated;
+        border: 2px solid $border-subtle;
+        z-index: 1;
+
+        &--current {
+            background: $success;
+            border-color: $success;
+            box-shadow: 0 0 0 4px $success-bg;
+        }
+    }
+
+    &__card {
+        background: $bg-card;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-lg;
+        padding: $space-4;
+        display: flex;
+        flex-direction: column;
+        gap: $space-3;
+    }
+
+    &__row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+        flex-wrap: wrap;
+    }
+
+    &__meta {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        flex-wrap: wrap;
+    }
+
+    &__time {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-1;
+        color: $text-tertiary;
+        font-size: 0.8125rem;
+    }
+
+    &__details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+    }
+
+    &__chip {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-1;
+        padding: 2px $space-2;
+        background: $bg-elevated;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        color: $text-secondary;
+        font-size: 0.8125rem;
+        font-family: $font-mono;
+    }
+
+    &__summary {
+        margin: 0;
+        color: $text-secondary;
+        font-size: 0.8125rem;
+    }
+}
+
+// ---------------------------------------------------------------- Timeline card
+.deploy-timeline-card {
+    &__hint {
+        margin: 0 0 $space-4;
+        color: $text-secondary;
+        font-size: 0.8125rem;
+        max-width: 70ch;
+    }
+}
+
+// ---------------------------------------------------------------- Config diff
+.config-diff {
+    max-width: 640px;
+    width: 100%;
+
+    &__body {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+        max-height: 60vh;
+        overflow-y: auto;
+        padding: $space-2 0;
+    }
+
+    &__loading {
+        color: $text-secondary;
+    }
+
+    // Plain-language summary, shown prominently above the technical diff so a
+    // less-technical user knows what they're looking at / rolling back.
+    &__summary-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-2;
+        padding: $space-3;
+        background: $info-bg;
+        border: 1px solid $info-border;
+        border-radius: $radius-md;
+    }
+
+    &__summary-icon {
+        flex-shrink: 0;
+        margin-top: 1px;
+        color: $info;
+    }
+
+    &__summary-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    &__summary-label {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: $text-tertiary;
+    }
+
+    &__summary {
+        margin: 0;
+        color: $text-primary;
+        font-size: 0.9375rem;
+        line-height: 1.4;
+    }
+
+    &__section {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+    }
+
+    &__section-title {
+        margin: 0;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: $text-secondary;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    &__none {
+        margin: 0;
+        color: $text-tertiary;
+        font-size: 0.8125rem;
+    }
+
+    &__lines {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    &__line {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        padding: 2px $space-2;
+        border-radius: $radius-sm;
+        font-family: $font-mono;
+        font-size: 0.8125rem;
+
+        &--add {
+            background: $success-bg;
+            color: $success;
+        }
+
+        &--remove {
+            background: $danger-bg;
+            color: $danger;
+        }
+
+        &--change {
+            background: $warning-bg;
+            color: $warning;
+        }
+    }
+
+    &__sign {
+        font-weight: 700;
+        width: 12px;
+        display: inline-block;
+        text-align: center;
+    }
+
+    &__scalar {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        flex-wrap: wrap;
+        font-family: $font-mono;
+        font-size: 0.8125rem;
+    }
+
+    &__old {
+        color: $danger;
+        text-decoration: line-through;
+    }
+
+    &__new {
+        color: $success;
+    }
+
+    &__arrow {
+        color: $text-tertiary;
+    }
+
+    &__confirm-text {
+        margin-right: auto;
+        color: $text-secondary;
+        font-size: 0.875rem;
+    }
+}

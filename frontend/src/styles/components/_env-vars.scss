@@ -1,0 +1,340 @@
+// ============================================
+// ENVIRONMENT VARIABLES COMPONENT
+// ============================================
+
+.env-vars-container {
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-4;
+
+        h3 {
+            margin: 0;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: $space-2;
+        }
+    }
+
+    .hint {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+        margin-bottom: $space-6;
+    }
+}
+
+// Add new variable form
+.env-add-form {
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    padding: $space-4;
+    margin-bottom: $space-6;
+
+    .env-form-row {
+        display: flex;
+        gap: $space-2;
+        margin-bottom: $space-2;
+    }
+
+    .env-key-input {
+        width: 200px;
+        flex-shrink: 0;
+        font-family: $font-mono;
+        text-transform: uppercase;
+    }
+
+    .env-value-input {
+        flex: 1;
+    }
+
+    .env-secret-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: $bg-hover;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-sm;
+        cursor: pointer;
+        color: $text-tertiary;
+        transition: all 0.2s;
+
+        input {
+            display: none;
+        }
+
+        &:hover {
+            border-color: $accent-primary;
+            color: $accent-primary;
+        }
+
+        &:has(input:checked) {
+            background: fade($accent-primary-raw, 20%);
+            border-color: $accent-primary;
+            color: $accent-primary;
+        }
+    }
+
+    .env-description-input {
+        flex: 1;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+    }
+
+    // Second form row: description + optional compose-service target
+    .env-form-meta-row {
+        display: flex;
+        gap: $space-2;
+        align-items: stretch;
+    }
+}
+
+// "Applies to" selector — compose-service targeting (add form)
+.env-target-select {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-shrink: 0;
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+
+    &__label {
+        white-space: nowrap;
+    }
+
+    select,
+    &__control {
+        padding: $space-2 $space-3;
+        background: $bg-body;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-sm;
+        color: $text-primary;
+        font-size: $font-size-sm;
+
+        &:hover {
+            border-color: $border-active;
+        }
+    }
+}
+
+// Standalone select control used in the inline edit row
+.env-target-select__control {
+    padding: $space-2 $space-3;
+    background: $bg-body;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    color: $text-primary;
+    font-size: $font-size-sm;
+    flex-shrink: 0;
+
+    &:hover {
+        border-color: $border-active;
+    }
+}
+
+// Filter
+.env-filter {
+    position: relative;
+    margin-bottom: $space-4;
+
+    input {
+        width: 100%;
+        padding-right: 36px;
+    }
+
+    .filter-clear {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: $text-tertiary;
+        cursor: pointer;
+        font-size: 18px;
+        padding: 4px 8px;
+
+        &:hover {
+            color: $text-primary;
+        }
+    }
+}
+
+// Variables list
+.env-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+}
+
+.env-item {
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    padding: $space-4;
+    transition: border-color 0.2s;
+
+    &:hover {
+        border-color: $border-active;
+    }
+
+    &.is-secret {
+        border-left: 3px solid $warning;
+    }
+
+    .env-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-1;
+    }
+
+    .env-key {
+        font-family: $font-mono;
+        font-weight: 600;
+        color: $text-primary;
+        display: flex;
+        align-items: center;
+        gap: $space-1;
+
+        .secret-badge {
+            color: $warning;
+        }
+    }
+
+    .env-item-actions {
+        display: flex;
+        gap: $space-1;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    &:hover .env-item-actions {
+        opacity: 1;
+    }
+
+    .env-value {
+        font-family: $font-mono;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        word-break: break-all;
+        padding: $space-1 0;
+    }
+
+    .env-description {
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        margin-top: $space-1;
+        font-style: italic;
+    }
+
+    .env-edit-row {
+        display: flex;
+        gap: $space-2;
+        margin-top: $space-2;
+        flex-wrap: wrap;
+
+        input {
+            flex: 1;
+            font-family: $font-mono;
+        }
+    }
+}
+
+// Subtle chip showing the compose service a variable is scoped to.
+// Standalone so it can be reused in the shared-variables table too.
+.env-target-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    padding: 1px $space-2;
+    border-radius: $radius-sm;
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    font-weight: 600;
+    line-height: 1.5;
+    color: $accent-primary;
+    background: rgba($accent-primary-raw, 0.12);
+    border: 1px solid rgba($accent-primary-raw, 0.22);
+    white-space: nowrap;
+}
+
+.btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: $radius-sm;
+    color: $text-tertiary;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: $bg-hover;
+        color: $text-primary;
+    }
+
+    &.btn-danger:hover {
+        background: fade($danger, 20%);
+        color: $danger;
+    }
+}
+
+// Empty state
+.env-empty {
+    text-align: center;
+    padding: $space-8;
+    color: $text-tertiary;
+    background: $bg-card;
+    border: 1px dashed $border-subtle;
+    border-radius: $radius-md;
+}
+
+// Footer
+.env-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: $space-6;
+    padding-top: $space-4;
+    border-top: 1px solid $border-subtle;
+
+    .env-count {
+        color: $text-tertiary;
+        font-size: $font-size-sm;
+    }
+}
+
+// Import modal specific
+.import-file-upload {
+    margin-bottom: $space-4;
+}
+
+.import-textarea {
+    width: 100%;
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+    background: $bg-body;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    padding: $space-4;
+    resize: vertical;
+    min-height: 200px;
+
+    &::placeholder {
+        color: $text-tertiary;
+    }
+}
+
+// Modal large variant
+.modal-lg {
+    max-width: 700px;
+}

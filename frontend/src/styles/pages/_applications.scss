@@ -1,0 +1,1840 @@
+// ============================================
+// APPLICATIONS PAGES (redesign — infra console look)
+// ============================================
+// 1. Applications list (pages/Applications.jsx): KPI strip + dense table.
+// 2. Shared `app-*` detail chrome — BASE styles consumed by THREE pages:
+//      - pages/ApplicationDetail.jsx (this feature)
+//      - pages/WordPressDetail.jsx   (already restyled; `.wp-detail-page`
+//        overrides in _wordpress.scss layer the SAME spec on top — keep the
+//        base values aligned with that spec so the overrides stay harmless)
+//      - pages/WordPressProject.jsx  (no overrides; inherits this base)
+//    Selector names and structural layout roles are preserved on purpose.
+// 3. ApplicationDetail tab internals — re-tints of shared classes scoped
+//    under `.app-detail-page` so they cannot leak into other pages.
+// ============================================
+
+// Applications page wrapper
+.applications-page {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+}
+
+// ============================================
+// LIST — KPI STRIP
+// ============================================
+
+.apps-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: $space-4;
+
+    @media (max-width: $breakpoint-lg) {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: $breakpoint-sm) {
+        grid-template-columns: 1fr;
+    }
+}
+
+// ============================================
+// LIST — CARD + FILTER BAR + DENSE TABLE
+// ============================================
+
+.apps-list-card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.apps-list-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: $space-3;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.apps-search {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 $space-3;
+    min-width: 230px;
+    transition: border-color $transition-fast;
+
+    &:focus-within {
+        border-color: var(--accent-primary);
+    }
+
+    svg {
+        color: var(--text-faint);
+        flex-shrink: 0;
+    }
+
+    input {
+        flex: 1;
+        background: none;
+        border: none;
+        padding: 7px 0;
+        color: var(--text);
+        font-size: 13px;
+        outline: none;
+        box-shadow: none;
+        min-width: 0;
+
+        &::placeholder {
+            color: var(--text-faint);
+        }
+    }
+}
+
+.apps-table {
+    th:last-child,
+    td:last-child {
+        text-align: right;
+    }
+
+    .sk-cell-name > div {
+        min-width: 0;
+    }
+}
+
+// Tinted type glyph tile (brand colors arrive via inline style props,
+// same convention as the Services list type icon)
+.apps-type-ico {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: $font-weight-bold;
+}
+
+// Mono type chip (brand colors via inline style props)
+.apps-type-chip {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 5px;
+    border: 1px solid;
+    white-space: nowrap;
+}
+
+.apps-domain {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-family: var(--mono);
+    font-size: 12px;
+
+    a {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--text-dim);
+        text-decoration: none;
+
+        svg {
+            color: var(--text-faint);
+            flex-shrink: 0;
+        }
+
+        &:hover {
+            color: var(--accent-bright);
+        }
+    }
+}
+
+.apps-none {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-ghost);
+}
+
+// CPU / RAM mini gauges (token colors: CPU accent-bright, RAM cyan)
+.apps-res {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+
+    & + & {
+        margin-top: 6px;
+    }
+
+    .sk-gauge {
+        width: 88px;
+        flex-shrink: 0;
+    }
+
+    &__label {
+        width: 28px;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        flex-shrink: 0;
+    }
+
+    &__val {
+        width: 36px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-dim);
+        text-align: right;
+        flex-shrink: 0;
+    }
+}
+
+.is-faded {
+    opacity: 0.45;
+}
+
+// Per-row icon actions (tones via modifier classes, no inline hex)
+.apps-actions-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    white-space: nowrap;
+}
+
+.apps-icon-action {
+    width: 27px;
+    height: 27px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+
+    &:hover {
+        background: var(--surface-3);
+        color: var(--text);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    &--green:hover {
+        background: var(--green-bg);
+        color: var(--green);
+    }
+
+    &--red:hover {
+        background: var(--red-bg);
+        color: var(--red);
+    }
+}
+
+// Logs modal (list page) — console well on the code surface
+.app-logs-modal {
+    .app-logs-controls {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: $space-3;
+    }
+
+    .app-logs-select {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 10px;
+        color: var(--text);
+        font-size: 13px;
+        cursor: pointer;
+
+        &:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+    }
+
+    .log-viewer {
+        background: var(--bg-code);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        color: var(--text-code);
+        font-family: var(--mono);
+        font-size: 12.5px;
+    }
+}
+
+// ============================================
+// SHARED CHIPS (other consumers live outside these pages)
+// ============================================
+
+// Used by components/LinkAppModal.jsx
+.app-type-badge {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent-bright);
+    background: var(--accent-bg);
+    padding: 2px 7px;
+    border-radius: 5px;
+}
+
+// Used by pages/Firewall.jsx
+.port-status {
+    font-size: $font-size-xs;
+    margin-left: $space-2;
+
+    &.accessible {
+        color: $success;
+    }
+
+    &.not-accessible {
+        color: $danger;
+    }
+}
+
+// Used by components/wordpress/HealthStatusPanel.jsx
+.panel-empty {
+    text-align: center;
+    padding: $space-6;
+    color: var(--text-faint);
+    font-size: 13px;
+}
+
+// Icon-only button (legacy global utility; LinkedAppsSection consumes it)
+.btn-icon {
+    padding: $space-2 !important;
+
+    svg {
+        margin: 0 !important;
+    }
+}
+
+// ============================================
+// APP DETAIL — SHARED BASE CHROME
+// (visual spec matches the `.wp-detail-page` overrides in _wordpress.scss)
+// ============================================
+
+.app-detail-page {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    // Detail pages (WordPress site/project, etc.) run full-bleed across the
+    // content area — no 1400px cap — so the wide top action bar + tab strip
+    // and the two-column panels have room to breathe.
+    &--wide {
+        width: 100%;
+        max-width: none;
+    }
+}
+
+// Top bar with breadcrumbs and actions
+.app-detail-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: $space-4;
+    flex-wrap: wrap;
+}
+
+// Breadcrumbs — mono trail
+.app-detail-breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-family: var(--mono);
+    font-size: $font-size-sm;
+    color: var(--text-faint);
+
+    a {
+        color: var(--text-faint);
+        text-decoration: none;
+        @include transition(color);
+
+        &:hover {
+            color: var(--accent-bright);
+        }
+    }
+
+    > span {
+        color: var(--text-ghost);
+    }
+
+    .current {
+        color: var(--text-dim);
+        font-weight: $font-weight-medium;
+    }
+}
+
+.app-detail-actions {
+    display: flex;
+    gap: $space-2;
+}
+
+// Header — gradient surface card + radial accent wash
+.app-detail-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+    padding: 20px 22px;
+    background: linear-gradient(120deg, var(--surface) 0%, var(--surface-2) 100%);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+
+    // No overflow:hidden (header menus must escape), so the wash carries
+    // its own radius instead.
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: var(--radius-lg);
+        background: radial-gradient(420px 200px at 0% 0%, var(--accent-bg-soft), transparent 70%);
+        pointer-events: none;
+    }
+}
+
+.app-detail-icon {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 13px;
+    border: 1px solid fade(#fff, 8%);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: #fff;
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 13px;
+    }
+
+    svg {
+        color: currentColor;
+    }
+}
+
+.app-detail-title-block {
+    flex: 1;
+    min-width: 0;
+
+    h1 {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        flex-wrap: wrap;
+        margin: 0;
+        font-size: 21px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: -0.02em;
+        color: var(--text);
+
+        // linked-app glyph inside the EnvTag
+        .sk-tag svg {
+            margin-left: 4px;
+        }
+    }
+}
+
+// Mono dot-separated meta line under the title
+.app-detail-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+
+    a {
+        color: var(--accent-bright);
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    .separator {
+        color: var(--text-ghost);
+    }
+}
+
+// Status badge (WordPressProject still renders this class; ApplicationDetail
+// uses the ds Pill) — sk-pill visual spec.
+.app-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+
+    &.running {
+        background: var(--green-bg);
+        color: var(--green);
+    }
+
+    &.stopped {
+        background: var(--surface-3);
+        color: var(--text-faint);
+    }
+
+    &.error {
+        background: var(--red-bg);
+        color: var(--red);
+    }
+}
+
+.pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+
+    .running & {
+        box-shadow: 0 0 6px currentColor;
+        animation: pulse-green 2s ease-in-out infinite;
+    }
+}
+
+@keyframes pulse-green {
+    0%, 100% {
+        box-shadow: 0 0 0 0 fade($success, 40%);
+    }
+    50% {
+        box-shadow: 0 0 0 4px fade($success, 0%);
+    }
+}
+
+// Tabs navigation (WordPress pages render these classes; ApplicationDetail
+// uses shadcn Tabs — see the scoped `.tabs` block below)
+.app-detail-tabs {
+    display: flex;
+    gap: 2px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-soft);
+    border-radius: 0;
+    padding: 0;
+    overflow-x: auto;
+
+    &::-webkit-scrollbar {
+        height: 0;
+    }
+}
+
+.app-detail-tab {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 11px 14px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--text-faint);
+    font-size: 13px;
+    font-weight: $font-weight-normal;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.14s;
+
+    svg {
+        color: var(--text-ghost);
+        transition: color 0.14s;
+        flex-shrink: 0;
+    }
+
+    &:hover {
+        background: none;
+        color: var(--text-dim);
+
+        svg {
+            color: var(--text-faint);
+        }
+    }
+
+    &.active {
+        background: none;
+        color: var(--text);
+        border-bottom-color: var(--accent);
+        font-weight: $font-weight-medium;
+
+        svg {
+            color: var(--accent-bright);
+        }
+    }
+}
+
+// Tab content area
+.app-detail-content {
+    min-height: 400px;
+}
+
+// Overview grid layout
+.app-overview-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: $space-4;
+
+    @media (max-width: $breakpoint-lg) {
+        grid-template-columns: 1fr;
+    }
+}
+
+// Many tabs (PHP, Updates, Security, Vulnerabilities, Analytics, Uptime, …) reuse
+// this grid with ONLY an .app-overview-left and no right rail, which otherwise
+// reserves an empty 1fr column → a big wasted gap on the right. Collapse to a
+// single column whenever there's no .app-overview-right.
+.app-overview-grid:not(:has(.app-overview-right)) {
+    grid-template-columns: 1fr;
+}
+
+.app-overview-left,
+.app-overview-right {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+}
+
+// Panels — quiet surface + mono eyebrow header
+.app-panel {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.app-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 12px 17px;
+    border-bottom: 1px solid var(--border-soft);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+
+    svg {
+        width: 13px;
+        height: 13px;
+        color: var(--accent-bright);
+    }
+}
+
+// Right-aligned action slot inside an eyebrow header (resets the eyebrow
+// typography so buttons keep their normal type)
+.app-panel-header-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    font-family: $font-main;
+    font-weight: $font-weight-normal;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.app-panel-body {
+    padding: $space-4 17px;
+
+    .hint:last-child {
+        margin-bottom: 0;
+    }
+
+    .app-detail-actions {
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: $space-3;
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    .app-info-grid + .app-detail-actions,
+    .app-info-grid + .hint {
+        margin-top: $space-3;
+    }
+}
+
+.app-panel-hint {
+    margin: 0 0 $space-3;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+
+    &:last-child {
+        margin-bottom: 0;
+    }
+}
+
+// Info grids → k/v spec rows (.sk-info-row look)
+.app-info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.app-info-item {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: $space-4;
+    padding: 10px 0;
+    border-top: 1px solid var(--border-soft);
+
+    &:first-child {
+        border-top: none;
+        padding-top: 0;
+    }
+
+    &:last-child {
+        padding-bottom: 0;
+    }
+}
+
+.app-info-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.app-info-value {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: $space-2;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text);
+    text-align: right;
+    min-width: 0;
+    overflow-wrap: anywhere;
+
+    a {
+        color: var(--accent-bright);
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}
+
+// Mono path chip (Root Path row)
+.app-path-value {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    padding: 3px 8px;
+    border-radius: 5px;
+    overflow-wrap: anywhere;
+}
+
+// Port reachability hint inside the info value
+.port-indicator {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--red);
+
+    &.accessible {
+        color: var(--green);
+    }
+}
+
+// ============================================
+// APPLICATION DETAIL — SCOPED TAB INTERNALS
+// (shared class re-tints that must not leak to other pages)
+// ============================================
+
+.app-detail-page {
+
+    // ---- shadcn tab strip (.tabs/.tab) → accent-wash chips ----
+    .tabs {
+        gap: 2px;
+        border-bottom: 1px solid var(--border-soft);
+        padding-bottom: $space-2;
+        margin-bottom: $space-5;
+    }
+
+    .tab {
+        padding: 7px 12px;
+        border-bottom: none;
+        margin-bottom: 0;
+        border-radius: 8px;
+        color: var(--text-dim);
+        font-size: 13px;
+        font-weight: $font-weight-normal;
+
+        &:hover {
+            background: var(--surface-hover);
+            color: var(--text);
+        }
+
+        &.active,
+        &[data-state="active"] {
+            background: var(--accent-bg);
+            color: var(--accent-bright);
+            font-weight: $font-weight-medium;
+        }
+    }
+
+    // ---- Mono eyebrow heading (JSX opt-in for bare h3 headers) ----
+    .app-eyebrow,
+    h3.app-eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0 0 $space-3;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    // ---- Section headers → mono eyebrows ----
+    .section-header {
+        margin-bottom: $space-4;
+
+        h3 {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+    }
+
+    // ---- Generic cards (Build / Deploy / Settings tabs) ----
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        box-shadow: none;
+
+        > h3,
+        .card-header-row h3 {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0 0 $space-3;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        h4 {
+            font-size: $font-size-sm;
+            font-weight: $font-weight-semibold;
+            color: var(--text);
+        }
+    }
+
+    .card-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-4;
+
+        h3 {
+            margin: 0;
+        }
+    }
+
+    .card-actions {
+        display: flex;
+        gap: $space-2;
+        margin-top: $space-4;
+        padding-top: $space-4;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    // ---- InfoList rows → k/v spec rows ----
+    .info-item {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-soft);
+
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+
+    .info-label {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-faint);
+    }
+
+    .info-value {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: var(--text);
+        overflow-wrap: anywhere;
+        text-align: right;
+    }
+
+    // ---- Build auto-detection grid ----
+    .detection-label {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        color: var(--text-faint);
+    }
+
+    .detection-value {
+        font-size: 13px;
+        font-weight: $font-weight-medium;
+        color: var(--text);
+    }
+
+    // ---- Deployment history rows (Build + Deploy tabs) ----
+    .deployments-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .deployment-item {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        padding: 10px 0;
+        border-top: 1px solid var(--border-soft);
+
+        &:first-child {
+            border-top: none;
+        }
+
+        &.current {
+            background: fade($success, 5%);
+            margin: 0 (-$space-2);
+            padding-left: $space-2;
+            padding-right: $space-2;
+            border-radius: $radius-sm;
+        }
+
+        > .btn,
+        > button {
+            margin-left: auto;
+        }
+    }
+
+    .deployment-info {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+    }
+
+    .deployment-version {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--accent-bright);
+        background: var(--accent-bg);
+        padding: 2px 7px;
+        border-radius: 5px;
+    }
+
+    .deployment-meta {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+    }
+
+    .deployment-date {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+    }
+
+    // ---- Domains panel rows ----
+    .domains-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .domain-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+        padding: 10px 0;
+        border-top: 1px solid var(--border-soft);
+
+        &:first-child {
+            border-top: none;
+            padding-top: 0;
+        }
+
+        &:last-child {
+            padding-bottom: 0;
+        }
+
+        a {
+            font-family: var(--mono);
+            font-size: 12.5px;
+            color: var(--accent-bright);
+            text-decoration: none;
+            overflow-wrap: anywhere;
+
+            &:hover {
+                text-decoration: underline;
+            }
+        }
+    }
+
+    .ssl-badge {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        background: var(--green-bg);
+        color: var(--green);
+        padding: 2px 7px;
+        border-radius: 5px;
+        flex-shrink: 0;
+    }
+
+    // ---- Live resources (CPU accent-bright / RAM cyan, sk-gauge spec) ----
+    .resource-bar-container {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+
+        & + .resource-bar-container {
+            margin-top: $space-4;
+        }
+    }
+
+    .resource-bar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .resource-bar-label {
+        font-size: 13px;
+        color: var(--text-dim);
+    }
+
+    .resource-bar-value {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        font-weight: $font-weight-semibold;
+        color: var(--text);
+    }
+
+    .resource-bar-track {
+        height: 5px;
+        background: var(--surface-3);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .resource-bar-fill {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+
+        &.cpu {
+            background: var(--accent-bright);
+        }
+
+        &.ram {
+            background: var(--cyan);
+        }
+    }
+
+    .resource-hint {
+        margin: $space-3 0 0;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-faint);
+    }
+
+    // ---- Routing diagnostics ----
+    .diag-status {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        padding: $space-3;
+        border-radius: var(--radius-sm);
+
+        &.healthy {
+            background: var(--green-bg);
+        }
+
+        &.unhealthy {
+            background: var(--red-bg);
+        }
+    }
+
+    .diag-icon {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: $font-weight-bold;
+        flex-shrink: 0;
+
+        &.healthy {
+            color: var(--green);
+        }
+
+        &.unhealthy {
+            color: var(--red);
+        }
+    }
+
+    .diag-text {
+        min-width: 0;
+
+        h4 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: $font-weight-semibold;
+            color: var(--text);
+        }
+
+        p {
+            margin: 2px 0 0;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+    }
+
+    .diag-issues {
+        margin: $space-3 0 0;
+        padding-left: $space-5;
+        font-size: 12.5px;
+        color: var(--red);
+
+        li {
+            margin-bottom: $space-1;
+
+            &:last-child {
+                margin-bottom: 0;
+            }
+        }
+    }
+
+    // ---- Packages tab — dense list rows ----
+    .packages-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    .package-item {
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 11px 16px;
+
+        & + .package-item {
+            border-top: 1px solid var(--border-soft);
+        }
+    }
+
+    .package-name {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: var(--accent-bright);
+    }
+
+    .package-version {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-faint);
+    }
+
+    .install-form {
+        margin-bottom: $space-4;
+    }
+
+    // ---- Consoles / editors → code surface ----
+    .code-editor {
+        background: var(--bg-code);
+        border-color: var(--border-soft);
+        color: var(--text-code);
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+    }
+
+    .command-output {
+        background: var(--bg-code);
+        border-color: var(--border-soft);
+        border-radius: var(--radius);
+
+        pre {
+            color: var(--text-code);
+            font-size: $font-size-sm;
+        }
+
+        &.error {
+            border-color: rgba(251, 111, 111, 0.4);
+        }
+
+        .stderr {
+            color: var(--red);
+        }
+    }
+
+    .log-viewer {
+        background: var(--bg-code);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        color: var(--text-code);
+        font-family: var(--mono);
+        font-size: 12.5px;
+    }
+
+    // ---- Logs tab chrome ----
+    .logs-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: $space-3;
+        flex-wrap: wrap;
+        margin-bottom: $space-3;
+
+        h3 {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+    }
+
+    .logs-controls {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+
+        .hint {
+            margin: 0;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-faint);
+        }
+    }
+
+    .checkbox-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-1;
+        font-size: 13px;
+        color: var(--text-dim);
+        cursor: pointer;
+        white-space: nowrap;
+
+        input {
+            accent-color: var(--accent-primary);
+        }
+    }
+
+    // ---- Config modals (Build / Deploy) — mono eyebrow field labels ----
+    .modal .form-group > label:not(.checkbox-label) {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+}
+
+// ============================================
+// DEPLOY TAB
+// ============================================
+
+.deploy-tab {
+    @include flex-column-gap($space-5);
+
+    .deploy-setup {
+        padding: $space-8 0;
+    }
+
+    .deploy-header {
+        margin-bottom: 0;
+    }
+
+    .deploy-status-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-4;
+        padding: $space-4 $space-5;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+
+        @media (max-width: $breakpoint-md) {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+
+    .deploy-repo-info {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+
+        svg {
+            flex-shrink: 0;
+            color: var(--text-faint);
+        }
+
+        > div {
+            display: flex;
+            flex-direction: column;
+            gap: $space-1;
+        }
+
+        .repo-url {
+            font-family: var(--mono);
+            font-size: $font-size-sm;
+            color: var(--text);
+            word-break: break-all;
+        }
+
+        .repo-branch {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--accent-bright);
+        }
+    }
+
+    .deploy-actions {
+        display: flex;
+        gap: $space-2;
+        flex-shrink: 0;
+    }
+
+    .deploy-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: $space-5;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        cursor: pointer;
+
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent-primary);
+        }
+
+        span {
+            font-size: $font-size-sm;
+            color: var(--text);
+        }
+    }
+
+    .form-help {
+        display: block;
+        margin-top: $space-1;
+        font-size: $font-size-xs;
+        color: var(--text-faint);
+    }
+
+    textarea {
+        font-family: var(--mono);
+        font-size: $font-size-sm;
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .text-danger {
+        color: $danger;
+        font-size: $font-size-sm;
+    }
+
+    .text-muted {
+        color: var(--text-faint);
+        font-size: $font-size-sm;
+    }
+}
+
+// ============================================
+// RESPONSIVE ADJUSTMENTS
+// ============================================
+
+@media (max-width: $breakpoint-md) {
+    .apps-list-head {
+        flex-direction: column;
+        align-items: stretch;
+
+        .apps-search {
+            min-width: 0;
+        }
+    }
+
+    .app-detail-header {
+        flex-wrap: wrap;
+    }
+}
+
+// ============================================
+// CONTAINER OPS PANEL (image update / auto-sleep / auto-scale)
+// ============================================
+
+.container-ops {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-lg;
+
+    &__section {
+        // reuses .app-panel shell; nothing extra needed by default
+    }
+
+    &__actions {
+        display: flex;
+        gap: $spacing-sm;
+        margin-top: $space-3;
+    }
+
+    // k/v field row with a control on the right (toggle / number input)
+    &__field {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $spacing-md;
+        padding: $space-3 0;
+        border-top: 1px solid var(--border-soft);
+
+        &:first-of-type {
+            border-top: none;
+        }
+    }
+
+    &__field-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    &__field-hint {
+        font-size: 12px;
+        color: var(--text-faint);
+        line-height: 1.4;
+    }
+
+    &__num {
+        max-width: 120px;
+        text-align: right;
+    }
+
+    // registry picker (native select, themed to match the Input control)
+    &__select {
+        max-width: 280px;
+        padding: 8px 10px;
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-md;
+        background: var(--surface-2, var(--bg-card));
+        color: var(--text-strong, inherit);
+        font-size: 13px;
+
+        &:focus {
+            outline: none;
+            border-color: var(--primary-color, #6366f1);
+        }
+
+        &:disabled {
+            opacity: 0.6;
+        }
+    }
+
+    // grid of labelled inputs (auto-scale config)
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: $spacing-md;
+        margin-top: $space-3;
+
+        @media (max-width: $breakpoint-sm) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__input {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        label {
+            font-size: 12.5px;
+            color: var(--text-dim);
+        }
+    }
+
+    // manual scale row: input + apply button aligned to the bottom
+    &__manual {
+        display: flex;
+        align-items: flex-end;
+        gap: $spacing-sm;
+        margin-top: $spacing-md;
+        padding-top: $spacing-md;
+        border-top: 1px solid var(--border-soft);
+
+        .container-ops__input {
+            flex: 1;
+            max-width: 200px;
+        }
+    }
+}
+
+// ============================================
+// MANAGED VOLUMES (Storage panel)
+// ============================================
+
+.app-volumes {
+    &__empty {
+        font-size: 13px;
+        color: var(--text-faint);
+        padding: $space-3 0;
+    }
+
+    &__table {
+        display: flex;
+        flex-direction: column;
+        margin-top: $space-3;
+    }
+
+    &__row {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) 90px 140px auto;
+        align-items: center;
+        gap: $spacing-md;
+        padding: $space-3 0;
+        border-top: 1px solid var(--border-soft);
+
+        &--head {
+            border-top: none;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-faint);
+        }
+
+        @media (max-width: $breakpoint-sm) {
+            grid-template-columns: 1fr;
+            gap: 4px;
+        }
+    }
+
+    &__cell {
+        min-width: 0;
+        font-size: 13px;
+
+        &--name {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+    }
+
+    &__mono {
+        font-family: $font-mono, monospace;
+        font-size: 12px;
+        color: var(--text-dim);
+        word-break: break-all;
+    }
+
+    &__pills {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    &__confirm {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    &__wipe,
+    &__ro {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        color: var(--text-dim);
+    }
+
+    &__attach {
+        margin-top: $spacing-md;
+        padding-top: $spacing-md;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    &__attach-fields {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+        align-items: end;
+        gap: $spacing-md;
+
+        @media (max-width: $breakpoint-sm) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    &__note {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: $spacing-md;
+        font-size: 12px;
+        color: var(--text-faint);
+    }
+}
+
+// ============================================
+// WAF PANEL (ModSecurity policy / events)
+// ============================================
+
+.waf-panel {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-lg;
+
+    &__section {
+        // reuses .app-panel shell; nothing extra needed by default
+    }
+
+    // install notice shown when ModSecurity is absent
+    &__banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $spacing-md;
+        padding: $spacing-md;
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-md;
+        background: var(--surface-2, var(--bg-card));
+    }
+
+    &__banner-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+
+        span {
+            font-size: 12.5px;
+            color: var(--text-dim);
+            line-height: 1.4;
+        }
+    }
+
+    &__mode {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: $space-3;
+
+        .sk-seg {
+            align-self: flex-start;
+        }
+    }
+
+    &__mode-hint {
+        font-size: 12.5px;
+        color: var(--text-dim);
+        line-height: 1.4;
+    }
+
+    &__rules {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: $spacing-md;
+        padding-top: $spacing-md;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    &__rules-input {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        margin-top: 4px;
+
+        .input,
+        input {
+            max-width: 200px;
+        }
+    }
+
+    &__chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $spacing-sm;
+        margin-top: 8px;
+    }
+
+    &__chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 6px 3px 10px;
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-full;
+        background: var(--surface-2, var(--bg-card));
+        font-size: 12.5px;
+    }
+
+    &__chip-remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        background: transparent;
+        color: var(--text-faint);
+        cursor: pointer;
+        transition: color 0.15s ease, background 0.15s ease;
+
+        &:hover {
+            color: var(--danger, #ef4444);
+            background: var(--border-soft);
+        }
+    }
+
+    &__table-wrap {
+        overflow-x: auto;
+    }
+
+    &__table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+
+        th,
+        td {
+            text-align: left;
+            padding: $space-3 $spacing-md;
+            border-bottom: 1px solid var(--border-soft);
+            vertical-align: top;
+        }
+
+        th {
+            font-size: 11.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-faint);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+    }
+
+    &__msg {
+        max-width: 320px;
+    }
+
+    &__uri {
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__time {
+        white-space: nowrap;
+        color: var(--text-dim);
+    }
+}

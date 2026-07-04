@@ -1,0 +1,264 @@
+// ============================================
+// CRON JOBS PAGE (redesign — infra console look)
+// ============================================
+
+.cron-page {
+
+    // ── KPI strip ───────────────────────────────────────────
+    .cron-kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: $space-4;
+        margin-bottom: $space-5;
+
+        @media (max-width: $breakpoint-lg) { grid-template-columns: repeat(2, 1fr); }
+        @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+    }
+
+    // ── list head: eyebrow + search + segmented filter ──────
+    .cron-listhead {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        margin-bottom: $space-3;
+
+        h2 {
+            flex: 1;
+            min-width: 0;
+            margin: 0;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        @media (max-width: $breakpoint-md) {
+            flex-wrap: wrap;
+
+            h2 { flex-basis: 100%; }
+            .cron-search { flex: 1; width: auto; }
+        }
+    }
+
+    .cron-search {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        width: 240px;
+        height: 34px;
+        padding: 0 $space-3;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: $radius-lg;
+        @include transition(border-color);
+
+        &:focus-within { border-color: var(--accent); }
+
+        svg {
+            color: var(--text-faint);
+            flex-shrink: 0;
+        }
+
+        input {
+            flex: 1;
+            min-width: 0;
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-size: 13px;
+
+            &::placeholder { color: var(--text-faint); }
+        }
+    }
+
+    // ── jobs table ──────────────────────────────────────────
+    .cron-card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    .cron-empty {
+        padding: $space-10;
+        text-align: center;
+        color: var(--text-faint);
+        font-size: 13px;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+    }
+
+    .cron-table {
+        // Schedule / Status fixed; actions column shrinks to fit
+        th:nth-child(2) { width: 200px; }
+        th:nth-child(3) { width: 110px; }
+        th:last-child { width: 1%; }
+        td:last-child { white-space: nowrap; }
+
+        tbody tr.is-disabled {
+            opacity: 0.55;
+
+            .cron-ico {
+                background: var(--surface-3);
+                color: var(--text-faint);
+            }
+        }
+    }
+
+    // job cell: accent icon tile + name / description / mono command
+    .cron-ico {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        background: var(--accent-bg);
+        color: var(--accent-bright);
+    }
+
+    .cron-jobcell {
+        min-width: 0;
+
+        &__desc {
+            margin-top: 2px;
+            font-size: 12px;
+            font-weight: $font-weight-normal;
+            color: var(--text-dim);
+        }
+
+        &__cmd {
+            max-width: 460px;
+            font-weight: $font-weight-normal;
+            @include truncate();
+        }
+    }
+
+    // schedule expression chip + readable hint
+    .cron-sched {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 8px;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-dim);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        white-space: nowrap;
+
+        svg {
+            color: var(--text-faint);
+            flex-shrink: 0;
+        }
+    }
+
+    .cron-sched-readable {
+        margin-top: 3px;
+        font-size: 11px;
+        color: var(--text-faint);
+    }
+
+    .cron-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: $space-1;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        .cron-card { overflow-x: auto; }
+        .cron-table { min-width: 640px; }
+    }
+
+    // ── create/edit modal (field labels → mono eyebrows) ────
+    .modal {
+        .form-group > label:not(.checkbox-label) {
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        .form-help {
+            display: block;
+            margin-top: $space-2;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-faint);
+        }
+    }
+
+    // ── run-output modal ────────────────────────────────────
+    .run-output {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+    }
+
+    .run-output-exit {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+    }
+
+    .run-output-label {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    .run-output-section {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+    }
+
+    .run-output-pre {
+        margin: 0;
+        padding: $space-3 $space-4;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.62;
+        background: var(--bg-code);
+        color: var(--text-code);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        max-height: 300px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        @include custom-scrollbar();
+
+        &--error {
+            color: var(--red);
+            border-color: rgba(251, 111, 111, 0.28);
+        }
+    }
+
+    // spinner inside the run-now button
+    .spinner-inline {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid var(--border-strong);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

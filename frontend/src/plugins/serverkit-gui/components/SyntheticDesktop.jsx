@@ -1,0 +1,91 @@
+import React, { useEffect, useState } from 'react';
+
+/**
+ * Fake desktop UI rendered from agent data, used when the host has no
+ * display server. Each "window" is just data the agent already exposes.
+ */
+export default function SyntheticDesktop({ api, serverId, fetchJson }) {
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const load = () => {
+            fetchJson(`/api/v1/server-gui/${serverId}/synthetic`)
+                .then(d => { if (!cancelled) setData(d); })
+                .catch(err => { if (!cancelled) setError(err.message); });
+        };
+        load();
+        const id = setInterval(load, 4000);
+        return () => { cancelled = true; clearInterval(id); };
+    }, [serverId, fetchJson]);
+
+    if (error) return <div className="sk-gui__banner sk-gui__banner--error">{error}</div>;
+    if (!data) return <div className="sk-gui__loading">Loading synthetic desktop…</div>;
+
+    return (
+        <div className="sk-synth">
+            <div className="sk-synth__wallpaper">
+                <div className="sk-synth__hostname">{data.hostname || 'host'}</div>
+                <div className="sk-synth__windows">
+                    {data.windows?.map(w => <SynthWindow key={w.id} win={w} />)}
+                </div>
+            </div>
+
+            <div className="sk-synth__taskbar">
+                <span className="sk-synth__start">≡</span>
+                {data.taskbar?.map(t => (
+                    <span key={t.id} className="sk-synth__task" title={t.name}>
+                        {t.name}
+                    </span>
+                ))}
+                <span className="sk-synth__clock">
+                    {new Date().toLocaleTimeString()}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+function SynthWindow({ win }) {
+    return (
+        <div className="sk-synth__window">
+            <div className="sk-synth__titlebar">
+                <span className="sk-synth__title">{win.title}</span>
+                <span className="sk-synth__controls">— □ ×</span>
+            </div>
+            <div className="sk-synth__body">
+                <WindowBody body={win.body} />
+            </div>
+        </div>
+    );
+}
+
+function WindowBody({ body }) {
+    if (Array.isArray(body)) {
+        return (
+            <ul className="sk-synth__list">
+                {body.map((row, i) => (
+                    <li key={i}>
+                        <span>{row.name}</span>
+                        <span>{row.cpu != null ? `${row.cpu.toFixed?.(1) ?? row.cpu}% cpu` : ''}</span>
+                        <span>{row.mem != null ? `${row.mem.toFixed?.(1) ?? row.mem}% mem` : ''}</span>
+                    </li>
+                ))}
+            </ul>
+        );
+    }
+    if (body && typeof body === 'object') {
+        return (
+            <dl className="sk-synth__kv">
+                {Object.entries(body).map(([k, v]) => (
+                    <React.Fragment key={k}>
+                        <dt>{k}</dt>
+                        <dd>{String(v)}</dd>
+                    </React.Fragment>
+                ))}
+            </dl>
+        );
+    }
+    return <div>{String(body ?? '')}</div>;
+}

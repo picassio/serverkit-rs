@@ -1,0 +1,134 @@
+// ============================================
+// STYLE GUIDE - Dev-only reference page
+// ============================================
+
+.styleguide {
+    // Nav tabs for sections
+    &__nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+        margin-bottom: $space-6;
+        padding-bottom: $space-4;
+        border-bottom: 1px solid $border-default;
+    }
+
+    &__nav-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        padding: $space-2 $space-3;
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+        color: $text-tertiary;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: $radius-md;
+        cursor: pointer;
+        transition: all $transition-fast;
+
+        &:hover {
+            color: $text-primary;
+            background: $bg-hover;
+        }
+
+        &.active {
+            color: $accent-primary;
+            background: $accent-glow;
+            border-color: $accent-primary;
+        }
+    }
+
+    &__content {
+        min-height: 400px;
+    }
+
+    &__section-title {
+        font-size: $font-size-lg;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+        margin-bottom: $space-3;
+        padding-bottom: $space-2;
+        border-bottom: 1px solid $border-subtle;
+    }
+
+    // Color swatches
+    &__swatch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: $space-3;
+    }
+
+    &__swatch {
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+    }
+
+    &__swatch-preview {
+        width: 100%;
+        height: 64px;
+        border-radius: $radius-lg;
+        border: 1px solid $border-default;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    &__swatch-label {
+        font-size: $font-size-sm;
+        font-weight: $font-weight-medium;
+        color: $text-primary;
+    }
+
+    &__swatch-token {
+        font-family: $font-mono;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+    }
+
+    // Spacing bars
+    &__spacing-bar {
+        background: $accent-primary;
+        border-radius: $radius-sm;
+        min-width: 4px;
+    }
+
+    // Radius preview boxes
+    &__radius-box {
+        width: 64px;
+        height: 64px;
+        background: $accent-glow;
+        border: 2px solid $accent-primary;
+    }
+
+    // Shadow preview boxes
+    &__shadow-box {
+        width: 80px;
+        height: 80px;
+        background: $bg-card;
+        border-radius: $radius-lg;
+        border: 1px solid $border-default;
+    }
+
+    // Utility demo boxes
+    &__util-box {
+        padding: $space-2 $space-3;
+        background: $bg-elevated;
+        border: 1px solid $border-default;
+        border-radius: $radius-md;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        text-align: center;
+    }
+
+    &__split-demo {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: $space-4;
+
+        @media (max-width: $breakpoint-lg) {
+            grid-template-columns: 1fr;
+        }
+    }
+}

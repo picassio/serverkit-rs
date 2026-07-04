@@ -1,0 +1,344 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+    ArrowLeft,
+    Inbox,
+    Send,
+    Trash2,
+    RefreshCw,
+    Lock,
+    X,
+} from 'lucide-react';
+import api from '../services/api';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../hooks/useConfirm';
+import EmptyState from '../components/EmptyState';
+import Modal from '@/components/Modal';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { MetricCard, Pill } from '@/components/ds';
+
+const STATUS_KINDS = {
+    pending: 'blue',
+    in_flight: 'yellow',
+    completed: 'green',
+    failed: 'red',
+    dead_letter: 'gray',
+};
+
+const STATUS_LABELS = {
+    pending: 'Pending',
+    in_flight: 'In Flight',
+    completed: 'Completed',
+    failed: 'Failed',
+    dead_letter: 'Dead Letter',
+};
+
+const STATUS_ORDER = ['pending', 'in_flight', 'completed', 'failed', 'dead_letter'];
+
+const POLL_INTERVAL = 3000;
+
+const QueueDetail = () => {
+    const { groupSlug, queueSlug } = useParams();
+    const navigate = useNavigate();
+    const toast = useToast();
+    const { confirm } = useConfirm();
+
+    const [loading, setLoading] = useState(true);
+    const [queue, setQueue] = useState(null);
+    const [group, setGroup] = useState(null);
+    const [messages, setMessages] = useState([]);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [selectedMessage, setSelectedMessage] = useState(null);
+    const [showSend, setShowSend] = useState(false);
+    const [sendForm, setSendForm] = useState({ payload: '{}', priority: 0, delay_ms: 0 });
+
+    const pollRef = useRef(null);
+
+    const viewOnly = group?.owner_type === 'system';
+
+    const loadMeta = useCallback(async () => {
+        try {
+            const [queueRes, groupRes] = await Promise.all([
+                api.getQueue(groupSlug, queueSlug),
+                api.getQueueGroup(groupSlug).catch(() => null),
+            ]);
+            setQueue(queueRes.queue || null);
+            setGroup(groupRes?.group || null);
+        } catch (err) {
+            toast.error(err.message);
+            navigate('/queue');
+        } finally {
+            setLoading(false);
+        }
+    }, [groupSlug, queueSlug, navigate, toast]);
+
+    const loadMessages = useCallback(async (status) => {
+        try {
+            const res = await api.getMessages(groupSlug, queueSlug, {
+                status: status === 'all' ? undefined : status,
+                limit: 100,
+            });
+            setMessages(res.messages || []);
+        } catch (err) {
+            toast.error(err.message);
+        }
+    }, [groupSlug, queueSlug, toast]);
+
+    useEffect(() => {
+        loadMeta();
+    }, [loadMeta]);
+
+    useEffect(() => {
+        loadMessages(statusFilter);
+        pollRef.current = setInterval(() => {
+            loadMessages(statusFilter);
+            api.getQueue(groupSlug, queueSlug)
+                .then(r => setQueue(r.queue || null))
+                .catch(() => {});
+        }, POLL_INTERVAL);
+        return () => {
+            if (pollRef.current) clearInterval(pollRef.current);
+        };
+    }, [statusFilter, loadMessages, groupSlug, queueSlug]);
+
+    const stats = queue?.stats || {};
+
+    const handleSend = async (e) => {
+        e.preventDefault();
+        let payload = {};
+        try {
+            payload = JSON.parse(sendForm.payload);
+        } catch {
+            toast.error('Payload must be valid JSON');
+            return;
+        }
+        try {
+            await api.sendMessage(groupSlug, queueSlug, payload, {
+                priority: parseInt(sendForm.priority, 10) || 0,
+                delay_ms: parseInt(sendForm.delay_ms, 10) || 0,
+            });
+            toast.success('Message sent');
+            setShowSend(false);
+            setSendForm({ payload: '{}', priority: 0, delay_ms: 0 });
+            loadMessages(statusFilter);
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    const handleRequeue = async (msg) => {
+        try {
+            await api.requeueMessage(groupSlug, queueSlug, msg.id);
+            toast.success('Message requeued');
+            loadMessages(statusFilter);
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    const handleDelete = async (msg) => {
+        const confirmed = await confirm({
+            title: 'Delete Message',
+            message: 'Permanently delete this message?',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
+        try {
+            await api.deleteMessage(groupSlug, queueSlug, msg.id);
+            toast.success('Message deleted');
+            if (selectedMessage?.id === msg.id) setSelectedMessage(null);
+            loadMessages(statusFilter);
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="queue-page queue-page--loading">
+                <div className="queue-loading-card">
+                    <Inbox size={24} />
+                    <span>Loading queue...</span>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="queue-page queue-detail">
+            <div className="queue-detail-header">
+                <button type="button" className="queue-back" onClick={() => navigate('/queue')}>
+                    <ArrowLeft size={16} /> Queue Bus
+                </button>
+                <div className="queue-detail-headline">
+                    <div className="queue-workbar-title">
+                        <span>Queue</span>
+                        <h1>{queue?.name || queueSlug}</h1>
+                        <em>{groupSlug} / {queueSlug}</em>
+                    </div>
+                    <div className="queue-detail-actions">
+                        {viewOnly && (
+                            <span className="queue-readonly-badge">
+                                <Lock size={12} /> Read-only
+                            </span>
+                        )}
+                        {!viewOnly && (
+                            <Button variant="outline" onClick={() => setShowSend(true)}>
+                                <Send size={16} /> Send Message
+                            </Button>
+                        )}
+                        <Button variant="outline" onClick={() => { loadMeta(); loadMessages(statusFilter); }}>
+                            <RefreshCw size={16} /> Refresh
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="queue-detail-stats">
+                <MetricCard label="Total" value={stats.total || 0} />
+                {STATUS_ORDER.map(s => (
+                    <MetricCard
+                        key={s}
+                        label={STATUS_LABELS[s]}
+                        value={stats[s] || 0}
+                        kind={s === 'failed' || s === 'dead_letter' ? 'danger' : undefined}
+                    />
+                ))}
+            </div>
+
+            <div className={`queue-detail-body ${selectedMessage ? 'has-panel' : ''}`}>
+                <div className="queue-detail-main">
+                    <div className="queue-messages-toolbar">
+                        <select
+                            className="queue-select"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                            <option value="all">All statuses</option>
+                            {STATUS_ORDER.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                        </select>
+                        <span className="queue-results-summary">
+                            <strong>{messages.length}</strong>
+                            <span>{messages.length === 1 ? 'message' : 'messages'}</span>
+                        </span>
+                    </div>
+
+                    {messages.length === 0 ? (
+                        <EmptyState
+                            icon={Inbox}
+                            title="No messages"
+                            description={viewOnly
+                                ? 'This system queue has no messages in this view.'
+                                : 'This queue is empty. Send a message to get started.'}
+                        />
+                    ) : (
+                        <div className="queue-table-wrap">
+                            <table className="queue-table">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Payload</th>
+                                        <th>Attempts</th>
+                                        <th>Created</th>
+                                        {!viewOnly && <th className="col-actions" aria-label="Actions" />}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {messages.map(msg => (
+                                        <tr
+                                            key={msg.id}
+                                            className={`is-clickable ${selectedMessage?.id === msg.id ? 'is-selected' : ''}`}
+                                            onClick={() => setSelectedMessage(msg)}
+                                        >
+                                            <td><Pill kind={STATUS_KINDS[msg.status] || 'gray'}>{msg.status}</Pill></td>
+                                            <td><code className="queue-payload-preview">{JSON.stringify(msg.payload).slice(0, 80)}</code></td>
+                                            <td>{msg.attempts} / {msg.max_attempts}</td>
+                                            <td>{new Date(msg.created_at).toLocaleString()}</td>
+                                            {!viewOnly && (
+                                                <td className="col-actions" onClick={e => e.stopPropagation()}>
+                                                    <div className="queue-actions">
+                                                        {(msg.status === 'failed' || msg.status === 'dead_letter') && (
+                                                            <Button variant="ghost" size="sm" onClick={() => handleRequeue(msg)} title="Requeue">
+                                                                <RefreshCw size={14} />
+                                                            </Button>
+                                                        )}
+                                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(msg)} title="Delete message">
+                                                            <Trash2 size={14} />
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {selectedMessage && (
+                    <aside className="queue-detail-panel">
+                        <div className="queue-detail-panel-header">
+                            <h2>Message</h2>
+                            <button type="button" className="queue-panel-close" onClick={() => setSelectedMessage(null)} aria-label="Close">
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="queue-message-detail">
+                            <div><strong>ID:</strong> <code>{selectedMessage.id}</code></div>
+                            <div><strong>Status:</strong> <Pill kind={STATUS_KINDS[selectedMessage.status] || 'gray'}>{selectedMessage.status}</Pill></div>
+                            <div><strong>Attempts:</strong> {selectedMessage.attempts} / {selectedMessage.max_attempts}</div>
+                            <div><strong>Created:</strong> {new Date(selectedMessage.created_at).toLocaleString()}</div>
+                            {selectedMessage.error_message && (
+                                <div className="queue-message-error"><strong>Error:</strong> {selectedMessage.error_message}</div>
+                            )}
+                            <div className="queue-message-section"><strong>Payload:</strong>
+                                <pre>{JSON.stringify(selectedMessage.payload, null, 2)}</pre>
+                            </div>
+                            {selectedMessage.result && (
+                                <div className="queue-message-section"><strong>Result:</strong>
+                                    <pre>{JSON.stringify(selectedMessage.result, null, 2)}</pre>
+                                </div>
+                            )}
+                        </div>
+                        {!viewOnly && (selectedMessage.status === 'failed' || selectedMessage.status === 'dead_letter') && (
+                            <div className="queue-detail-panel-footer">
+                                <Button onClick={() => handleRequeue(selectedMessage)}>
+                                    <RefreshCw size={14} className="mr-2" /> Requeue
+                                </Button>
+                            </div>
+                        )}
+                    </aside>
+                )}
+            </div>
+
+            <Modal open={showSend && !viewOnly} onClose={() => setShowSend(false)} title="Send Message">
+                        <form onSubmit={handleSend}>
+                                <div className="form-group">
+                                    <Label htmlFor="payload">Payload (JSON)</Label>
+                                    <Textarea id="payload" value={sendForm.payload} onChange={(e) => setSendForm({ ...sendForm, payload: e.target.value })} rows={6} required />
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <Label htmlFor="priority">Priority</Label>
+                                        <Input id="priority" type="number" value={sendForm.priority} onChange={(e) => setSendForm({ ...sendForm, priority: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <Label htmlFor="delay_ms">Delay (ms)</Label>
+                                        <Input id="delay_ms" type="number" value={sendForm.delay_ms} onChange={(e) => setSendForm({ ...sendForm, delay_ms: e.target.value })} />
+                                    </div>
+                                </div>
+                            <div className="modal-actions">
+                                <Button type="button" variant="outline" onClick={() => setShowSend(false)}>Cancel</Button>
+                                <Button type="submit"><Send size={14} className="mr-2" /> Send</Button>
+                            </div>
+                        </form>
+            </Modal>
+        </div>
+    );
+};
+
+export default QueueDetail;

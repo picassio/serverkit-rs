@@ -1,0 +1,94 @@
+# ServerKit dependency manifest
+# ============================================================================
+# Declarative source of truth for the per-distro-family packages ServerKit
+# needs. The selector key is the OS *family* (derived from /etc/os-release `ID`,
+# falling back to `ID_LIKE`):
+#
+#   debian  → Debian, Ubuntu, Linux Mint, Pop!_OS, Raspbian, …
+#   rhel    → RHEL, Rocky, AlmaLinux, CentOS, Oracle Linux, …
+#   fedora  → Fedora (kept distinct from rhel only for the Docker repo URL)
+#   suse    → openSUSE Leap/Tumbleweed, SLES/SLED
+#   arch    → Arch, Manjaro, EndeavourOS   (community-supported, best-effort)
+#   alpine  → Alpine                         (community-supported, best-effort)
+#
+# WHO READS THIS
+# --------------
+# The Python bootstrap (backend/serverkit_installer, see the hardening plan §8)
+# parses this file directly with PyYAML and installs accordingly. The bash
+# installer (install.sh) cannot parse YAML before Python itself is installed
+# (chicken-and-egg), so it mirrors these choices in its own inline logic — keep
+# the two in sync when editing. This file is therefore both the spec and the
+# documentation of what "supported distro" actually means.
+#
+# Python policy (Goal G2): accept 3.11 OR 3.12, prefer the distro package over a
+# source compile. Debian 12 ships 3.11; Ubuntu 24.04 and Fedora 40 ship 3.12;
+# RHEL 9 has 3.11 (and 3.12 on 9.4+) via CRB/EPEL; openSUSE Leap ships python311.
+
+python:
+  debian:
+    package: python3.11
+    venv_package: python3.11-venv
+    dev_package: python3.11-dev
+  ubuntu:
+    package: python3.12
+    venv_package: python3.12-venv
+    dev_package: python3.12-dev
+    # Older Ubuntu without 3.12 in the main repo falls back to this PPA.
+    fallback_ppa: ppa:deadsnakes/ppa
+  rhel:
+    package: python3.12
+    fallback_package: python3.11
+    dev_package: python3.12-devel
+    repos: [crb, epel]
+  fedora:
+    package: python3.12
+    fallback_package: python3.11
+    dev_package: python3.12-devel
+  suse:
+    package: python311
+    dev_package: python311-devel
+  arch:
+    package: python          # rolling; already 3.11+
+  alpine:
+    package: python3
+    dev_package: python3-dev
+
+node:
+  # Node 18 is the floor for the Vite build. Distro nodejs on supported targets
+  # already meets it; NodeSource 20 is the fallback when it doesn't.
+  debian:    { method: distro, package: nodejs, npm_package: npm, fallback: nodesource_20 }
+  ubuntu:    { method: distro, package: nodejs, npm_package: npm, fallback: nodesource_20 }
+  rhel:      { method: distro, package: nodejs, fallback: nodesource_20 }
+  fedora:    { method: distro, package: nodejs, fallback: nodesource_20 }
+  suse:      { method: distro, package: nodejs20, npm_package: npm20 }
+  arch:      { method: distro, package: nodejs, npm_package: npm }
+  alpine:    { method: distro, package: nodejs, npm_package: npm }
+
+docker:
+  debian: { method: get.docker.com }
+  ubuntu: { method: get.docker.com }
+  rhel:   { method: repo, repo_url: "https://download.docker.com/linux/rhel/docker-ce.repo",
+            packages: [docker-ce, docker-ce-cli, containerd.io, docker-compose-plugin, docker-buildx-plugin] }
+  fedora: { method: repo, repo_url: "https://download.docker.com/linux/fedora/docker-ce.repo",
+            packages: [docker-ce, docker-ce-cli, containerd.io, docker-compose-plugin, docker-buildx-plugin] }
+  suse:   { method: distro, packages: [docker, docker-compose] }
+  arch:   { method: distro, packages: [docker, docker-compose] }
+  alpine: { method: distro, packages: [docker, docker-cli-compose] }
+
+base_packages:
+  debian: [git, curl, nginx, sqlite3, ca-certificates, openssl]
+  rhel:   [git, curl, nginx, sqlite, ca-certificates, openssl]
+  fedora: [git, curl, nginx, sqlite, ca-certificates, openssl]
+  suse:   [git, curl, nginx, sqlite3, ca-certificates, openssl]
+  arch:   [git, curl, nginx, sqlite, ca-certificates, openssl]
+  alpine: [git, curl, nginx, sqlite, ca-certificates, openssl]
+
+# Package-manager + init-system per family, mirrored by scripts/lib/pkg.sh and
+# scripts/lib/init.sh (which detect at runtime rather than reading this).
+package_manager:
+  debian: apt
+  rhel:   dnf      # yum on EL7
+  fedora: dnf
+  suse:   zypper
+  arch:   pacman
+  alpine: apk

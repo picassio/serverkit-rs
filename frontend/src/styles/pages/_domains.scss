@@ -1,0 +1,536 @@
+// ============================================
+// DOMAINS PAGE (redesign — top-bar layout, see docs/REDESIGN_MAP.md)
+// ============================================
+
+.domains-page {
+    display: flex;
+    flex-direction: column;
+}
+
+.domains-body {
+    max-width: 1320px;
+    width: 100%;
+    margin: 0 auto;
+    padding-top: $space-5;
+}
+
+// KPI strip
+.dom-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: $space-4;
+    margin-bottom: $space-5;
+
+    @media (max-width: $breakpoint-lg) { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+}
+
+// List header + segmented filter
+.dom-listhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-4;
+    margin-bottom: $space-3;
+
+    &__title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+}
+
+// Table card
+.dom-card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.dom-empty {
+    padding: $space-10;
+    text-align: center;
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+}
+
+// Domain cell bits
+.dom-fav {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    background: var(--accent-bg);
+    color: var(--accent-bright);
+}
+
+.dom-primary {
+    margin-left: $space-2;
+    padding: 1px 6px;
+    border-radius: $radius-sm;
+    background: var(--accent-bg);
+    color: var(--accent-bright);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.dom-dash {
+    color: var(--text-ghost);
+    font-family: var(--mono);
+    font-size: 12px;
+}
+
+.dom-chev { color: var(--text-ghost); }
+
+// "Managed" chip — a provider zone ServerKit has adopted for record/ops management.
+.dom-managed {
+    margin-left: $space-2;
+    padding: 1px 6px;
+    border-radius: $radius-sm;
+    background: $success-bg;
+    color: $success;
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+}
+
+// Registration expiry, coloured by urgency.
+.dom-expiry {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+
+    &--green { color: $success; }
+    &--amber { color: $warning; }
+    &--red { color: $danger; }
+}
+
+// Inline per-row actions (DNS records / Cloudflare) for provider domains.
+.dom-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $space-2;
+}
+
+// Notice when a connected token couldn't enumerate its zones (e.g. scoped token).
+.dom-portfolio-note {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-bottom: $space-3;
+    padding: $space-2 $space-3;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    background: fade($warning, 8%);
+    font-size: $font-size-xs;
+    color: $text-secondary;
+
+    svg { color: $warning; flex-shrink: 0; }
+    strong { color: $text-primary; }
+}
+
+// DNS records panel inside the Domains drawer (DomainDnsPanel) — the unified
+// inline DNS experience for both app domains and provider zones.
+.ddp {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    &__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $space-3;
+    }
+
+    &__title {
+        margin: 0;
+        font-size: $font-size-sm;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+
+    &__count { color: $text-tertiary; }
+
+    &__head-actions { display: flex; align-items: center; gap: $space-2; }
+
+    &__hint {
+        margin: 0;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+    }
+
+    &__msg {
+        margin: 0;
+        padding: $space-4;
+        text-align: center;
+        font-size: $font-size-sm;
+        color: $text-tertiary;
+        background: var(--surface-2);
+        border-radius: $radius-md;
+
+        &--error { color: $danger; }
+    }
+
+    &__form {
+        display: flex;
+        flex-direction: column;
+        gap: $space-3;
+        padding: $space-3;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        background: var(--surface-2);
+    }
+
+    &__form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: $space-2;
+    }
+
+    &__proxy-toggle {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: $font-size-sm;
+        color: $text-secondary;
+        cursor: pointer;
+    }
+
+    &__table-wrap { width: 100%; }
+
+    // Fixed layout so the table never overflows the drawer — narrow columns get a
+    // set width, Name + Content share the rest and ellipsis-truncate (full value
+    // on hover via title), so there's no horizontal scroll.
+    &__table {
+        width: 100%;
+        table-layout: fixed;
+
+        td, th { white-space: nowrap; }
+    }
+
+    &__c-type { width: 58px; }
+    &__c-ttl { width: 76px; }
+    &__c-proxy { width: 116px; }
+    &__c-src { width: 100px; }
+
+    &__c-name,
+    &__content {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__ssl {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        font-size: $font-size-xs;
+        color: $success;
+
+        svg { flex-shrink: 0; }
+    }
+
+    &__proxy {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+
+        &--on { color: #f6821f; font-weight: $font-weight-medium; }
+    }
+
+    &__src {
+        font-size: 11px;
+        font-weight: $font-weight-medium;
+        color: $text-tertiary;
+        padding: 1px 6px;
+        border-radius: $radius-full;
+        background: var(--surface-2);
+
+        &--sk { color: $success; background: $success-bg; }
+    }
+
+    &__foot {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        flex-wrap: wrap;
+        padding-top: $space-2;
+        border-top: 1px solid $border-subtle;
+    }
+
+    // Per-record actions column — "Make dynamic" / Dynamic-host controls.
+    &__c-act { width: 168px; text-align: right; }
+
+    &__dynwrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+    }
+
+    // "Dynamic" badge on a record that is a token-updatable DDNS host.
+    &__dyn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 1px 7px;
+        border-radius: $radius-full;
+        font-size: 11px;
+        font-weight: $font-weight-medium;
+        color: var(--accent-bright);
+        background: var(--accent-bg);
+
+        svg { flex-shrink: 0; }
+    }
+
+    &__iconbtn { padding-inline: $space-2; }
+    &__stopbtn { color: $danger; }
+
+    // Inline propagation results (moved from the retired DNS Zones page).
+    &__prop {
+        display: flex;
+        flex-direction: column;
+        padding: $space-2 $space-3;
+        background: var(--surface-2);
+        border-radius: $radius-md;
+    }
+
+    &__prop-row {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        padding: $space-2 0;
+        font-size: $font-size-sm;
+        border-bottom: 1px solid $border-subtle;
+
+        &:last-child { border-bottom: none; }
+    }
+
+    &__prop-ip { color: $text-tertiary; }
+
+    &__prop-res {
+        margin-left: auto;
+        font-family: var(--mono);
+        font-size: $font-size-xs;
+        color: $text-secondary;
+    }
+}
+
+// ── Detail drawer body ──────────────────────────────────────
+// Header actions live in the drawer head (top-right); pad past the close "×".
+.dom-drawer__headeractions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: $space-2;
+    padding-right: 32px;
+}
+
+.dom-drawer {
+    padding: $space-5 $space-5 $space-8;
+    display: flex;
+    flex-direction: column;
+    gap: $space-5;
+
+    &__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+    }
+
+    &__section { display: flex; flex-direction: column; align-items: flex-start; gap: $space-2; }
+    &__sectiontitle {
+        margin: 0;
+        font-size: 14px;
+        font-weight: $font-weight-semibold;
+        color: $text-primary;
+    }
+    &__hint { margin: 0; font-size: $font-size-sm; color: $text-tertiary; }
+
+    &__danger {
+        padding-top: $space-4;
+        border-top: 1px solid var(--border-soft);
+    }
+}
+
+// ── Inline DNS records table inside the domain drawer ────────
+.dom-dns {
+    width: 100%;
+
+    &__count {
+        margin-left: $space-2;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: $font-weight-normal;
+        color: var(--text-faint);
+    }
+
+    &__error { color: var(--red); }
+
+    &__table {
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    &__col-type { width: 70px; }
+    &__col-ttl { width: 70px; }
+
+    // Truncate long record values (e.g. TXT/SPF) to keep the table dense
+    &__value {
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--text);
+    }
+}
+
+.dom-specs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: $space-3;
+
+    @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+}
+
+.dom-delete-btn {
+    color: $danger;
+    &:hover { background: var(--red-bg); color: $danger; }
+}
+
+// ── Kept: modal styles used by Add-Domain + Enable-SSL forms ─
+.ssl-info-box {
+    @include flex-start();
+    gap: $space-4;
+    padding: $space-5;
+    background: $success-bg;
+    border: 1px solid $success-border;
+    border-radius: $radius-lg;
+    margin-bottom: $space-5;
+    color: $success;
+
+    h4 {
+        font-size: $font-size-base;
+        font-weight: $font-weight-semibold;
+        margin-bottom: $space-1;
+    }
+
+    p {
+        font-size: $font-size-sm;
+        color: $text-secondary;
+
+        strong { color: $text-primary; }
+    }
+}
+
+.checkbox-label {
+    @include flex-start();
+    gap: $space-2;
+    cursor: pointer;
+
+    input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: $accent-primary;
+    }
+}
+
+// ── Relocated from the retired DNS Zones / Dynamic DNS pages ─────────────────
+// Colored DNS record-type chip — used by the drawer's record table and the
+// Connections → DNS activity feed (DnsActivity.jsx), so it stays global.
+.dns-rtype {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    background: var(--surface-3);
+    color: var(--text-dim);
+
+    &--a, &--aaaa, &--ns { background: var(--accent-bg); color: var(--accent-bright); }
+    &--cname { background: var(--cyan-bg); color: var(--cyan); }
+    &--mx { background: var(--amber-bg); color: var(--amber); }
+    &--txt, &--spf { background: var(--green-bg); color: var(--green); }
+    &--soa, &--srv, &--caa { background: var(--violet-bg); color: var(--violet); }
+}
+
+// One-time Dynamic DNS token callout (DdnsTokenCallout.jsx, shown in the drawer).
+.ddns-token-callout {
+    margin-top: $spacing-lg;
+    background: var(--amber-bg);
+    border: 1px solid var(--amber);
+    border-radius: var(--radius);
+    padding: $spacing-md $spacing-lg;
+
+    &__head {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        font-size: 13.5px;
+        color: var(--text);
+
+        svg { color: var(--amber); flex-shrink: 0; }
+    }
+
+    &__close {
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+
+        &:hover { color: var(--text); }
+    }
+
+    &__row {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        margin-top: $spacing-md;
+    }
+
+    &__label {
+        flex-shrink: 0;
+        width: 84px;
+        font-family: var(--mono);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-faint);
+    }
+
+    &__value {
+        flex: 1;
+        min-width: 0;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-sm;
+        padding: $spacing-xs $spacing-sm;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text);
+        word-break: break-all;
+    }
+}

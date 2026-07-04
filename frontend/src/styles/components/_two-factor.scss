@@ -1,0 +1,306 @@
+// ============================================
+// TWO-FACTOR AUTHENTICATION STYLES
+// ============================================
+
+// TOTP Code Input (Login page)
+.totp-inputs {
+    display: flex;
+    justify-content: center;
+    gap: $space-2;
+    margin: $space-6 0;
+}
+
+.totp-input {
+    width: 48px;
+    height: 56px;
+    font-size: 24px;
+    font-weight: 600;
+    text-align: center;
+    border: 2px solid $border-subtle;
+    border-radius: $radius-md;
+    background: $bg-card;
+    color: $text-primary;
+    transition: all 0.2s;
+
+    &:focus {
+        border-color: $accent-primary;
+        outline: none;
+        box-shadow: 0 0 0 3px fade($accent-primary-raw, 20%);
+    }
+
+    &::placeholder {
+        color: $text-tertiary;
+    }
+}
+
+// Auth footer links
+.auth-footer-links {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-2;
+    margin-top: $space-6;
+}
+
+.link-button {
+    background: none;
+    border: none;
+    color: $accent-primary;
+    cursor: pointer;
+    font-size: $font-size-sm;
+    padding: 0;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
+// 2FA Card in Settings
+.two-fa-card {
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    padding: $space-6;
+    margin-bottom: $space-6;
+}
+
+.two-fa-header {
+    display: flex;
+    gap: $space-4;
+    margin-bottom: $space-6;
+
+    .two-fa-icon {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: fade($accent-primary-raw, 15%);
+        border-radius: $radius-md;
+        color: $accent-primary;
+        flex-shrink: 0;
+    }
+
+    h3 {
+        margin: 0 0 $space-1 0;
+    }
+
+    p {
+        margin: 0;
+        color: $text-secondary;
+        font-size: $font-size-sm;
+    }
+}
+
+.two-fa-disabled {
+    .two-fa-description {
+        color: $text-secondary;
+        margin-bottom: $space-4;
+    }
+}
+
+.two-fa-enabled {
+    .two-fa-status {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        margin-bottom: $space-4;
+    }
+
+    .two-fa-info {
+        color: $text-secondary;
+        font-size: $font-size-sm;
+    }
+
+    .two-fa-backup-info {
+        background: $bg-hover;
+        padding: $space-2 $space-4;
+        border-radius: $radius-sm;
+        margin-bottom: $space-4;
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+
+        .warning-text {
+            color: $warning;
+            font-size: $font-size-sm;
+        }
+    }
+
+    .two-fa-actions {
+        display: flex;
+        gap: $space-2;
+    }
+}
+
+// Setup Modal
+.setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: $space-6;
+}
+
+.setup-step {
+    display: flex;
+    gap: $space-4;
+
+    .step-number {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: $accent-primary;
+        color: white;
+        border-radius: 50%;
+        font-weight: 600;
+        font-size: $font-size-sm;
+        flex-shrink: 0;
+    }
+
+    .step-content {
+        flex: 1;
+
+        h4 {
+            margin: 0 0 $space-1 0;
+        }
+
+        p {
+            color: $text-secondary;
+            margin: 0 0 $space-4 0;
+            font-size: $font-size-sm;
+        }
+    }
+}
+
+.qr-code-container {
+    display: flex;
+    justify-content: center;
+    padding: $space-4;
+    background: white;
+    border-radius: $radius-md;
+    margin-bottom: $space-4;
+}
+
+.qr-code {
+    width: 200px;
+    height: 200px;
+}
+
+.qr-fallback {
+    background: $bg-hover;
+    padding: $space-4;
+    border-radius: $radius-md;
+    text-align: center;
+
+    .secret-key {
+        display: block;
+        font-size: $font-size-lg;
+        padding: $space-2;
+        margin-top: $space-2;
+        background: $bg-body;
+        border-radius: $radius-sm;
+        word-break: break-all;
+    }
+}
+
+.manual-entry {
+    margin-top: $space-4;
+    font-size: $font-size-sm;
+    color: $text-secondary;
+
+    summary {
+        cursor: pointer;
+        color: $accent-primary;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    p {
+        margin: $space-1 0;
+    }
+
+    code {
+        background: $bg-hover;
+        padding: 2px 6px;
+        border-radius: $radius-sm;
+    }
+}
+
+.verification-input {
+    font-size: 24px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.5em;
+    padding: $space-4;
+    width: 100%;
+    max-width: 200px;
+}
+
+// Warning Box
+.warning-box {
+    display: flex;
+    gap: $space-4;
+    padding: $space-4;
+    background: fade($warning, 10%);
+    border: 1px solid fade($warning, 30%);
+    border-radius: $radius-md;
+    margin-bottom: $space-6;
+
+    svg {
+        flex-shrink: 0;
+        color: $warning;
+    }
+
+    p {
+        margin: 0;
+        color: $text-primary;
+        font-size: $font-size-sm;
+    }
+}
+
+.error-text {
+    color: $danger;
+    font-size: $font-size-sm;
+    margin-top: $space-1;
+}
+
+// Backup Codes Grid
+.backup-codes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $space-2;
+    margin-bottom: $space-6;
+}
+
+.backup-code {
+    display: block;
+    padding: $space-2 $space-4;
+    background: $bg-hover;
+    border-radius: $radius-sm;
+    text-align: center;
+    font-size: $font-size-md;
+    font-family: $font-mono;
+}
+
+.backup-codes-actions {
+    display: flex;
+    justify-content: center;
+    gap: $space-2;
+
+    .btn svg {
+        margin-right: $space-1;
+    }
+}
+
+// Modal medium size
+.modal-md {
+    max-width: 500px;
+}
+
+// Loading small
+.loading-sm {
+    color: $text-tertiary;
+    font-size: $font-size-sm;
+}

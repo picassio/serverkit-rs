@@ -1,0 +1,71 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/sk-core",
+    "crates/sk-auth",
+    "crates/sk-models",
+    "crates/sk-server",
+    "crates/sk-acme",
+    "crates/sk-monitor",
+    "crates/sk-templates",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+sk-core = { path = "crates/sk-core" }
+sk-auth = { path = "crates/sk-auth" }
+sk-models = { path = "crates/sk-models" }
+sk-system = { path = "crates/sk-system" }
+sk-docker = { path = "crates/sk-docker" }
+sk-terminal = { path = "crates/sk-terminal" }
+sk-ops = { path = "crates/sk-ops" }
+sk-files = { path = "crates/sk-files" }
+sk-web = { path = "crates/sk-web" }
+sk-db = { path = "crates/sk-db" }
+sk-magento = { path = "crates/sk-magento" }
+sk-acme = { path = "crates/sk-acme" }
+sk-monitor = { path = "crates/sk-monitor" }
+sk-templates = { path = "crates/sk-templates" }
+
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["multipart"] }
+tower = "0.5"
+tokio-util = { version = "0.7", features = ["io"] }
+tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
+socketioxide = { version = "0.18", features = ["extensions"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate", "chrono"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jsonwebtoken = "9"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+fernet = "0.2"
+scrypt = { version = "0.11", default-features = false }
+pbkdf2 = "0.12"
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+subtle = "2"
+rand = "0.8"
+sysinfo = "0.33"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# scrypt in an unoptimized build takes seconds per login — always optimize
+# the crypto crates, even in dev builds.
+[profile.dev.package.scrypt]
+opt-level = 3
+[profile.dev.package.salsa20]
+opt-level = 3
+[profile.dev.package.pbkdf2]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.hmac]
+opt-level = 3

@@ -1,0 +1,12 @@
+[package]
+name = "sk-system"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sysinfo.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+anyhow.workspace = true

@@ -1,0 +1,371 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import useTabParam from '../hooks/useTabParam';
+import api from '../services/api';
+import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
+import ConfirmDialog from '../components/ConfirmDialog';
+import EmptyState from '../components/EmptyState';
+import Modal from '@/components/Modal';
+import { Pill, ServiceTile, PageTopbar } from '@/components/ds';
+import { Button } from '@/components/ui/button';
+import {
+    LayoutGrid, ChevronLeft, Server, Box, Globe,
+    Users, Settings2,
+} from 'lucide-react';
+import WorkspaceOverviewTab from '../components/workspaces/WorkspaceOverviewTab';
+import WorkspaceServersTab from '../components/workspaces/WorkspaceServersTab';
+import WorkspaceServicesTab from '../components/workspaces/WorkspaceServicesTab';
+import WorkspaceSitesTab from '../components/workspaces/WorkspaceSitesTab';
+import WorkspaceMembersTab from '../components/workspaces/WorkspaceMembersTab';
+import WorkspaceSettingsTab from '../components/workspaces/WorkspaceSettingsTab';
+
+const ACTIVE_KEY = 'active_workspace_id';
+const ACCENT_KEY = 'workspace_accent';
+
+const VALID_TABS = ['overview', 'servers', 'services', 'sites', 'members', 'settings'];
+
+const TAB_META = {
+    overview: { label: 'Overview', icon: LayoutGrid },
+    servers: { label: 'Servers', icon: Server },
+    services: { label: 'Services', icon: Box },
+    sites: { label: 'Sites', icon: Globe },
+    members: { label: 'Members', icon: Users },
+    settings: { label: 'Settings', icon: Settings2 },
+};
+
+const formatSince = (iso) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+        ? null
+        : d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+};
+
+const asServerList = (data) => (Array.isArray(data) ? data : (data?.servers || []));
+
+const WorkspaceDetail = () => {
+    const { id } = useParams();
+    const wsId = Number(id);
+    const navigate = useNavigate();
+    const toast = useToast();
+    const { user } = useAuth();
+    const [activeTab, setActiveTab] = useTabParam(`/workspaces/${id}`, VALID_TABS, 'overview');
+
+    const [ws, setWs] = useState(null);
+    const [members, setMembers] = useState([]);
+    const [apps, setApps] = useState([]);
+    const [servers, setServers] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [deleteConfirm, setDeleteConfirm] = useState(false);
+    const [sharingApp, setSharingApp] = useState(null);
+    const [grants, setGrants] = useState([]);
+    const [grantRole, setGrantRole] = useState('editor');
+
+    const load = useCallback(async () => {
+        try {
+            const [wsData, mData, appData, srvData, uData] = await Promise.all([
+                api.getWorkspace(wsId),
+                api.getWorkspaceMembers(wsId).catch(() => ({ members: [] })),
+                api.getApps({ allWorkspaces: true }).catch(() => ({ apps: [] })),
+                api.getServers({ allWorkspaces: true }).catch(() => []),
+                api.getUsers().catch(() => ({ users: [] })),
+            ]);
+            setWs(wsData);
+            setMembers(mData.members || []);
+            setApps(appData.apps || []);
+            setServers(asServerList(srvData));
+            setAllUsers(uData.users || []);
+        } catch (err) {
+            toast.error('Failed to load workspace');
+            setWs(null);
+        } finally {
+            setLoading(false);
+        }
+    }, [wsId, toast]);
+
+    useEffect(() => { setLoading(true); load(); }, [load]);
+
+    const isCurrent = localStorage.getItem(ACTIVE_KEY) === String(wsId);
+
+    const setActiveWorkspace = () => {
+        localStorage.setItem(ACTIVE_KEY, String(wsId));
+        localStorage.setItem('active_workspace', JSON.stringify(ws));
+        if (ws?.primary_color) localStorage.setItem(ACCENT_KEY, ws.primary_color);
+        else localStorage.removeItem(ACCENT_KEY);
+        window.location.reload();
+    };
+
+    const handleArchive = async () => {
+        try {
+            await api.archiveWorkspace(wsId);
+            toast.success('Workspace archived');
+            load();
+        } catch (err) { toast.error(err.message); }
+    };
+
+    const handleRestore = async () => {
+        try {
+            await api.restoreWorkspace(wsId);
+            toast.success('Workspace restored');
+            load();
+        } catch (err) { toast.error(err.message); }
+    };
+
+    const handleDelete = async () => {
+        try {
+            await api.deleteWorkspace(wsId);
+            toast.success('Workspace deleted');
+            navigate('/workspaces');
+        } catch (err) { toast.error(err.message); }
+    };
+
+    const handleAddMember = async (userId) => {
+        try {
+            await api.addWorkspaceMember(wsId, userId);
+            toast.success('Member added');
+            load();
+        } catch (err) { toast.error(err.message); }
+    };
+
+    const handleRemoveMember = async (memberId) => {
+        try {
+            await api.removeWorkspaceMember(memberId);
+            toast.success('Member removed');
+            load();
+        } catch (err) { toast.error(err.message); }
+    };
+
+    const handleMoveApp = async (appId, workspaceId) => {
+        try {
+            await api.setAppWorkspace(appId, workspaceId);
+            toast.success(workspaceId ? 'Application moved in' : 'Application removed');
+            const data = await api.getApps({ allWorkspaces: true });
+            setApps(data.apps || []);
+        } catch (err) { toast.error(err.message); }
+    };
+
+    const handleMoveServer = async (serverId, workspaceId) => {
+        try {
+            await api.setServerWorkspace(serverId, workspaceId);
+            toast.success(workspaceId ? 'Server moved in' : 'Server removed');
+            setServers(asServerList(await api.getServers({ allWorkspaces: true })));
+        } catch (err) { toast.error(err.message); }
+    };
+
+    const loadSharing = async (appObj) => {
+        try {
+            const gData = await api.getAppGrants(appObj.id);
+            setGrants(gData.grants || []);
+            setSharingApp(appObj);
+        } catch (err) { toast.error('Failed to load sharing'); }
+    };
+
+    const handleGrant = async (userId) => {
+        try {
+            await api.grantAppAccess(sharingApp.id, userId, grantRole);
+            toast.success('Access granted');
+            const gData = await api.getAppGrants(sharingApp.id);
+            setGrants(gData.grants || []);
+        } catch (err) { toast.error(err.message); }
+    };
+
+    const handleRevoke = async (grantId) => {
+        try {
+            await api.revokeAppAccess(sharingApp.id, grantId);
+            toast.success('Access revoked');
+            const gData = await api.getAppGrants(sharingApp.id);
+            setGrants(gData.grants || []);
+        } catch (err) { toast.error(err.message); }
+    };
+
+    if (loading) return <div className="page-container workspaces-page ws-detail"><EmptyState loading title="Loading workspace" /></div>;
+
+    if (!ws) {
+        return (
+            <div className="page-container workspaces-page ws-detail">
+                <Link className="ws-detail__back" to="/workspaces"><ChevronLeft size={14} /> All workspaces</Link>
+                <EmptyState icon={LayoutGrid} title="Workspace not found" description="It may have been deleted, or you may not have access." />
+            </div>
+        );
+    }
+
+    const appsIn = apps.filter(a => a.workspace_id === wsId);
+    const appsOut = apps.filter(a => a.workspace_id !== wsId);
+    const srvIn = servers.filter(s => s.workspace_id === wsId);
+    const srvOut = servers.filter(s => s.workspace_id !== wsId);
+    const services = appsIn.filter(a => a.app_type !== 'wordpress');
+    const sites = appsIn.filter(a => a.app_type === 'wordpress');
+    const since = formatSince(ws.created_at);
+
+    return (
+        <div className="app-detail-page app-detail-page--wide ws-detail-page">
+            <PageTopbar
+                className="ws-detail-topbar"
+                icon={<LayoutGrid size={18} />}
+                title={(
+                    <span className="ws-crumbs">
+                        <Link to="/workspaces">Workspaces</Link>
+                        <span className="ws-crumbs__sep">/</span>
+                        <span className="ws-crumbs__cur">{ws.name}</span>
+                    </span>
+                )}
+            />
+
+            <div className="app-detail-body">
+                <div className="app-detail-header">
+                    <ServiceTile name={ws.name} size={54} gradient={ws.primary_color || undefined} className="ws-detail__tile" />
+                    <div className="app-detail-title-block">
+                        <h1>
+                            {ws.name}
+                            {isCurrent
+                                ? <Pill kind="green">active workspace</Pill>
+                                : <Pill kind={ws.status === 'active' ? 'green' : 'amber'}>{ws.status}</Pill>}
+                        </h1>
+                        <div className="app-detail-subtitle">
+                            <span>/{ws.slug}</span>
+                            <span className="separator">·</span>
+                            <span>{members.length} member{members.length !== 1 ? 's' : ''}</span>
+                            {since && <><span className="separator">·</span><span>since {since}</span></>}
+                        </div>
+                    </div>
+                </div>
+
+                {ws.description && <p className="ws-detail__desc">{ws.description}</p>}
+
+                <div className="app-detail-tabs">
+                    {VALID_TABS.map((tab) => {
+                        const meta = TAB_META[tab];
+                        const Icon = meta.icon;
+                        return (
+                            <div
+                                key={tab}
+                                className={`app-detail-tab ${activeTab === tab ? 'active' : ''} ${tab === 'settings' ? 'app-detail-tab--end' : ''}`}
+                                onClick={() => setActiveTab(tab)}
+                            >
+                                <Icon size={14} /> {meta.label}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="app-detail-content">
+                    {activeTab === 'overview' && (
+                        <WorkspaceOverviewTab
+                            ws={ws}
+                            since={since}
+                            members={members}
+                            srvIn={srvIn}
+                            services={services}
+                            sites={sites}
+                        />
+                    )}
+                    {activeTab === 'servers' && (
+                        <WorkspaceServersTab
+                            wsId={wsId}
+                            srvIn={srvIn}
+                            srvOut={srvOut}
+                            onMoveServer={handleMoveServer}
+                        />
+                    )}
+                    {activeTab === 'services' && (
+                        <WorkspaceServicesTab
+                            wsId={wsId}
+                            services={services}
+                            appsOut={appsOut.filter(a => a.app_type !== 'wordpress')}
+                            onMoveApp={handleMoveApp}
+                            onShare={loadSharing}
+                        />
+                    )}
+                    {activeTab === 'sites' && (
+                        <WorkspaceSitesTab
+                            wsId={wsId}
+                            sites={sites}
+                            appsOut={appsOut.filter(a => a.app_type === 'wordpress')}
+                            onMoveApp={handleMoveApp}
+                            onShare={loadSharing}
+                        />
+                    )}
+                    {activeTab === 'members' && (
+                        <WorkspaceMembersTab
+                            wsId={wsId}
+                            members={members}
+                            allUsers={allUsers}
+                            onAddMember={handleAddMember}
+                            onRemoveMember={handleRemoveMember}
+                        />
+                    )}
+                    {activeTab === 'settings' && (
+                        <WorkspaceSettingsTab
+                            wsId={wsId}
+                            ws={ws}
+                            onUpdate={load}
+                            user={user}
+                            isCurrent={isCurrent}
+                            onSetActive={setActiveWorkspace}
+                            onArchive={handleArchive}
+                            onRestore={handleRestore}
+                            onDeleteClick={() => setDeleteConfirm(true)}
+                        />
+                    )}
+                </div>
+            </div>
+
+            <Modal
+                open={Boolean(sharingApp)}
+                onClose={() => setSharingApp(null)}
+                title={sharingApp ? `Sharing: ${sharingApp.name}` : 'Sharing'}
+            >
+                {sharingApp && (
+                    <>
+                        <p className="form-hint">Grant a user access to this application without transferring ownership.</p>
+                        <div className="ws-rows">
+                            {grants.length === 0 && <p className="form-hint">Not shared with anyone yet.</p>}
+                            {grants.map(g => (
+                                <div key={g.id} className="ws-row">
+                                    <ServiceTile name={g.username || g.email || '?'} size={28} className="ws-row__av" />
+                                    <div className="ws-row__id">
+                                        <strong>{g.username || g.email}</strong>
+                                        <span className="sk-tag">{g.role}</span>
+                                    </div>
+                                    <Button size="sm" variant="destructive" onClick={() => handleRevoke(g.id)}>Revoke</Button>
+                                </div>
+                            ))}
+                        </div>
+                        <hr />
+                        <h4>Grant Access</h4>
+                        <div className="form-group">
+                            <label>Role for new grants</label>
+                            <select value={grantRole} onChange={e => setGrantRole(e.target.value)}>
+                                <option value="editor">Editor · view + operate</option>
+                                <option value="viewer">Viewer · read-only</option>
+                            </select>
+                        </div>
+                        <div className="ws-pick">
+                            {allUsers.filter(u => u.id !== sharingApp.user_id && !grants.find(g => g.user_id === u.id)).map(u => (
+                                <div key={u.id} className="ws-pick__item" onClick={() => handleGrant(u.id)}>
+                                    <ServiceTile name={u.username || u.email || '?'} size={24} className="ws-row__av" />
+                                    <span className="ws-pick__name">{u.username || u.email}</span>
+                                    <span className="ws-pick__plus">+</span>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </Modal>
+
+            {deleteConfirm && (
+                <ConfirmDialog
+                    title="Delete Workspace"
+                    message={`Delete "${ws.name}"? All data will be lost.`}
+                    onConfirm={handleDelete}
+                    onCancel={() => setDeleteConfirm(false)}
+                    variant="danger"
+                />
+            )}
+        </div>
+    );
+};
+
+export default WorkspaceDetail;

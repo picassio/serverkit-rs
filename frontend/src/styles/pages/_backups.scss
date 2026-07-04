@@ -1,0 +1,732 @@
+// ============================================
+// BACKUPS PAGE (redesign — infra console look)
+// ============================================
+
+.backups-page {
+
+    // ── KPI strip (4 tiles, +1 when a remote provider is set) ──
+    .bk-kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: $space-4;
+        margin-bottom: $space-5;
+
+        @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+    }
+
+    // ── list head: mono eyebrow + segmented filter + actions ─
+    .bk-listhead {
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+        margin-bottom: $space-3;
+
+        h2 {
+            flex: 1;
+            min-width: 0;
+            margin: 0;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        @media (max-width: $breakpoint-md) {
+            flex-wrap: wrap;
+
+            h2 { flex-basis: 100%; }
+        }
+    }
+
+    // ── dense tables (backup archive + schedules) ───────────
+    .bk-card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    .bk-empty {
+        padding: $space-10;
+        text-align: center;
+        color: var(--text-faint);
+        font-size: 13px;
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+    }
+
+    .bk-table {
+        // actions column shrinks to fit, buttons never wrap
+        th:last-child { width: 1%; }
+        td:last-child { white-space: nowrap; }
+
+        tbody tr.is-disabled {
+            opacity: 0.55;
+
+            .bk-ico {
+                background: var(--surface-3);
+                color: var(--text-faint);
+            }
+        }
+    }
+
+    // backup kind tile (tinted per type)
+    .bk-ico {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        background: var(--surface-2);
+        color: var(--text-dim);
+
+        &--application { background: var(--accent-bg); color: var(--accent-bright); }
+        &--database { background: var(--violet-bg); color: var(--violet); }
+        &--files { background: var(--amber-bg); color: var(--amber); }
+    }
+
+    // mono type chip (application / database / files) — %sk-state shape
+    // (_design-system.scss) with local sizing + bordered per-type tints kept
+    .bk-type {
+        @extend %sk-state;
+        padding: 2px 7px;
+        border-radius: 5px;
+        font-size: 10.5px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+
+        &--application {
+            background: var(--accent-bg);
+            border-color: fade($accent-primary-raw, 30%);
+            color: var(--accent-bright);
+        }
+
+        &--database {
+            background: var(--violet-bg);
+            border-color: rgba(176, 123, 245, 0.3);
+            color: var(--violet);
+        }
+
+        &--files {
+            background: var(--amber-bg);
+            border-color: rgba(245, 185, 69, 0.3);
+            color: var(--amber);
+        }
+    }
+
+    .bk-when {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-faint);
+        white-space: nowrap;
+    }
+
+    .bk-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: $space-1;
+    }
+
+    // schedule time chip (matches the cron expression chip)
+    .bk-sched {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 8px;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--text-dim);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        white-space: nowrap;
+
+        svg {
+            color: var(--text-faint);
+            flex-shrink: 0;
+        }
+    }
+
+    // remote-upload indicator on schedule rows
+    .bk-remote-on { color: var(--green); }
+    .bk-remote-off { color: var(--text-ghost); }
+
+    // storage pills carry a small lucide icon instead of the dot
+    .sk-pill svg { flex-shrink: 0; }
+
+    @media (max-width: $breakpoint-md) {
+        .bk-card { overflow-x: auto; }
+        .bk-table { min-width: 720px; }
+        .bk-table--schedules { min-width: 880px; }
+    }
+
+    // ── storage tab: real-data spec strip ───────────────────
+    .bk-specs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: $space-3;
+        margin-bottom: $space-4;
+
+        @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+    }
+
+    // storage/settings cards → surface chrome + eyebrow headers
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius);
+    }
+
+    .card-header h3 {
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    .storage-provider-config {
+        margin: $space-4 0;
+        padding: $space-4;
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-sm);
+
+        h4 {
+            margin: 0 0 $space-4;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: $font-weight-semibold;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+    }
+
+    // ── forms (cards + modals): mono eyebrow labels ─────────
+    .form-group > label:not(.checkbox-label) {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $space-4;
+
+        @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+    }
+
+    .form-help {
+        display: block;
+        margin-top: $space-2;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-faint);
+    }
+
+    // inline hint inside an eyebrow label — undo the uppercase
+    .form-help-inline {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: $font-weight-normal;
+        letter-spacing: normal;
+        text-transform: none;
+        color: var(--text-ghost);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: $space-2;
+        margin-top: $space-5;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        cursor: pointer;
+
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        span {
+            font-size: 13px;
+            color: var(--text);
+        }
+    }
+
+    // ── restore modal ───────────────────────────────────────
+    .bk-restore-warn {
+        display: flex;
+        gap: 11px;
+        padding: 13px 15px;
+        margin-bottom: $space-5;
+        border-radius: 11px;
+        background: var(--amber-bg);
+        border: 1px solid rgba(245, 185, 69, 0.28);
+        font-size: 12.5px;
+        line-height: 1.5;
+        color: var(--text-dim);
+
+        svg {
+            color: var(--amber);
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        b { color: var(--text); }
+    }
+
+    .bk-restore-details {
+        padding: $space-1 $space-4;
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-sm);
+    }
+
+    // ── spinners (upload / test-connection buttons) ─────────
+    .spinning {
+        animation: spin 1s linear infinite;
+    }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+// Reusable inline spinner for the protection components (lucide <Loader2 className="spin" />).
+.spin { animation: spin 1s linear infinite; }
+
+// ============================================
+// PROTECTION PANEL (backup protection — WordPress + Services settings)
+// Rendered inside .app-overview-grid > .app-overview-left, so these styles are
+// top-level (not nested under .backups-page).
+// ============================================
+.protection-panel {
+    // Single column inside a settings pane (no right rail).
+    grid-template-columns: 1fr;
+
+    .app-overview-left {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+    }
+}
+
+// ── Card 1: status ──────────────────────────────────────────
+.protection-status-card {
+    &__toggle {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-3;
+        padding-bottom: $space-4;
+        border-bottom: 1px solid var(--border-soft);
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            cursor: pointer;
+        }
+    }
+
+    &__toggle-title { font-weight: $font-weight-semibold; color: var(--text); }
+    &__toggle-sub { font-size: 12px; color: var(--text-faint); }
+
+    &__status {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: $space-2;
+        margin: $space-4 0;
+        font-size: 13px;
+        color: var(--text-dim);
+    }
+
+    &__kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: $space-3;
+        margin-bottom: $space-4;
+
+        @media (max-width: $breakpoint-sm) { grid-template-columns: 1fr; }
+    }
+
+    &__actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: $space-2;
+    }
+}
+
+// ── Card 2: schedule ────────────────────────────────────────
+.schedule-card {
+    .app-panel-body {
+        display: flex;
+        flex-direction: column;
+        gap: $space-4;
+    }
+
+    &__field {
+        display: flex;
+        flex-direction: column;
+        gap: $space-2;
+
+        > label {
+            font-size: 12px;
+            font-weight: $font-weight-semibold;
+            color: var(--text);
+        }
+    }
+
+    &__days {
+        display: flex;
+        gap: $space-2;
+    }
+
+    &__day {
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--border-soft);
+        background: var(--surface-2);
+        color: var(--text-dim);
+        border-radius: $radius-sm;
+        font-size: 12px;
+        font-weight: $font-weight-semibold;
+        cursor: pointer;
+        transition: border-color .12s ease, background .12s ease, color .12s ease;
+
+        &:hover { border-color: var(--accent-bright); }
+
+        &.is-active {
+            background: var(--accent-bg);
+            color: var(--accent-bright);
+            border-color: var(--accent-bright);
+        }
+    }
+
+    &__preview {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+
+        code {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text);
+            background: var(--surface-2);
+            border: 1px solid var(--border-soft);
+            border-radius: $radius-sm;
+            padding: 2px 8px;
+        }
+    }
+
+    &__preview-label {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-faint);
+    }
+
+    &__retention-row {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        font-size: 13px;
+        color: var(--text-dim);
+
+        input { width: 80px; }
+    }
+
+    &__remote {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: $space-3;
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            cursor: pointer;
+        }
+    }
+
+    &__actions { margin-top: $space-1; }
+}
+
+// ── Card 3: history list ────────────────────────────────────
+.backup-history-list {
+    width: 100%;
+
+    &__row.is-clickable { cursor: pointer; }
+
+    &__ico {
+        display: inline-flex;
+        color: var(--text-faint);
+    }
+
+    &__when {
+        color: var(--text-dim);
+        font-size: 13px;
+        white-space: nowrap;
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: $space-1;
+    }
+
+    &__storage {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--text-dim);
+    }
+}
+
+// ── History card chrome (list/calendar toggle + day-filter chip) ────
+.backup-history-card {
+    &__tools {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+    }
+
+    &__toggle {
+        display: inline-flex;
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-sm;
+        overflow: hidden;
+
+        button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 26px;
+            background: var(--surface-2);
+            color: var(--text-dim);
+            border: none;
+            cursor: pointer;
+
+            &.is-active { background: var(--accent-bg); color: var(--accent-bright); }
+            & + button { border-left: 1px solid var(--border-soft); }
+        }
+    }
+
+    &__chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        font-size: 12px;
+        color: var(--text-dim);
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-full;
+        cursor: pointer;
+
+        &:hover { color: var(--text); }
+    }
+}
+
+// ── Calendar view ───────────────────────────────────────────
+.backup-calendar {
+    &__head {
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+        margin-bottom: $space-3;
+    }
+
+    &__month {
+        flex: 1;
+        font-weight: $font-weight-semibold;
+        color: var(--text);
+    }
+
+    &__nav,
+    &__today {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 28px;
+        padding: 0 $space-2;
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-sm;
+        color: var(--text-dim);
+        cursor: pointer;
+
+        &:hover { border-color: var(--accent-bright); color: var(--text); }
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: $space-1;
+    }
+
+    &__dow {
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-faint);
+        padding-bottom: $space-1;
+    }
+
+    &__cell {
+        position: relative;
+        aspect-ratio: 1 / 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-sm;
+        background: var(--surface-2);
+        color: var(--text-dim);
+        font-size: 12px;
+
+        &--empty { background: transparent; border-color: transparent; }
+
+        &--has {
+            cursor: pointer;
+
+            &:hover { border-color: var(--accent-bright); }
+            &.is-success { border-color: var(--green); background: var(--green-bg); }
+            &.is-failed { border-color: var(--red); background: var(--red-bg); }
+            &.is-running { border-color: var(--cyan); background: var(--cyan-bg); }
+        }
+    }
+
+    &__badge {
+        position: absolute;
+        top: 2px;
+        right: 3px;
+        font-size: 9px;
+        font-weight: $font-weight-semibold;
+        color: var(--text-faint);
+    }
+}
+
+// ── Detail drawer ───────────────────────────────────────────
+.backup-detail-drawer {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    &__error {
+        padding: $space-2 $space-3;
+        font-size: 13px;
+        color: var(--red);
+        background: var(--red-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-sm;
+    }
+
+    &__meta {
+        display: grid;
+        gap: $space-1;
+    }
+
+    &__row {
+        display: flex;
+        justify-content: space-between;
+        gap: $space-3;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border-soft);
+        font-size: 13px;
+
+        span:first-child { color: var(--text-faint); }
+        span:last-child { color: var(--text); }
+    }
+
+    &__cost {
+        font-size: 13px;
+        color: var(--text-dim);
+        font-family: var(--mono);
+    }
+
+    &__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space-2;
+    }
+
+    &__joblink {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+        color: var(--accent-bright);
+    }
+}
+
+// ── Restore drawer ──────────────────────────────────────────
+.restore-drawer {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    &__section { display: flex; flex-direction: column; gap: $space-2; }
+    &__label { font-size: 12px; font-weight: $font-weight-semibold; color: var(--text); }
+
+    &__tables {
+        display: flex;
+        flex-direction: column;
+        gap: $space-1;
+        max-height: 180px;
+        overflow-y: auto;
+        padding: $space-2;
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-sm;
+
+        label { display: flex; align-items: center; gap: $space-2; font-size: 13px; color: var(--text-dim); }
+    }
+
+    &__options { display: flex; flex-direction: column; gap: $space-3; }
+
+    &__option {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-3;
+
+        label { display: flex; flex-direction: column; font-size: 13px; color: var(--text); cursor: pointer; }
+    }
+
+    &__warning {
+        display: flex;
+        align-items: flex-start;
+        gap: $space-2;
+        padding: $space-2 $space-3;
+        font-size: 13px;
+        color: var(--amber);
+        background: var(--amber-bg);
+        border: 1px solid var(--border-soft);
+        border-radius: $radius-sm;
+    }
+}

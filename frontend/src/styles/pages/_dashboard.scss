@@ -1,0 +1,741 @@
+// ============================================
+// DASHBOARD PAGE - Pro Layout (new_dashboard_3 style)
+// ============================================
+
+.dashboard-page {
+    display: flex;
+    flex-direction: column;
+    gap: $space-6;
+    min-height: 100%;
+
+    // Override generic .top-bar margin from _main-content (40px not needed here)
+    > .top-bar {
+        margin-bottom: 0;
+    }
+}
+
+// --- Top Bar: Pro Layout ---
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: $space-4;
+    border-bottom: 1px solid $border-subtle;
+}
+
+.server-identity {
+    h1 {
+        font-size: 1.5rem;
+        font-weight: $font-weight-bold;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: $text-primary;
+        font-family: $font-mono;
+    }
+}
+
+// --- Server switcher (title becomes a clickable name + chevron) ---
+// Visual parity with the design's `.srv-switch` + `.env-menu` popover.
+.srv-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 4px;
+    border: none;
+    background: transparent;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    color: $text-primary;
+    @include focus-ring();
+
+    &__name {
+        font-size: 1.5rem;
+        font-weight: $font-weight-bold;
+        letter-spacing: -0.02em;
+        font-family: $font-mono;
+        color: $text-primary;
+    }
+
+    &__chev {
+        color: var(--text-faint);
+        transition: transform 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    &--open &__chev {
+        transform: rotate(180deg);
+    }
+}
+
+// Popover menu listing connected servers (PopoverContent className="env-menu").
+// Plain SCSS class overrides the primitive's baked-in utilities — same pattern
+// as `.ui-popover-content`.
+.env-menu {
+    min-width: 280px;
+    padding: 7px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    color: var(--text);
+
+    &__head {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-ghost);
+        padding: 7px 10px 5px;
+    }
+}
+
+.env-opt {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 9px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    @include focus-ring();
+
+    &:hover {
+        background: var(--surface-3);
+    }
+
+    &__dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex-shrink: 0;
+
+        &--online {
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+        }
+
+        &--offline {
+            background: var(--red);
+        }
+    }
+
+    &__body {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    &__name {
+        font-weight: $font-weight-semibold;
+        font-size: 13px;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    &__meta {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--text-faint);
+        margin-top: 1px;
+    }
+
+    &__check {
+        margin-left: auto;
+        color: var(--accent-bright);
+        flex-shrink: 0;
+        display: inline-flex;
+    }
+}
+
+// Connection status: dot + text label (never color alone), announced to
+// screen readers via role="status". The label stays a readable neutral
+// (contrast-safe in both themes); the dot carries the status color.
+.conn-status {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: $text-secondary;
+
+    .conn-status__dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    &--live .conn-status__dot {
+        background: $success;
+        box-shadow: 0 0 8px $success;
+    }
+
+    &--down .conn-status__dot {
+        background: $warning;
+        box-shadow: 0 0 8px $warning;
+    }
+}
+
+.server-details {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    margin-top: $space-2;
+    font-size: $font-size-sm;
+    color: $text-tertiary;
+    font-family: $font-mono;
+
+    .detail-separator {
+        color: $border-default;
+        user-select: none;
+    }
+}
+
+// Right section: clock + refresh stacked
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: $space-5;
+}
+
+.clock-widget {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.clock-time {
+    font-family: $font-mono;
+    font-size: 1.25rem;
+    font-weight: $font-weight-bold;
+    color: $text-primary;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+}
+
+.clock-zone {
+    color: $accent-primary;
+    font-weight: $font-weight-semibold;
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+// --- Grid System ---
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: $space-5;
+    max-width: 1800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+// --- Metric Tiles ---
+.metric-tile {
+    grid-column: span 3;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    padding: $space-5;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, $accent-primary, transparent);
+        opacity: 0.5;
+    }
+
+    @media (max-width: $breakpoint-xl) {
+        grid-column: span 6;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        grid-column: span 12;
+    }
+}
+
+// KPI cards (redesign) use the shared `.sk-kpi` primitive; this just places
+// them on the dashboard's 12-col grid (4-up, like the old metric tiles).
+.dash-kpi {
+    grid-column: span 3;
+
+    @media (max-width: $breakpoint-xl) {
+        grid-column: span 6;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        grid-column: span 12;
+    }
+}
+
+.tile-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $space-3;
+}
+
+.tile-title {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    color: $text-tertiary;
+    letter-spacing: 0.05em;
+}
+
+.tile-icon {
+    &.cpu { color: $accent-primary; }
+    &.memory { color: $success; }
+    &.network { color: $warning; }
+    &.disk { color: $danger; }
+}
+
+.tile-val {
+    font-family: $font-mono;
+    font-size: 1.75rem;
+    font-weight: $font-weight-bold;
+    color: $text-primary;
+}
+
+.tile-val-unit {
+    font-size: $font-size-base;
+    font-weight: $font-weight-normal;
+    color: $text-tertiary;
+    margin-left: $space-1;
+}
+
+.tile-sub {
+    font-size: $font-size-sm;
+    color: $text-tertiary;
+    margin-top: $space-2;
+    display: flex;
+    justify-content: space-between;
+}
+
+.trend-up { color: $warning; }
+.trend-down { color: $success; }
+
+// --- Chart Panel ---
+.chart-panel {
+    grid-column: span 8;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    padding: $space-5;
+    min-height: 450px;
+    display: flex;
+    flex-direction: column;
+
+    // Override MetricsGraph card styling when inside chart-panel
+    .metrics-graph-card {
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin-bottom: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    // Toolbar styling matching new_dashboard_3
+    .metrics-graph-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $space-5;
+        gap: $space-4;
+    }
+
+    .graph-title {
+        font-weight: $font-weight-semibold;
+        font-size: $font-size-base;
+        color: $text-primary;
+    }
+
+    .metrics-chart-container {
+        flex-grow: 1;
+        margin-bottom: 0;
+    }
+
+    @media (max-width: $breakpoint-lg) {
+        grid-column: span 12;
+        min-height: 400px;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        .metrics-graph-header {
+            flex-wrap: wrap;
+            gap: $space-3;
+        }
+    }
+}
+
+// --- Spec Panel ---
+.spec-panel {
+    grid-column: span 4;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    padding: $space-5;
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    @media (max-width: $breakpoint-lg) {
+        grid-column: span 12;
+    }
+}
+
+.spec-panel-title {
+    font-size: $font-size-sm;
+    text-transform: uppercase;
+    color: $text-tertiary;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.05em;
+}
+
+.spec-row {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid $border-subtle;
+    padding-bottom: $space-3;
+    font-size: $font-size-sm;
+
+    &:last-child {
+        border: none;
+        padding-bottom: 0;
+    }
+}
+
+.spec-label {
+    color: $text-tertiary;
+}
+
+.spec-data {
+    font-family: $font-mono;
+    color: $text-primary;
+    text-align: right;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-action {
+    width: 100%;
+    padding: $space-3;
+    background: $bg-hover;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    color: $text-primary;
+    font-weight: $font-weight-semibold;
+    font-size: $font-size-sm;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all $transition-fast;
+    @include focus-ring();
+
+    &:hover {
+        border-color: $accent-primary;
+        background: $accent-glow;
+    }
+
+    svg {
+        color: $text-tertiary;
+    }
+}
+
+// --- Process Table ---
+// Pairs side-by-side with the Recent Activity panel (8/4 split, mirroring the
+// prototype's 1.55fr/1fr). Collapses to full width when activity stacks below.
+.table-panel {
+    grid-column: span 8;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    overflow: hidden;
+
+    @media (max-width: $breakpoint-lg) {
+        grid-column: span 12;
+    }
+}
+
+// --- Recent Activity Panel ---
+// Admin-only audit feed. Rows are rendered by the DS <Feed>/<FeedItem>
+// primitives (.sk-feed*); this only provides the card shell + header + placement.
+.activity-panel {
+    grid-column: span 4;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    padding: $space-5;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    @media (max-width: $breakpoint-lg) {
+        grid-column: span 12;
+    }
+
+    &__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: $space-3;
+    }
+
+    &__title {
+        font-size: $font-size-sm;
+        text-transform: uppercase;
+        color: $text-tertiary;
+        font-weight: $font-weight-semibold;
+        letter-spacing: 0.05em;
+    }
+
+    &__link {
+        display: inline-flex;
+        align-items: center;
+        gap: $space-1;
+        font-size: $font-size-xs;
+        color: $text-tertiary;
+        text-decoration: none;
+        border-radius: $radius-sm;
+        transition: color $transition-fast;
+        @include focus-ring();
+
+        &:hover {
+            color: $accent-primary;
+        }
+    }
+
+    &__empty {
+        padding: $space-5 0;
+        text-align: center;
+        font-size: $font-size-sm;
+        color: $text-tertiary;
+    }
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $space-4 $space-5;
+    border-bottom: 1px solid $border-subtle;
+    font-weight: $font-weight-semibold;
+    color: $text-primary;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: $font-size-sm;
+
+    th {
+        text-align: left;
+        padding: $space-4 $space-5;
+        background: $bg-hover;
+        color: $text-tertiary;
+        font-weight: $font-weight-semibold;
+        text-transform: uppercase;
+        font-size: $font-size-xs;
+        letter-spacing: 0.05em;
+    }
+
+    td {
+        padding: $space-4 $space-5;
+        border-bottom: 1px solid $border-subtle;
+        font-family: $font-mono;
+        color: $text-secondary;
+    }
+
+    tr:hover {
+        background: $bg-hover;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+}
+
+.app-name-cell {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    color: $text-primary;
+}
+
+.app-name-link {
+    color: $text-primary;
+    text-decoration: none;
+    border-radius: $radius-sm;
+    @include focus-ring();
+
+    &:hover {
+        color: $accent-primary;
+        text-decoration: underline;
+    }
+}
+
+.app-icon-mini {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: $text-tertiary;
+}
+
+// Status Badges
+.badge {
+    padding: 2px 8px;
+    border-radius: $radius-sm;
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+    font-weight: $font-weight-semibold;
+    letter-spacing: 0.5px;
+}
+
+.badge-running {
+    color: $success;
+    background: $success-bg;
+    border: 1px solid $success-border;
+}
+
+.badge-warning {
+    color: $warning;
+    background: $warning-bg;
+    border: 1px solid $warning-border;
+}
+
+.badge-stopped {
+    color: $danger;
+    background: $danger-bg;
+    border: 1px solid $danger-border;
+}
+
+// Responsive
+@media (max-width: $breakpoint-md) {
+    .top-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: $space-4;
+    }
+
+    .server-details {
+        flex-wrap: wrap;
+        gap: $space-3;
+    }
+
+    .clock-widget {
+        text-align: left;
+    }
+
+    .data-table {
+        th:nth-child(3),
+        th:nth-child(5),
+        td:nth-child(3),
+        td:nth-child(5) {
+            display: none;
+        }
+    }
+}
+
+@media (max-width: $breakpoint-sm) {
+    .server-details {
+        flex-direction: column;
+        gap: $space-1;
+    }
+
+    .metric-tile {
+        padding: $space-4;
+    }
+
+    .tile-val {
+        font-size: 1.5rem;
+    }
+}
+
+// --- Refresh Control ---
+.refresh-control {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: $space-2;
+    padding-left: $space-5;
+    border-left: 1px solid $border-subtle;
+
+    .refresh-select,
+    .btn-refresh {
+        width: 100%;
+    }
+}
+
+.refresh-select {
+    background: $bg-hover;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    color: $text-primary;
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+    padding: $space-1 $space-2;
+    cursor: pointer;
+    outline: none;
+
+    &:hover {
+        border-color: $accent-primary;
+    }
+
+    &:focus {
+        border-color: $accent-primary;
+        box-shadow: 0 0 0 2px $accent-glow;
+    }
+}
+
+.btn-refresh {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $bg-hover;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-sm;
+    color: $text-secondary;
+    padding: $space-2;
+    cursor: pointer;
+    transition: all $transition-fast;
+    @include focus-ring();
+
+    &:hover {
+        border-color: $accent-primary;
+        color: $accent-primary;
+        background: $accent-glow;
+    }
+}
+
+@media (max-width: $breakpoint-md) {
+    .refresh-control {
+        width: 100%;
+        justify-content: flex-start;
+        margin-left: 0;
+        padding-left: 0;
+    }
+}

@@ -1,0 +1,23 @@
+#cloud-config
+# Minimal bootstrap for ServerKit E2E test VMs.
+# The harness uploads the local working tree and runs vm-install.sh afterward.
+package_update: true
+package_upgrade: false
+
+packages:
+  - curl
+  - git
+  - rsync
+  - sudo
+  - ca-certificates
+
+write_files:
+  - path: /etc/profile.d/serverkit-test.sh
+    permissions: '0644'
+    content: |
+      export DEBIAN_FRONTEND=noninteractive
+      export NEEDRESTART_MODE=a
+
+runcmd:
+  - mkdir -p /opt/serverkit-src
+  - chown ubuntu:ubuntu /opt/serverkit-src 2>/dev/null || true

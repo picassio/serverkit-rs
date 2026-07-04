@@ -1,0 +1,109 @@
+import { useState } from 'react';
+import { X, Plus, FolderTree } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+// Smart tracked-path selector for WordPress Git connections. Replaces the raw
+// textarea with removable chips, common-path shortcuts, and custom-path input.
+const QUICK_PATHS = [
+    { label: 'Themes', value: 'wp-content/themes' },
+    { label: 'Plugins', value: 'wp-content/plugins' },
+    { label: 'Uploads', value: 'wp-content/uploads' },
+    { label: 'MU Plugins', value: 'wp-content/mu-plugins' },
+];
+
+function normalizePath(value) {
+    return value
+        .replace(/\\/g, '/')
+        .split('/')
+        .filter((p) => p.trim())
+        .join('/')
+        .replace(/^\//, '')
+        .replace(/\/$/, '');
+}
+
+const PathSelector = ({ paths, onChange, label, hint, id }) => {
+    const [inputValue, setInputValue] = useState('');
+
+    function addPath(raw) {
+        const normalized = normalizePath(raw);
+        if (!normalized) return;
+        if (paths.includes(normalized)) return;
+        onChange([...paths, normalized]);
+        setInputValue('');
+    }
+
+    function removePath(path) {
+        onChange(paths.filter((p) => p !== path));
+    }
+
+    function handleKeyDown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addPath(inputValue);
+        }
+    }
+
+    return (
+        <div className="git-path-selector">
+            {label && <label htmlFor={id} className="git-path-selector__label">{label}</label>}
+
+            <div className="git-path-selector__quick">
+                {QUICK_PATHS.map(({ label: quickLabel, value }) => {
+                    const active = paths.includes(value);
+                    return (
+                        <button
+                            type="button"
+                            key={value}
+                            className={`git-path-selector__chip git-path-selector__chip--quick${active ? ' is-active' : ''}`}
+                            onClick={() => (active ? removePath(value) : addPath(value))}
+                            aria-pressed={active}
+                        >
+                            {active ? <X size={12} aria-hidden="true" /> : <Plus size={12} aria-hidden="true" />}
+                            {quickLabel}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div className="git-path-selector__add">
+                <span className="git-path-selector__add-icon"><FolderTree size={14} aria-hidden="true" /></span>
+                <input
+                    id={id}
+                    type="text"
+                    className="ui-input"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="wp-content/custom-path"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => addPath(inputValue)}>
+                    <Plus size={14} aria-hidden="true" /> Add
+                </Button>
+            </div>
+
+            {paths.length > 0 ? (
+                <ul className="git-path-selector__list">
+                    {paths.map((path) => (
+                        <li key={path} className="git-path-selector__item">
+                            <code>{path}</code>
+                            <button
+                                type="button"
+                                className="git-path-selector__remove"
+                                onClick={() => removePath(path)}
+                                aria-label={`Remove ${path}`}
+                            >
+                                <X size={12} aria-hidden="true" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="git-path-selector__empty">No paths tracked yet. Choose a shortcut above or type a custom path.</p>
+            )}
+
+            {hint && <span className="git-connect__field-hint">{hint}</span>}
+        </div>
+    );
+};
+
+export default PathSelector;

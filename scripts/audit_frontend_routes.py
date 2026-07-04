@@ -63,10 +63,10 @@ def _strip_template_exprs(s: str) -> str:
 
 def normalize_path(path: str) -> str | None:
     path = _strip_template_exprs(path).strip()
-    if path.startswith("/api/v1"):
-        path = path[len("/api/v1") :]
-    elif path.startswith("/api"):
-        path = path[len("/api") :]
+    if path == "/api/v1" or path.startswith("/api/v1/"):
+        path = path[len("/api/v1") :] or "/"
+    elif path == "/api" or path.startswith("/api/"):
+        path = path[len("/api") :] or "/"
     if not path.startswith("/"):
         return None
     path = path.split("?", 1)[0]

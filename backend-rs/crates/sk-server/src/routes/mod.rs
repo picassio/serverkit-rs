@@ -8,6 +8,7 @@ pub mod jobs;
 pub mod magento;
 pub mod monitoring;
 pub mod ops;
+pub mod projects;
 pub mod servers;
 pub mod stubs;
 pub mod system;

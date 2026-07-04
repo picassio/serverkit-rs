@@ -47,11 +47,6 @@ pub fn router() -> Router<SharedState> {
             "/modules",
             get(async |AuthUser(_u): AuthUser| Json(json!({ "modules": [] }))),
         )
-        // app/api/workspaces.py list_workspaces
-        .route(
-            "/workspaces/",
-            get(async |AuthUser(_u): AuthUser| Json(json!({ "workspaces": [] }))),
-        )
         // app/api/gpu.py GpuService.info()
         .route(
             "/gpu/",

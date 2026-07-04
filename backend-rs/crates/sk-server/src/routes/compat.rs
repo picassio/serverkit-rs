@@ -46,8 +46,6 @@ pub fn router() -> Router<SharedState> {
         .route("/plugins/", get(async |AuthUser(_u): AuthUser| Json(json!({ "plugins": [] }))))
         .route("/plugins/builtin", get(async |AuthUser(_u): AuthUser| Json(json!({ "plugins": [] }))))
         .route("/plugins/updates", get(async |AuthUser(_u): AuthUser| Json(json!({ "updates": [] }))))
-        // ── Projects / workspaces ───────────────────────────────────────
-        .route("/projects", get(async |AuthUser(_u): AuthUser| Json(json!({ "projects": [] }))))
         // ── Security ────────────────────────────────────────────────────
         .route("/security/status", get(async |AuthUser(_u): AuthUser| Json(json!({ "score": 0, "max_score": 0, "checks": [] }))))
         .route("/security/clamav/status", get(async |AuthUser(_u): AuthUser| Json(json!({ "installed": false, "running": false, "last_scan": null, "definitions": null }))))

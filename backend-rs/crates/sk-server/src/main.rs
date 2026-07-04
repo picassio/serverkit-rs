@@ -42,6 +42,7 @@ async fn main() -> anyhow::Result<()> {
     // fork-owned tables + additive columns (safe to run every boot)
     sk_magento::store::ensure_schema(&pool).await?;
     sk_jobs::ensure_schema(&pool).await?;
+    sk_projects::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -78,6 +79,13 @@ async fn main() -> anyhow::Result<()> {
         .nest("/monitoring", routes::monitoring::router())
         .nest("/jobs", routes::jobs::jobs_router())
         .nest("/queue", routes::jobs::queue_router())
+        .nest("/projects", routes::projects::projects_router())
+        .nest("/environments", routes::projects::environments_router())
+        .nest("/workspaces", routes::projects::workspaces_router())
+        .nest("/api-keys", routes::projects::api_keys_router())
+        .nest("/vaults", routes::projects::vaults_router())
+        .nest("/secrets", routes::projects::secrets_router())
+        .nest("/shared", routes::projects::shared_router())
         .merge(routes::templates::router())
         .nest("/databases", routes::db::databases_router())
         .nest("/cron", routes::db::cron_router())

@@ -515,11 +515,12 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 
 - **Phase 0 started (commit `eef67c4`)**: added `scripts/audit_frontend_routes.py`, `scripts/check_route_ledger.py`, `docs/API_ROUTE_LEDGER.md`, `docs/api_route_families.json`, and a CI route-ledger gate. The ledger currently tracks 1064 frontend method+path API uses across 69 route families.
 - **Phase 1 jobs/queue foundation started**: added `sk-jobs`, SQLite schema bootstrapping, real `/jobs/*` and `/queue/*` routes, removed jobs/queue empty compat handlers, and marked `jobs` + `queue` as `implemented` in the ledger. VM 131 smoke test: created queue group + queue + message, received the message, completed it, and stats reported `completed: 1`.
+- **Phase 1 projects/workspaces/secrets foundation started**: added `sk-projects`, boot-time SQLite schema creation, and real routes for `projects`, `environments`, `workspaces`, `api-keys`, `vaults`, `secrets`, and `shared`. Secrets/API keys/variables are encrypted at rest via `sk_core::crypto`. Removed the stale `/workspaces/` stub and `/projects` compat handler. VM 131 smoke test: workspace → project → environment, API key creation, vault/secret reveal, shared tag, and variable-group variable all succeeded.
 
 ## Immediate next engineering tasks
 
-1. Mark every existing route in `compat.rs` and `stubs.rs` as debt in the ledger.
+1. Mark every remaining route in `compat.rs` and `stubs.rs` as debt in the ledger.
 2. Expand `sk-jobs` worker execution: leases, background workers, retries, cancellation of running tasks, job logs, scheduled-job runner.
-3. Build `sk-projects`/`sk-workspaces` because many route families require project/environment ownership.
+3. Build notifications/telemetry/event-subscriptions/webhooks so events emitted by jobs/projects/apps become durable and deliverable.
 5. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
 6. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.

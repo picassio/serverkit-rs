@@ -62,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
     sk_workflows::ensure_schema(&pool).await?;
     sk_git::ensure_schema(&pool).await?;
     sk_email::ensure_schema(&pool).await?;
+    sk_plugins::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -157,6 +158,14 @@ async fn main() -> anyhow::Result<()> {
         .nest("/workflows", routes::workflows::router())
         .nest("/git", routes::git::router())
         .nest("/email", routes::email::router())
+        .route("/plugins/", get(routes::plugins::plugin_root_alias))
+        .route(
+            "/agent-plugins/",
+            get(routes::plugins::agent_root_alias).post(routes::plugins::agent_create_root_alias),
+        )
+        .nest("/plugins", routes::plugins::plugin_router())
+        .nest("/marketplace", routes::plugins::marketplace_router())
+        .nest("/agent-plugins", routes::plugins::agent_router())
         .route(
             "/status/",
             get(routes::status::pages).post(routes::status::create_page),

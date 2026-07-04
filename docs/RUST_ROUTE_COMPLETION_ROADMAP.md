@@ -570,6 +570,16 @@ Build:
 - Agent plugin spec, server installs, config, enable/disable, bulk install.
 - Marketplace registry and install route backed by the same extension system.
 
+Implemented 2026-07-04:
+
+- Added `sk-plugins`, boot-time schema creation, and `routes/plugins.rs` ownership for all 14 `/plugins/*`, 2 `/marketplace/*`, and 13 `/agent-plugins/*` frontend routes.
+- Installed plugins, configs, update metadata, active contributions, built-in extension catalog, and marketplace registry installs persist in SQLite through one shared extension subsystem.
+- Built-in/marketplace catalogs expose the real bundled frontend plugin manifests currently present under `frontend/src/plugins` (GPU, FTP, workflows, GUI, Cloudflare ops, email, git, cloud provision, WordPress, status, remote access) and merge installed state.
+- Plugin install from registry/URL/upload persists install records; local install verifies that the supplied path exists and returns a typed `LOCAL_PLUGIN_PATH_NOT_FOUND` state when it does not.
+- Agent plugin definitions and per-server installs persist independently with config, enable/disable, uninstall, bulk install, server install listing, and spec routes.
+- Removed the old plugin/marketplace empty compat routes and `/plugins/contributions` stub; added explicit trailing-slash aliases for frontend `/plugins/` and `/agent-plugins/` calls.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered plugin list/builtin/registry install/get/config/disable/enable/updates/update/contributions/delete, URL/local/upload install paths, agent plugin CRUD/install/bulk/server listing/install enable-disable-config-delete/spec, and cleanup.
+
 ## Phase 9 — Remaining cross-cutting/product routes
 
 Route families:

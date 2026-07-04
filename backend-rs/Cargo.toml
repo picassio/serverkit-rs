@@ -27,6 +27,7 @@ members = [
     "crates/sk-workflows",
     "crates/sk-git",
     "crates/sk-email",
+    "crates/sk-plugins",
 ]
 
 [workspace.package]
@@ -68,6 +69,7 @@ sk-wordpress = { path = "crates/sk-wordpress" }
 sk-workflows = { path = "crates/sk-workflows" }
 sk-git = { path = "crates/sk-git" }
 sk-email = { path = "crates/sk-email" }
+sk-plugins = { path = "crates/sk-plugins" }
 
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["multipart"] }

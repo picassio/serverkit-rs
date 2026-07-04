@@ -5,9 +5,9 @@
     "owner": "sk-workspaces/sk-notifications"
   },
   "agent-plugins": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 8,
-    "owner": "sk-plugins/sk-fleet"
+    "owner": "sk-plugins"
   },
   "ai": {
     "status": "planned",
@@ -175,7 +175,7 @@
     "note": "Implemented routes exist; parity tests still required before marking implemented."
   },
   "marketplace": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 8,
     "owner": "sk-plugins"
   },
@@ -235,7 +235,7 @@
     "owner": "sk-web::php"
   },
   "plugins": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 8,
     "owner": "sk-plugins"
   },

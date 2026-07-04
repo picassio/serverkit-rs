@@ -2784,6 +2784,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-plugins"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde_json",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "sk-projects"
 version = "0.1.6"
 dependencies = [
@@ -2860,6 +2871,7 @@ dependencies = [
  "sk-models",
  "sk-monitor",
  "sk-ops",
+ "sk-plugins",
  "sk-projects",
  "sk-runtimes",
  "sk-security",

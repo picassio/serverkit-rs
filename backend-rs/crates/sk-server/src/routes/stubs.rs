@@ -13,17 +13,6 @@ use serde_json::{json, Value};
 
 pub fn router() -> Router<SharedState> {
     Router::new()
-        // app/api/plugins.py get_contributions
-        .route(
-            "/plugins/contributions",
-            get(async |AuthUser(_u): AuthUser| {
-                Json(json!({
-                    "nav": [], "routes": [], "page_titles": {},
-                    "command_palette": [], "widgets": [], "layouts": [], "tabs": [],
-                    "ai": { "suggested_prompts": [], "tool_renderers": [] }
-                }))
-            }),
-        )
         // (ai/* is now served by routes::ai, backed by the pi-SDK sidecar)
         // app/api/admin.py get_settings — Settings page reads the system settings
         // map; empty list until an admin-settings store is ported.

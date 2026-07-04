@@ -20,6 +20,7 @@ pub mod jobs;
 pub mod magento;
 pub mod monitoring;
 pub mod ops;
+pub mod plugins;
 pub mod projects;
 pub mod runtimes;
 pub mod security;

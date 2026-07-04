@@ -42,6 +42,7 @@ sk-workflows = { workspace = true }
 sk-git = { workspace = true }
 sk-email = { workspace = true }
 sk-plugins = { workspace = true }
+sk-sso = { workspace = true }
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

@@ -624,6 +624,16 @@ Implemented 2026-07-04 (monitoring slice):
 - Webhook test posts a real test payload to the configured/provided URL; email test now returns typed `EMAIL_ALERTS_NOT_CONFIGURED` until SMTP settings are configured, and otherwise performs a real SMTP TCP connectivity check.
 - Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status, metrics, alert check/history, config update, threshold update, start/stop persistence, webhook test, and typed email-test unavailable state.
 
+Implemented 2026-07-04 (SSO slice):
+
+- Added `sk-sso`, boot-time schema creation, and `routes/sso.rs` ownership for all 10 `/sso/*` frontend routes.
+- General SSO settings, provider configs, identities, and OAuth/SAML state records persist in SQLite; client secrets and SAML certificates are encrypted with `sk_core::crypto` and redacted in admin config responses.
+- Public provider listing reflects only enabled persisted providers and SSO-only/password-login state.
+- Authorize routes generate real Google/GitHub/SAML authorization URLs and persist CSRF state; disabled/unconfigured providers return typed domain errors.
+- Callback/link routes require an auth code and return typed `SSO_TOKEN_EXCHANGE_UNAVAILABLE` until a provider-specific token/assertion exchange adapter is configured, avoiding fake login/link success.
+- Admin provider tests validate persisted config and perform real OIDC discovery HTTP checks for OIDC providers; SAML/OAuth tests report typed missing-config states.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered providers, identities, admin config, general/provider update, provider test, authorize URL generation, typed callback/link failure, unlink, and cleanup.
+
 ## Endpoint-family inventory from frontend API modules
 
 Generated from `frontend/src/services/api/*.js` before manual normalization. Counts are useful for scope sizing; the Phase 0 ledger is the authoritative route-by-route source.

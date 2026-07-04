@@ -300,7 +300,7 @@
     "owner": "sk-acme/sk-web"
   },
   "sso": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 9,
     "owner": "sk-sso"
   },

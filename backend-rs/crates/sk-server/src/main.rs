@@ -64,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
     sk_email::ensure_schema(&pool).await?;
     sk_plugins::ensure_schema(&pool).await?;
     routes::system::ensure_schema(&pool).await?;
+    sk_sso::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -184,6 +185,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/processes", routes::ops::processes_router())
         .nest("/system", routes::system::router())
         .nest("/metrics", routes::system::metrics_router())
+        .nest("/sso", routes::sso::router())
         .merge(routes::stubs::router())
         .merge(routes::compat::router())
         .with_state(state.clone())

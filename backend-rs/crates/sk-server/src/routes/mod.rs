@@ -25,6 +25,7 @@ pub mod projects;
 pub mod runtimes;
 pub mod security;
 pub mod servers;
+pub mod sso;
 pub mod status;
 pub mod stubs;
 pub mod system;

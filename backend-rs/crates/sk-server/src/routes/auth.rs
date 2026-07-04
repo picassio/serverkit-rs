@@ -1,7 +1,7 @@
 //! Port of `backend/app/api/auth.py` (P0 endpoints).
 //!
 //! Response shapes are contract — see the Flask handlers for the oracle.
-//! TODO(P1): audit logging, rate limiting, 2FA verify endpoint, SSO.
+//! Includes setup/login/register/profile plus Rust-native TOTP 2FA and SSO setup metadata.
 
 use crate::error::{ApiError, ApiResult};
 use crate::extract::{AuthUser, RefreshUser};
@@ -69,11 +69,14 @@ async fn setup_status(State(state): State<SharedState>) -> ApiResult<Json<Value>
         settings::get_bool(&state.db, "registration_enabled", false).await?
     };
 
+    let sso = sk_sso::providers(&state.db)
+        .await
+        .unwrap_or_else(|_| json!({"providers": [], "password_login_enabled": true}));
     Ok(Json(json!({
         "needs_setup": needs_setup,
         "registration_enabled": registration_enabled,
-        "sso_providers": [],                 // TODO(P1): SSO port
-        "password_login_enabled": true,      // TODO(P1): sso_service.is_password_login_allowed
+        "sso_providers": sso["providers"].clone(),
+        "password_login_enabled": sso["password_login_enabled"].as_bool().unwrap_or(true),
         "needs_migration": false,
         "migration_info": {
             "pending_count": 0,

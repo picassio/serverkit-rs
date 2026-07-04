@@ -1,0 +1,12 @@
+[package]
+name = "sk-ftp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+sk-core.workspace = true

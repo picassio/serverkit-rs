@@ -460,6 +460,14 @@ Route family: `/ftp/*`
 
 Build install/status/config/users/connections/test/logs/service controls.
 
+Implemented 2026-07-04:
+
+- Added `sk-ftp`, boot-time schema creation, and `routes/ftp.rs` ownership for all 14 `/ftp/*` frontend routes.
+- FTP config is persisted as daemon desired state; virtual FTP users are persisted with encrypted passwords and enable/disable state.
+- Status/install/service routes inspect real daemon/systemd state (`vsftpd`/configured service) and return explicit `FTP_DAEMON_NOT_INSTALLED` unavailable states instead of fake install/service success when no daemon is present.
+- Connections/logs/test routes use real host integration (`ss`, `journalctl`, and TCP connect) with typed errors for invalid disconnect ids.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status, config get/set, users create/password/toggle/delete, connections, disconnect typed error, logs, install typed state, service status, and TCP test.
+
 ### 7.3 Git service (`sk-git`)
 
 Route family: `/git/*`
@@ -573,7 +581,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | files | 21 | sk-files | 3 |
 | firewall | 14 | sk-security | 5 |
 | fleet-monitor | 11 | sk-fleet | 6 |
-| ftp | 13 | sk-ftp | 7 |
+| ftp | 14 | sk-ftp | 7 |
 | git | 25 | sk-git | 7 |
 | gpu | 1 | sk-gpu | 7 |
 | image-updates | 2 | sk-apps | 2 |

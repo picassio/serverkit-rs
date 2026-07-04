@@ -2673,6 +2673,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-ftp"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde_json",
+ "sk-core",
+ "sqlx",
+]
+
+[[package]]
 name = "sk-gpu"
 version = "0.1.6"
 dependencies = [
@@ -2814,6 +2825,7 @@ dependencies = [
  "sk-events",
  "sk-files",
  "sk-fleet",
+ "sk-ftp",
  "sk-gpu",
  "sk-jobs",
  "sk-magento",

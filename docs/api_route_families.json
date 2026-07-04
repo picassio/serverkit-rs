@@ -139,7 +139,7 @@
     "owner": "sk-fleet"
   },
   "ftp": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 7,
     "owner": "sk-ftp"
   },

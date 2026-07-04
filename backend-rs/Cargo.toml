@@ -22,6 +22,7 @@ members = [
     "crates/sk-cloud",
     "crates/sk-gpu",
     "crates/sk-status",
+    "crates/sk-ftp",
 ]
 
 [workspace.package]
@@ -58,6 +59,7 @@ sk-fleet = { path = "crates/sk-fleet" }
 sk-cloud = { path = "crates/sk-cloud" }
 sk-gpu = { path = "crates/sk-gpu" }
 sk-status = { path = "crates/sk-status" }
+sk-ftp = { path = "crates/sk-ftp" }
 
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["multipart"] }

@@ -433,6 +433,130 @@ pub async fn add_ssl_to_site(name: &str, cert_path: &str, key_path: &str) -> Val
     }
 }
 
+pub fn site_by_name(name: &str) -> Option<Value> {
+    list_sites()
+        .into_iter()
+        .find(|s| s["name"].as_str() == Some(name))
+}
+
+pub fn raw_site_config(name: &str) -> Option<String> {
+    if !validate_name(name) {
+        return None;
+    }
+    std::fs::read_to_string(format!("{SITES_AVAILABLE}/{name}")).ok()
+}
+
+pub async fn resolve_domain(domain: &str) -> Value {
+    match tokio::process::Command::new("getent")
+        .args(["ahosts", domain])
+        .output()
+        .await
+    {
+        Ok(o) if o.status.success() => {
+            json!({"success":true,"output":String::from_utf8_lossy(&o.stdout).to_string()})
+        }
+        Ok(o) => json!({"success":false,"error":String::from_utf8_lossy(&o.stderr).to_string()}),
+        Err(e) => json!({"success":false,"error":e.to_string()}),
+    }
+}
+
+pub fn lb_methods() -> Value {
+    json!({"methods":[
+        {"key":"round_robin","name":"Round robin","nginx_directive":null},
+        {"key":"least_conn","name":"Least connections","nginx_directive":"least_conn;"},
+        {"key":"ip_hash","name":"IP hash","nginx_directive":"ip_hash;"},
+        {"key":"hash","name":"Consistent hash","nginx_directive":"hash $request_uri consistent;"}
+    ]})
+}
+
+pub async fn proxy_rules(name: &str) -> Value {
+    let Some(config) = raw_site_config(name) else {
+        return json!({"success":false,"error":"site not found","rules":[]});
+    };
+    let proxy_re = regex::Regex::new(r"proxy_pass\s+([^;]+);").unwrap();
+    let rules: Vec<Value> = proxy_re
+        .captures_iter(&config)
+        .map(|c| json!({"proxy_pass":c[1].to_string()}))
+        .collect();
+    json!({"success":true,"site":name,"rules":rules,"config":config})
+}
+
+pub async fn create_proxy_site(name: &str, domain: &str, upstream: &str) -> Value {
+    if !validate_name(name) || !validate_domain(domain) {
+        return json!({"success":false,"error":"invalid name or domain"});
+    }
+    let config = format!(
+        r#"server {{
+    listen 80;
+    listen [::]:80;
+    server_name {domain};
+
+    access_log /var/log/nginx/{name}.access.log;
+    error_log /var/log/nginx/{name}.error.log;
+
+    location / {{
+        proxy_pass {upstream};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+}}
+"#
+    );
+    let path = format!("{SITES_AVAILABLE}/{name}");
+    let r = privileged_with_stdin(&["tee", &path], Some(&config), 30).await;
+    if r.ok {
+        json!({"success":true,"site":name,"path":path})
+    } else {
+        json!({"success":false,"error":r.stderr})
+    }
+}
+
+pub async fn diff_site_config(name: &str, proposed: &str) -> Value {
+    let current = raw_site_config(name).unwrap_or_default();
+    let current_lines: Vec<&str> = current.lines().collect();
+    let proposed_lines: Vec<&str> = proposed.lines().collect();
+    let mut diff = Vec::new();
+    let max = current_lines.len().max(proposed_lines.len());
+    for i in 0..max {
+        match (current_lines.get(i), proposed_lines.get(i)) {
+            (Some(a), Some(b)) if a == b => diff.push(format!(" {}", a)),
+            (Some(a), Some(b)) => {
+                diff.push(format!("-{}", a));
+                diff.push(format!("+{}", b));
+            }
+            (Some(a), None) => diff.push(format!("-{}", a)),
+            (None, Some(b)) => diff.push(format!("+{}", b)),
+            (None, None) => {}
+        }
+    }
+    json!({"success":true,"site":name,"changed":current != proposed,"current":current,"proposed":proposed,"diff":diff.join("\n")})
+}
+
+pub fn vhost_logs(name: &str, kind: &str, lines: usize) -> Value {
+    if !validate_name(name) {
+        return json!({"success":false,"error":"invalid site name"});
+    }
+    let file = format!(
+        "/var/log/nginx/{name}.{}.log",
+        if kind == "error" { "error" } else { "access" }
+    );
+    let output = std::process::Command::new("tail")
+        .args(["-n", &lines.min(1000).to_string(), &file])
+        .output();
+    match output {
+        Ok(o) if o.status.success() => {
+            json!({"success":true,"path":file,"lines":String::from_utf8_lossy(&o.stdout).lines().collect::<Vec<_>>() })
+        }
+        Ok(o) => {
+            json!({"success":false,"path":file,"error":String::from_utf8_lossy(&o.stderr).trim()})
+        }
+        Err(e) => json!({"success":false,"path":file,"error":e.to_string()}),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

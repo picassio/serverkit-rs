@@ -2820,10 +2820,14 @@ dependencies = [
 name = "sk-web"
 version = "0.1.6"
 dependencies = [
+ "anyhow",
+ "chrono",
  "regex",
  "serde_json",
+ "sqlx",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

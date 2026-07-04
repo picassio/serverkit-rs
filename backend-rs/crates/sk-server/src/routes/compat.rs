@@ -12,8 +12,6 @@ use serde_json::{json, Value};
 
 pub fn router() -> Router<SharedState> {
     Router::new()
-        // ── Domains: real, from nginx vhosts ────────────────────────────
-        .route("/domains", get(domains))
         // ── Firewall: real, from ufw ────────────────────────────────────
         .route("/firewall/status", get(firewall_status))
         .route("/firewall/rules", get(firewall_rules).post(firewall_add_rule).delete(firewall_del_rule))
@@ -31,33 +29,6 @@ pub fn router() -> Router<SharedState> {
         .route("/security/status", get(async |AuthUser(_u): AuthUser| Json(json!({ "score": 0, "max_score": 0, "checks": [] }))))
         .route("/security/clamav/status", get(async |AuthUser(_u): AuthUser| Json(json!({ "installed": false, "running": false, "last_scan": null, "definitions": null }))))
     // (servers/* live in the nested servers router to avoid a nest conflict)
-}
-
-/// GET /domains — map nginx vhosts to the Domains page's domain objects.
-async fn domains(AuthUser(_u): AuthUser) -> Json<Value> {
-    let sites = sk_web::nginx::list_sites();
-    let domains: Vec<Value> = sites
-        .into_iter()
-        .map(|s| {
-            let list = s.get("domains").cloned().unwrap_or_else(|| json!([]));
-            let primary = list
-                .as_array()
-                .and_then(|a| a.first())
-                .and_then(|d| d.as_str())
-                .unwrap_or("")
-                .to_string();
-            json!({
-                "name": s.get("name").and_then(|v| v.as_str()).unwrap_or(""),
-                "domain": primary,
-                "domains": list,
-                "enabled": s.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false),
-                "ssl": s.get("ssl").and_then(|v| v.as_bool()).unwrap_or(false),
-                "root": s.get("root").cloned().unwrap_or(Value::Null),
-                "source": "nginx",
-            })
-        })
-        .collect();
-    Json(json!({ "domains": domains }))
 }
 
 fn ufw(args: &[&str]) -> Option<String> {

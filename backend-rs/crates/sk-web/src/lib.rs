@@ -1,6 +1,7 @@
 //! sk-web — nginx vhost management and PHP-FPM management.
 //! Ports `app/services/nginx_service.py` and `app/services/php_service.py`.
 
+pub mod domains;
 pub mod nginx;
 pub mod php;
 

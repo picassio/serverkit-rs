@@ -104,7 +104,7 @@
     "note": "Implemented routes exist; parity tests still required before marking implemented."
   },
   "domains": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 4,
     "owner": "sk-web/sk-dns"
   },
@@ -205,7 +205,7 @@
     "owner": "sk-monitor"
   },
   "nginx": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 4,
     "owner": "sk-web"
   },

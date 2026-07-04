@@ -269,6 +269,20 @@ Build:
 - WAF install/status/apply/policy/events using nginx/ModSecurity or documented provider adapter.
 - Uptime tracking current/history/stats/graph.
 
+Implemented 2026-07-04 for `domains` + `nginx`:
+
+- Added `sk-web::domains` with persisted `sk_domains` and `sk_base_domains` tables.
+- `/domains/*` is now owned by `routes/web.rs` + `sk-web::domains`, not `compat.rs`.
+- Domain create/update/delete persist metadata and create/delete matching nginx site configs when root/port data is supplied.
+- Domain list/get syncs existing nginx vhosts into persisted domain records, so an empty list is real nginx+SQLite state.
+- Domain verification performs real local DNS resolution via `getent` and checks the nginx site config exists.
+- Base-domain, suggest-subdomain, give-subdomain, domain-nginx-sites, and domain-SSL status routes are real SQLite/nginx/app-state adapters.
+- Domain SSL enable requires real certificate/key paths and calls nginx config mutation; renew returns an explicit typed not-configured error unless certificate automation is configured for the domain.
+- `/nginx/*` is fully ledger-owned by `sk-web`; existing status/test/reload/sites/enable/disable/delete remain real nginx/systemd/filesystem operations.
+- Added advanced nginx routes for proxy config creation/inspection, config diff preview, vhost logs, advanced test/reload aliases, and load-balancing method metadata.
+- Removed the previous `/domains` compat route.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered nginx status, LB methods, domain create/get/verify/list/base/suggest/nginx-sites/ssl-status/ssl-disable/typed-renew/delete, nginx site create/list/test/enable/disable/delete, advanced diff/proxy-get/logs, and advanced proxy create/rules/delete.
+
 ### 4.2 DNS, registrars, DDNS (`sk-dns`, `sk-registrars`)
 
 Route families:
@@ -469,7 +483,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | deployment-jobs | 2 | sk-jobs | 1 |
 | dns | 20 | sk-dns | 4 |
 | docker | 32 | sk-docker | existing + parity |
-| domains | 11 | sk-web/sk-dns | 4 |
+| domains | 14 | sk-web/sk-dns | 4 |
 | email | 30 | sk-email | 7 |
 | environments | 3 | sk-projects | 1 |
 | event-subscriptions | 6 | sk-telemetry/sk-notifications | 1 |
@@ -489,7 +503,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | mobile | 6 | sk-telemetry/sk-notifications | 1 |
 | modules | 2 | sk-apps/sk-plugins | 2/8 |
 | monitoring | 10 | sk-monitor | 9 |
-| nginx | 14 | sk-web | 4 |
+| nginx | 15 | sk-web | 4 |
 | notifications | 17 | sk-notifications | 1 |
 | pairing | 2 | sk-fleet | 6 |
 | performance | 6 | sk-jobs/sk-monitor | 1/9 |
@@ -548,6 +562,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 - **Phase 3 databases route family completed**: `sk-db` now owns all frontend-referenced `/databases/*` routes. Added missing password generation, MySQL table-structure, Docker aggregate/app discovery, PostgreSQL live-command adapter, SQLite live adapter, and durable managed database records with encrypted secrets and explicit connection-URI reveal. PostgreSQL routes call real `psql`/`createdb`/`dropdb`/`pg_dump`/`psql -f` commands and return typed connection errors when PostgreSQL is not running. SQLite routes use `sqlx` against allowed filesystem paths. Managed records persist in `sk_managed_databases`; physical drops intentionally require engine-specific delete endpoints. VM 131 smoke: status/password, SQLite tables/structure/query, managed create/get/reveal/protect, Docker aggregate, and PostgreSQL typed-not-running response succeeded.
 - **Phase 3 backups route family completed**: `sk-backups` now owns all 25 frontend-referenced `/backups/*` routes. Added persisted backup records, schedules, retention config, encrypted storage config, cost rates, file/app/database backup actions, restore/delete/cleanup/upload/verify/remote-list/remote-download. File/app paths perform real tar archives under allowed roots; MySQL/SQLite database actions use real engine/file operations; unsupported engines return explicit unavailable errors. Remote storage is an honest local object-store adapter via persisted `remote_dir` config or `SK_BACKUP_REMOTE_DIR`; unconfigured remote routes report that remote storage is not configured. Removed Magento-only backup compat aggregation and the backup-storage stub. Local gates plus VM 131 and VM 130 API smoke passed, including upload/verify/list/download.
 - **Phase 4 DNS/DDNS/registrars slice completed**: `sk-dns` owns all 20 `/dns/*`, 4 `/ddns/*`, and 6 `/registrars/*` frontend routes. Added persisted DNS zones/records/change log, DDNS hosts with encrypted token regeneration, registrar connections with encrypted config, manual-domain RDAP sync, DoH propagation checks, zone import/export, presets, managed/mirror/portfolio views, and explicit unconfigured provider-record responses. Local gates plus VM 131 and VM 130 API smoke passed.
+- **Phase 4 domains/nginx slice completed**: `sk-web` now owns all 14 `/domains/*` and 15 `/nginx/*` frontend routes. Added persisted domain/base-domain state, nginx vhost adoption into domain records, domain create/update/delete/verify, base-domain and subdomain helpers, domain SSL metadata/actions with typed unconfigured renewal, and advanced nginx proxy/diff/log/LB routes. Removed the `/domains` compat route. Local gates plus VM 131 and VM 130 API smoke passed.
 
 ## Immediate next engineering tasks
 
@@ -562,7 +577,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 5. Continue Phase 2 `sk-deploy`: implement live GitHub/GitLab/Bitbucket API repository listing once provider tokens are configured, real git clone/pull operations, real build execution, deployment log streaming, and rollback materialization.
 6. Deepen `sk-runtimes`: add NVM/NodeSource installation for requested Node versions, add process logs, add package-manager lockfile detection, and wire runtime apps into `sk-apps` adoption/assignment.
 7. Deepen `sk-apps` image updates: add authenticated registry manifest lookup using stored registry credentials, multi-image compose reporting, and UI surfacing of explicit `unknown` reasons.
-8. Continue Phase 4 with the remaining web/domains/SSL/nginx/Cloudflare route families now that Phase 3 and the DNS/DDNS/registrars slice are complete.
+8. Continue Phase 4 with the remaining SSL and Cloudflare route families now that Phase 3 plus DNS/DDNS/registrars and domains/nginx are complete.
 9. Deepen `databases`: add authenticated PostgreSQL password support, richer Docker app-to-container mapping, and physical managed-record drop workflows with explicit credentials.
 10. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
 11. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.

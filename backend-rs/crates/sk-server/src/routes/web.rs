@@ -3,7 +3,7 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
-use axum::extract::Path;
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
@@ -21,6 +21,31 @@ pub fn nginx_router() -> Router<SharedState> {
         .route("/sites/{name}/enable", post(enable_site))
         .route("/sites/{name}/disable", post(disable_site))
         .route("/sites/{name}/ssl", post(add_ssl))
+        .route("/advanced/proxy", post(create_proxy))
+        .route("/advanced/proxy/{name}", get(get_proxy))
+        .route("/advanced/test", post(nginx_test))
+        .route("/advanced/reload", post(nginx_reload))
+        .route("/advanced/diff", post(diff_config))
+        .route("/advanced/logs/{name}", get(vhost_logs))
+        .route("/advanced/lb-methods", get(lb_methods))
+}
+
+pub fn domains_router() -> Router<SharedState> {
+    Router::new()
+        .route("/", get(domains_list).post(domain_create))
+        .route("/base-domains", get(base_domains))
+        .route("/give-subdomain", post(give_subdomain))
+        .route("/nginx/sites", get(domains_nginx_sites))
+        .route("/ssl/status", get(domains_ssl_status))
+        .route("/suggest-subdomain", get(suggest_subdomain))
+        .route(
+            "/{id}",
+            get(domain_get).put(domain_update).delete(domain_delete),
+        )
+        .route("/{id}/ssl/enable", post(domain_ssl_enable))
+        .route("/{id}/ssl/disable", post(domain_ssl_disable))
+        .route("/{id}/ssl/renew", post(domain_ssl_renew))
+        .route("/{id}/verify", get(domain_verify))
 }
 
 pub fn php_router() -> Router<SharedState> {
@@ -198,6 +223,181 @@ async fn add_ssl(
         sk_web::nginx::add_ssl_to_site(&name, &cert, &key).await,
         StatusCode::OK,
     ))
+}
+
+async fn get_proxy(AuthUser(u): AuthUser, Path(name): Path<String>) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::nginx::proxy_rules(&name).await))
+}
+
+async fn create_proxy(
+    AuthUser(u): AuthUser,
+    Json(b): Json<Value>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let domain = b
+        .get("domain")
+        .and_then(Value::as_str)
+        .ok_or_else(|| ApiError::bad_request("domain is required"))?;
+    let upstream = b
+        .get("upstream")
+        .or_else(|| b.get("proxy_pass"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| ApiError::bad_request("upstream/proxy_pass is required"))?;
+    let name = b.get("name").and_then(Value::as_str).unwrap_or(domain);
+    Ok(by_success(
+        sk_web::nginx::create_proxy_site(name, domain, upstream).await,
+        StatusCode::CREATED,
+    ))
+}
+
+async fn diff_config(AuthUser(u): AuthUser, Json(b): Json<Value>) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let domain = b
+        .get("domain")
+        .and_then(Value::as_str)
+        .ok_or_else(|| ApiError::bad_request("domain is required"))?;
+    let config = b.get("config").and_then(Value::as_str).unwrap_or("");
+    Ok(Json(sk_web::nginx::diff_site_config(domain, config).await))
+}
+
+#[derive(Deserialize)]
+struct LogsQuery {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    lines: Option<usize>,
+}
+
+async fn vhost_logs(
+    AuthUser(u): AuthUser,
+    Path(name): Path<String>,
+    Query(q): Query<LogsQuery>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::nginx::vhost_logs(
+        &name,
+        q.kind.as_deref().unwrap_or("access"),
+        q.lines.unwrap_or(100),
+    )))
+}
+
+async fn lb_methods(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::nginx::lb_methods()))
+}
+
+// ==================== DOMAINS ====================
+
+async fn domains_list(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_web::domains::list(&s.db).await?))
+}
+async fn domain_get(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(
+        sk_web::domains::get(&s.db, &id)
+            .await?
+            .unwrap_or(Value::Null),
+    ))
+}
+async fn domain_create(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::domains::create(&s.db, &b).await?))
+}
+async fn domain_update(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::domains::update(&s.db, &id, &b).await?))
+}
+async fn domain_delete(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::domains::delete(&s.db, &id).await?))
+}
+async fn domain_verify(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_web::domains::verify(&s.db, &id).await?))
+}
+async fn domain_ssl_enable(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::domains::enable_ssl(&s.db, &id, &b).await?))
+}
+async fn domain_ssl_disable(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::domains::disable_ssl(&s.db, &id).await?))
+}
+async fn domain_ssl_renew(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::domains::renew_ssl(&s.db, &id).await?))
+}
+async fn base_domains(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_web::domains::base_domains(&s.db).await?))
+}
+#[derive(Deserialize)]
+struct SuggestQuery {
+    application_id: String,
+    base: Option<String>,
+}
+async fn suggest_subdomain(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Query(q): Query<SuggestQuery>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(
+        sk_web::domains::suggest_subdomain(&s.db, &q.application_id, q.base.as_deref()).await?,
+    ))
+}
+async fn give_subdomain(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::domains::give_subdomain(&s.db, &b).await?))
+}
+async fn domains_nginx_sites(AuthUser(_u): AuthUser) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_web::domains::nginx_sites().await?))
+}
+async fn domains_ssl_status(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_web::domains::ssl_status(&s.db).await?))
 }
 
 // ==================== PHP ====================

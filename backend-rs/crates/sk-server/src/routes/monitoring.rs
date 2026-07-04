@@ -21,6 +21,7 @@ pub fn router() -> Router<SharedState> {
         .route("/start", post(start))
         .route("/stop", post(stop))
         .route("/test/webhook", post(test_webhook))
+        .route("/test/email", post(test_email))
 }
 
 fn require_admin(u: &sk_models::user::User) -> ApiResult<()> {
@@ -165,6 +166,51 @@ async fn stop(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     cfg["enabled"] = json!(false);
     sk_monitor::save_config(&cfg);
     Ok(Json(json!({ "success": true, "enabled": false })))
+}
+
+#[derive(Deserialize)]
+struct EmailTest {
+    email: Option<String>,
+}
+
+async fn test_email(
+    AuthUser(u): AuthUser,
+    body: Option<Json<EmailTest>>,
+) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let cfg = sk_monitor::get_config();
+    let to = body.and_then(|b| b.0.email).unwrap_or_default();
+    let host = cfg["email"]["smtp_host"].as_str().unwrap_or("").to_string();
+    let port = cfg["email"]["smtp_port"].as_u64().unwrap_or(587) as u16;
+    if to.is_empty() {
+        return Err(ApiError::bad_request("email is required"));
+    }
+    if !cfg["email"]["enabled"].as_bool().unwrap_or(false) || host.is_empty() {
+        return Ok((
+            axum::http::StatusCode::BAD_REQUEST,
+            Json(json!({ "success": false, "code": "EMAIL_ALERTS_NOT_CONFIGURED" })),
+        ));
+    }
+    let result = tokio::task::spawn_blocking(move || {
+        use std::net::{TcpStream, ToSocketAddrs};
+        use std::time::Duration;
+        let addr = (host, port).to_socket_addrs().ok().and_then(|mut a| a.next());
+        match addr {
+            Some(addr) => match TcpStream::connect_timeout(&addr, Duration::from_secs(5)) {
+                Ok(_) => json!({ "success": true, "message": "SMTP TCP connection succeeded", "to": to }),
+                Err(e) => json!({ "success": false, "code": "SMTP_CONNECT_FAILED", "error": e.to_string() }),
+            },
+            None => json!({ "success": false, "code": "SMTP_RESOLVE_FAILED" }),
+        }
+    })
+    .await
+    .unwrap_or_else(|e| json!({ "success": false, "error": e.to_string() }));
+    let status = if result["success"].as_bool().unwrap_or(false) {
+        axum::http::StatusCode::OK
+    } else {
+        axum::http::StatusCode::BAD_REQUEST
+    };
+    Ok((status, Json(result)))
 }
 
 #[derive(Deserialize)]

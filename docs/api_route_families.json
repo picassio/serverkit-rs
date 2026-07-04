@@ -200,7 +200,7 @@
     "owner": "sk-apps::modules"
   },
   "monitoring": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 9,
     "owner": "sk-monitor"
   },

@@ -616,6 +616,14 @@ Implemented 2026-07-04 (system/metrics slice):
 - Metrics routes now include persisted collection state and aggregate records: start/stop writes `sk_metrics_collection_state`, stats reports persisted sampler counts plus live metrics, history reads `metrics_history`, and aggregate computes real averages from minute samples into `sk_metrics_aggregates`.
 - Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered safe system routes, invalid timezone typed error, metrics history/stats, collection stop/start persistence, and aggregate persistence.
 
+Implemented 2026-07-04 (monitoring slice):
+
+- Completed route ownership for all 12 `/monitoring/*` frontend routes using `sk-monitor` and `sk-system`.
+- Monitoring status/metrics/alerts read real host metrics and threshold config; config/threshold/start/stop mutate the persisted monitoring JSON config under `SK_DATA_DIR`.
+- Alert history reads persisted JSONL alert history; alert checks compute real threshold breaches from current host snapshots.
+- Webhook test posts a real test payload to the configured/provided URL; email test now returns typed `EMAIL_ALERTS_NOT_CONFIGURED` until SMTP settings are configured, and otherwise performs a real SMTP TCP connectivity check.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status, metrics, alert check/history, config update, threshold update, start/stop persistence, webhook test, and typed email-test unavailable state.
+
 ## Endpoint-family inventory from frontend API modules
 
 Generated from `frontend/src/services/api/*.js` before manual normalization. Counts are useful for scope sizing; the Phase 0 ledger is the authoritative route-by-route source.

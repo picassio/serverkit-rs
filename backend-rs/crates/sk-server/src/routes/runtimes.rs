@@ -16,8 +16,8 @@ fn require_admin(user: &sk_models::user::User) -> ApiResult<()> {
 pub fn node_router() -> Router<SharedState> {
     Router::new()
         .route("/versions", get(node_versions))
-        .route("/apps", post(create_node_app))
-        .route("/apps/{id}", delete(delete_node_app))
+        .route("/apps", get(list_node_apps).post(create_node_app))
+        .route("/apps/{id}", get(get_node_app).delete(delete_node_app))
         .route(
             "/apps/{id}/packages",
             get(get_node_packages).post(install_node_packages),
@@ -62,6 +62,21 @@ pub fn python_router() -> Router<SharedState> {
 async fn node_versions(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
     Ok(Json(sk_runtimes::node_versions().await))
+}
+async fn list_node_apps(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_runtimes::list_node_apps(&s.db).await?))
+}
+async fn get_node_app(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_runtimes::node_app(&s.db, &id).await?))
 }
 async fn create_node_app(
     State(s): State<SharedState>,

@@ -665,6 +665,19 @@ pub async fn get_node_app(pool: &SqlitePool, app_id: &str) -> anyhow::Result<Opt
     Ok(row.as_ref().map(node_app_value))
 }
 
+pub async fn list_node_apps(pool: &SqlitePool) -> anyhow::Result<Value> {
+    let rows = sqlx::query("SELECT * FROM sk_node_apps ORDER BY created_at DESC")
+        .fetch_all(pool)
+        .await?;
+    Ok(json!({"apps":rows.iter().map(node_app_value).collect::<Vec<_>>() }))
+}
+
+pub async fn node_app(pool: &SqlitePool, app_id: &str) -> anyhow::Result<Value> {
+    Ok(get_node_app(pool, app_id)
+        .await?
+        .unwrap_or_else(|| json!({"success":false,"error":"node app not found"})))
+}
+
 pub async fn delete_node_app(
     pool: &SqlitePool,
     app_id: &str,

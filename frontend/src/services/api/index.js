@@ -32,6 +32,7 @@ import * as sharedResourceMethods from './sharedResources.js';
 import * as previewMethods from './previews.js';
 import * as proxyMethods from './proxy.js';
 import * as magentoMethods from './magento.js';
+import * as nodeMethods from './node.js';
 
 class ApiService extends ApiClient {
     constructor() {
@@ -71,6 +72,7 @@ class ApiService extends ApiClient {
             previewMethods,
             proxyMethods,
             magentoMethods,
+            nodeMethods,
         ];
         for (const mod of modules) {
             for (const [key, fn] of Object.entries(mod)) {

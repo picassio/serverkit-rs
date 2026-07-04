@@ -68,9 +68,9 @@
     "owner": "sk-deploy::connections"
   },
   "cron": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 1,
-    "owner": "sk-ops/sk-jobs"
+    "owner": "sk-ops"
   },
   "databases": {
     "status": "implemented",
@@ -190,9 +190,9 @@
     "owner": "sk-deploy::migrations"
   },
   "mobile": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 1,
-    "owner": "sk-telemetry/sk-notifications"
+    "owner": "sk-server::routes::mobile"
   },
   "modules": {
     "status": "implemented",
@@ -225,9 +225,9 @@
     "owner": "sk-fleet"
   },
   "performance": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 1,
-    "owner": "sk-jobs/sk-monitor"
+    "owner": "sk-server::routes::performance"
   },
   "php": {
     "status": "implemented",

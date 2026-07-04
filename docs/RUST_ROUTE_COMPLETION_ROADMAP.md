@@ -75,7 +75,7 @@ Route families:
 - `/jobs/*`
 - `/queue/*`
 - `/deployment-jobs/*`
-- `/performance/jobs/*`
+- `/performance/jobs/*` (completed in cron/performance/mobile slice)
 
 Build:
 
@@ -633,6 +633,13 @@ Implemented 2026-07-04 (SSO slice):
 - Callback/link routes require an auth code and return typed `SSO_TOKEN_EXCHANGE_UNAVAILABLE` until a provider-specific token/assertion exchange adapter is configured, avoiding fake login/link success.
 - Admin provider tests validate persisted config and perform real OIDC discovery HTTP checks for OIDC providers; SAML/OAuth tests report typed missing-config states.
 - Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered providers, identities, admin config, general/provider update, provider test, authorize URL generation, typed callback/link failure, unlink, and cleanup.
+
+Implemented 2026-07-04 (cron/performance/mobile slice):
+
+- Promoted the existing `sk-ops::cron` implementation to first-class ledger ownership for all 7 `/cron/*` frontend routes. Cron status reads real daemon/process state; job list reads the user crontab merged with persisted metadata; create/update/delete/toggle write the real crontab; run executes the configured command without a shell; invalid schedules/commands return typed errors.
+- Added `routes/performance.rs` ownership for all 6 `/performance/*` routes. Cache stats inspect a real ServerKit-managed cache directory plus `/proc/meminfo`; flush deletes only the managed cache directory contents; performance job list/detail/stats read `sk_jobs`; cleanup deletes terminal jobs older than seven days.
+- Added `routes/mobile.rs` ownership for all 6 `/mobile/*` routes. Push subscriptions persist per user in SQLite; unregister deletes real rows; quick actions list safe actions; `refresh-summary` returns live summary data, `mark-notifications-read` mutates persisted notifications, and cache mutation is directed to the performance endpoint; summary/offline-cache read real job/notification/telemetry/device counts.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered cron status/presets/list/create/run/toggle/update/delete/invalid schedule, performance cache stats/flush/jobs/stats/missing job/cleanup, and mobile push register/unregister/quick-actions/execute/summary/offline-cache.
 
 ## Endpoint-family inventory from frontend API modules
 

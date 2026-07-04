@@ -180,7 +180,7 @@
     "owner": "sk-plugins"
   },
   "metrics": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 9,
     "owner": "sk-monitor/sk-system"
   },
@@ -310,7 +310,7 @@
     "owner": "sk-status"
   },
   "system": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 9,
     "owner": "sk-system"
   },

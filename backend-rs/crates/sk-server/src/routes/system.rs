@@ -5,15 +5,34 @@ use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
 use axum::extract::{Query, State};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
+
+pub async fn ensure_schema(pool: &sqlx::SqlitePool) -> anyhow::Result<()> {
+    sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS sk_metrics_collection_state(id INTEGER PRIMARY KEY CHECK(id=1), collecting INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sk_metrics_aggregates(id TEXT PRIMARY KEY, summary_json TEXT NOT NULL, created_at TEXT NOT NULL);
+INSERT OR IGNORE INTO sk_metrics_collection_state(id, collecting, updated_at) VALUES(1, 1, datetime('now'));
+"#,
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
 
 pub fn router() -> Router<SharedState> {
     Router::new()
         .route("/metrics", get(metrics))
         .route("/info", get(info))
+        .route("/health", get(health))
+        .route("/processes", get(system_processes))
+        .route("/services", get(system_services))
+        .route("/time", get(time))
+        .route("/timezones", get(timezones))
+        .route("/timezone", put(set_timezone))
         .route("/version", get(version))
         .route("/check-update", get(check_update))
         .route("/upgrade", post(upgrade))
@@ -22,7 +41,12 @@ pub fn router() -> Router<SharedState> {
 }
 
 pub fn metrics_router() -> Router<SharedState> {
-    Router::new().route("/history", get(metrics_history))
+    Router::new()
+        .route("/history", get(metrics_history))
+        .route("/stats", get(metrics_stats))
+        .route("/collection/start", post(metrics_collection_start))
+        .route("/collection/stop", post(metrics_collection_stop))
+        .route("/aggregate", post(metrics_aggregate))
 }
 
 fn require_admin(user: &sk_models::user::User) -> ApiResult<()> {
@@ -30,6 +54,14 @@ fn require_admin(user: &sk_models::user::User) -> ApiResult<()> {
         return Err(ApiError::forbidden("Admin access required"));
     }
     Ok(())
+}
+
+fn status_of(v: &Value) -> axum::http::StatusCode {
+    if v.get("success").and_then(|s| s.as_bool()).unwrap_or(true) {
+        axum::http::StatusCode::OK
+    } else {
+        axum::http::StatusCode::BAD_REQUEST
+    }
 }
 
 /// GET /system/metrics
@@ -42,6 +74,97 @@ async fn metrics(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
 async fn info(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&user)?;
     Ok(Json(sk_system::system_info()))
+}
+
+/// GET /system/health
+async fn health(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    let metrics = sk_system::all_metrics().await;
+    let disk_ok = metrics["disk"]["partitions"]
+        .as_array()
+        .map(|parts| {
+            parts
+                .iter()
+                .all(|p| p["percent"].as_f64().unwrap_or(0.0) < 95.0)
+        })
+        .unwrap_or(true);
+    let mem_ok = metrics["memory"]["ram"]["percent"].as_f64().unwrap_or(0.0) < 95.0;
+    let cpu_ok = metrics["cpu"]["percent"].as_f64().unwrap_or(0.0) < 95.0;
+    Ok(Json(json!({
+        "status": if disk_ok && mem_ok && cpu_ok { "ok" } else { "degraded" },
+        "checks": { "cpu": cpu_ok, "memory": mem_ok, "disk": disk_ok },
+        "metrics": metrics,
+    })))
+}
+
+/// GET /system/processes
+async fn system_processes(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    let processes = sk_system::processes::list(50, "cpu").await;
+    Ok(Json(json!({ "processes": processes })))
+}
+
+/// GET /system/services
+async fn system_services(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    let running = sk_system::processes::running_names().await;
+    Ok(Json(
+        json!({ "services": sk_ops::services::services_status(&running) }),
+    ))
+}
+
+/// GET /system/time
+async fn time(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    Ok(Json(sk_system::server_time()))
+}
+
+/// GET /system/timezones
+async fn timezones(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    let zones = std::fs::read_to_string("/usr/share/zoneinfo/zone1970.tab")
+        .or_else(|_| std::fs::read_to_string("/usr/share/zoneinfo/zone.tab"))
+        .map(|content| {
+            content
+                .lines()
+                .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+                .filter_map(|l| l.split_whitespace().nth(2).map(str::to_string))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(|_| vec!["UTC".to_string()]);
+    Ok(Json(json!({ "timezones": zones })))
+}
+
+#[derive(Deserialize)]
+struct TimezoneBody {
+    timezone: String,
+}
+
+/// PUT /system/timezone
+async fn set_timezone(
+    AuthUser(user): AuthUser,
+    Json(body): Json<TimezoneBody>,
+) -> ApiResult<(axum::http::StatusCode, Json<Value>)> {
+    require_admin(&user)?;
+    let zone_path = std::path::Path::new("/usr/share/zoneinfo").join(&body.timezone);
+    if body.timezone.contains("..") || body.timezone.starts_with('/') || !zone_path.exists() {
+        return Err(ApiError::bad_request("Invalid timezone"));
+    }
+    let result = std::process::Command::new("timedatectl")
+        .args(["set-timezone", &body.timezone])
+        .output();
+    let value = match result {
+        Ok(o) if o.status.success() => {
+            json!({ "success": true, "timezone": body.timezone, "time": sk_system::server_time() })
+        }
+        Ok(o) => {
+            json!({ "success": false, "code": "TIMEZONE_SET_FAILED", "stderr": String::from_utf8_lossy(&o.stderr).trim() })
+        }
+        Err(e) => {
+            json!({ "success": false, "code": "TIMEZONE_SET_UNAVAILABLE", "error": e.to_string() })
+        }
+    };
+    Ok((status_of(&value), Json(value)))
 }
 
 /// GET /system/version
@@ -271,6 +394,108 @@ async fn metrics_history(
             "disk_avg": avg(|r| r.disk_percent),
         }
     })))
+}
+
+async fn metrics_stats(
+    State(state): State<SharedState>,
+    AuthUser(user): AuthUser,
+) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM metrics_history")
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(0);
+    let minute: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM metrics_history WHERE level='minute'")
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or(0);
+    let latest: Option<String> =
+        sqlx::query_scalar("SELECT timestamp FROM metrics_history ORDER BY timestamp DESC LIMIT 1")
+            .fetch_optional(&state.db)
+            .await
+            .unwrap_or(None);
+    let collecting: i64 =
+        sqlx::query_scalar("SELECT collecting FROM sk_metrics_collection_state WHERE id=1")
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or(1);
+    Ok(Json(json!({
+        "success": true,
+        "collection": { "running": collecting != 0, "interval_seconds": 60 },
+        "history": { "total_points": total, "minute_points": minute, "latest": latest },
+        "live": sk_system::all_metrics().await,
+    })))
+}
+
+async fn set_collection(
+    state: SharedState,
+    user: sk_models::user::User,
+    running: bool,
+) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    let ts = sk_core::time::now_sql();
+    sqlx::query("INSERT INTO sk_metrics_collection_state(id, collecting, updated_at) VALUES(1, ?, ?) ON CONFLICT(id) DO UPDATE SET collecting=excluded.collecting, updated_at=excluded.updated_at")
+        .bind(if running { 1 } else { 0 })
+        .bind(&ts)
+        .execute(&state.db)
+        .await
+        .map_err(anyhow::Error::from)?;
+    Ok(Json(
+        json!({ "success": true, "running": running, "updated_at": ts }),
+    ))
+}
+
+async fn metrics_collection_start(
+    State(state): State<SharedState>,
+    AuthUser(user): AuthUser,
+) -> ApiResult<Json<Value>> {
+    set_collection(state, user, true).await
+}
+
+async fn metrics_collection_stop(
+    State(state): State<SharedState>,
+    AuthUser(user): AuthUser,
+) -> ApiResult<Json<Value>> {
+    set_collection(state, user, false).await
+}
+
+async fn metrics_aggregate(
+    State(state): State<SharedState>,
+    AuthUser(user): AuthUser,
+) -> ApiResult<Json<Value>> {
+    require_admin(&user)?;
+    #[derive(sqlx::FromRow)]
+    struct Agg {
+        sample_count: i64,
+        cpu_avg: Option<f64>,
+        memory_avg: Option<f64>,
+        disk_avg: Option<f64>,
+    }
+    let agg: Agg = sqlx::query_as(
+        "SELECT COUNT(*) sample_count, AVG(cpu_percent) cpu_avg, AVG(memory_percent) memory_avg, AVG(disk_percent) disk_avg FROM metrics_history WHERE level='minute'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .map_err(anyhow::Error::from)?;
+    let summary = json!({
+        "sample_count": agg.sample_count,
+        "cpu_avg": agg.cpu_avg.map(round1).unwrap_or(0.0),
+        "memory_avg": agg.memory_avg.map(round1).unwrap_or(0.0),
+        "disk_avg": agg.disk_avg.map(round1).unwrap_or(0.0),
+    });
+    let id = uuid::Uuid::new_v4().to_string();
+    let ts = sk_core::time::now_sql();
+    sqlx::query("INSERT INTO sk_metrics_aggregates(id, summary_json, created_at) VALUES(?, ?, ?)")
+        .bind(&id)
+        .bind(summary.to_string())
+        .bind(&ts)
+        .execute(&state.db)
+        .await
+        .map_err(anyhow::Error::from)?;
+    Ok(Json(
+        json!({ "success": true, "aggregate_id": id, "created_at": ts, "summary": summary }),
+    ))
 }
 
 fn round1(v: f64) -> f64 {

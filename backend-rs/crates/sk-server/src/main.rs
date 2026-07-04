@@ -63,6 +63,7 @@ async fn main() -> anyhow::Result<()> {
     sk_git::ensure_schema(&pool).await?;
     sk_email::ensure_schema(&pool).await?;
     sk_plugins::ensure_schema(&pool).await?;
+    routes::system::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)

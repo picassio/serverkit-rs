@@ -607,6 +607,15 @@ Implemented 2026-07-04 (logs/processes slice):
 - Process routes list and detail real host processes via `sysinfo`, list monitored service/process state, call real system service controls with typed errors, and terminate real PIDs via TERM/KILL.
 - Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered log list/read/search/journal/app/clear plus process list/detail/services/service-control typed error and a real safe `sleep` process kill.
 
+Implemented 2026-07-04 (system/metrics slice):
+
+- Completed route ownership for all 12 `/system/*` and 5 `/metrics/*` frontend routes.
+- `/system/health`, `/system/info`, `/system/metrics`, `/system/processes`, `/system/services`, `/system/time`, and `/system/timezones` read real host state through `sk-system`, `sk-ops`, and OS timezone data.
+- `/system/timezone` validates timezone IDs against `/usr/share/zoneinfo` and calls real `timedatectl set-timezone`; invalid paths return typed errors without mutation.
+- Existing `/system/check-update` uses the real GitHub release API and `/system/upgrade` launches the real installer via `systemd-run`/`setsid` (not invoked in smoke because it is intentionally destructive/restarting).
+- Metrics routes now include persisted collection state and aggregate records: start/stop writes `sk_metrics_collection_state`, stats reports persisted sampler counts plus live metrics, history reads `metrics_history`, and aggregate computes real averages from minute samples into `sk_metrics_aggregates`.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered safe system routes, invalid timezone typed error, metrics history/stats, collection stop/start persistence, and aggregate persistence.
+
 ## Endpoint-family inventory from frontend API modules
 
 Generated from `frontend/src/services/api/*.js` before manual normalization. Counts are useful for scope sizing; the Phase 0 ledger is the authoritative route-by-route source.

@@ -599,6 +599,14 @@ Build:
 - Metrics aggregation/history/stats with retention.
 - Logs search/journal/app/read/clear with permission checks.
 
+Implemented 2026-07-04 (logs/processes slice):
+
+- Promoted existing `sk-ops`/`sk-system` host adapters to first-class ledger ownership for all 6 `/logs/*` and 5 `/processes/*` frontend routes.
+- Added missing `/logs/app/{id}` adapter backed by real `sk_apps::logs` compose-log lookup; unknown/non-compose apps return a real empty app-log state from app inventory rather than a stub.
+- Log routes list real allowed log files, read/tail/head real files, grep real files, read `journalctl` with syslog fallback, and truncate only allowlisted log paths with admin checks.
+- Process routes list and detail real host processes via `sysinfo`, list monitored service/process state, call real system service controls with typed errors, and terminate real PIDs via TERM/KILL.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered log list/read/search/journal/app/clear plus process list/detail/services/service-control typed error and a real safe `sleep` process kill.
+
 ## Endpoint-family inventory from frontend API modules
 
 Generated from `frontend/src/services/api/*.js` before manual normalization. Counts are useful for scope sizing; the Phase 0 ledger is the authoritative route-by-route source.

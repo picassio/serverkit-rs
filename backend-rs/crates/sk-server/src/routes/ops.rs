@@ -4,7 +4,7 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -14,6 +14,7 @@ use serde_json::{json, Value};
 pub fn logs_router() -> Router<SharedState> {
     Router::new()
         .route("/", get(list_logs))
+        .route("/app/{id}", get(app_logs))
         .route("/read", get(read_log))
         .route("/search", get(search_log))
         .route("/journal", get(journal))
@@ -49,6 +50,25 @@ fn status_of(v: &Value) -> StatusCode {
 async fn list_logs(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
     Ok(Json(json!({ "logs": sk_ops::logs::log_files() })))
+}
+
+#[derive(Deserialize)]
+struct AppLogQuery {
+    lines: Option<i64>,
+}
+
+async fn app_logs(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+    Query(q): Query<AppLogQuery>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(
+        sk_apps::logs(&s.db, &id, q.lines.unwrap_or(100))
+            .await
+            .map_err(ApiError::from)?,
+    ))
 }
 
 #[derive(Deserialize)]

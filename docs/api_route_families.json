@@ -164,7 +164,7 @@
     "owner": "sk-jobs"
   },
   "logs": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 9,
     "owner": "sk-ops"
   },
@@ -240,7 +240,7 @@
     "owner": "sk-plugins"
   },
   "processes": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 9,
     "owner": "sk-ops"
   },

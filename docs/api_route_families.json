@@ -58,7 +58,7 @@
     "owner": "sk-cloud"
   },
   "cloudflare": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 4,
     "owner": "sk-cloudflare"
   },

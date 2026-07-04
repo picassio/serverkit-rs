@@ -1,0 +1,13 @@
+[package]
+name = "sk-cloudflare"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true

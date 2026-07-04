@@ -2,6 +2,7 @@ pub mod ai;
 pub mod apps;
 pub mod auth;
 pub mod backups;
+pub mod cloudflare;
 pub mod compat;
 pub mod db;
 pub mod deploy;

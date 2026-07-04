@@ -2547,6 +2547,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-cloudflare"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "reqwest",
+ "serde_json",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "sk-core"
 version = "0.1.6"
 dependencies = [
@@ -2748,6 +2760,7 @@ dependencies = [
  "sk-apps",
  "sk-auth",
  "sk-backups",
+ "sk-cloudflare",
  "sk-core",
  "sk-db",
  "sk-deploy",

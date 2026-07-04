@@ -402,6 +402,16 @@ Build:
 - Server templates library, assignment, compliance, check/remediate.
 - Pairing claim/lookup and tunnel service records.
 
+Implemented subfamilies 2026-07-04:
+
+- Added `sk-fleet` with persisted pairing codes, WireGuard tunnel desired state, published tunnel services, server templates, template assignments/drift records, fleet thresholds, and fleet alerts.
+- `/pairing/*`, `/tunnels/*`, `/server-templates/*`, and `/fleet-monitor/*` are now owned by `routes/fleet.rs` + `sk-fleet` instead of falling through to missing routes.
+- Pairing lookup/claim uses persisted pair-code state and returns typed not-found/denied/expired states; tunnel routes persist endpoint/service desired state and explicitly report pending agent provisioning rather than fake WireGuard success.
+- Server templates include a real built-in library, persisted CRUD, local-server assignment, compliance summary, and typed pending-agent check/remediation state.
+- Fleet monitor routes read/write persisted thresholds/alerts and expose heatmap/comparison/anomalies/forecast/search from real local inventory and persisted data.
+- Added explicit trailing-slash aliases for `/tunnels/` and `/server-templates/` because the React API calls those roots with a slash.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered cloud/fleet/tunnel/template/monitor flows described below.
+
 ### 6.2 Cloud provider provisioning (`sk-cloud`)
 
 Route families:
@@ -414,6 +424,16 @@ Build:
 - Provider options, server provisioning, resize, snapshot, delete.
 - Cost records and cost summary.
 - Start with Proxmox provider because this deployment already runs there; add Hetzner/DigitalOcean/etc. behind traits.
+
+Implemented 2026-07-04:
+
+- Added `sk-cloud` with persisted cloud providers, encrypted provider tokens, cloud server desired state, snapshots, provider options, and cost summary.
+- `/cloud/*` is now owned by `routes/cloud.rs` + `sk-cloud`.
+- Provider create/list/delete/options persist records and redact secret material in responses; physical provider APIs are represented honestly with `configured:false` unless matching provider credentials exist in the environment.
+- Cloud server create/resize/delete and snapshot create/list/delete persist desired state and return typed unconfigured/provider-action metadata instead of fake cloud success.
+- Validation on VM 131 and VM 130 covered provider create/list/options/delete, provider secret redaction, cloud server create/get/resize/delete, snapshot create/list/delete, costs, pairing typed states, tunnel create/service/list/delete, template library/CRUD/assign/check/remediate/compliance/delete, and fleet monitor threshold/heatmap/comparison/alerts/anomalies/forecast/search/delete.
+
+Remaining Phase 6 work: full `/servers/*` fleet-agent route family and remote execution gateway.
 
 ## Phase 7 — Built-in extensions as Rust crates
 
@@ -507,7 +527,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | backups | 25 | sk-backups | 3 |
 | buildpacks | 2 | sk-builds | 2 |
 | builds | 13 | sk-builds | 2 |
-| cloud | 10 | sk-cloud | 6 |
+| cloud | 13 | sk-cloud | 6 |
 | cloudflare | 29 | sk-cloudflare | 4 |
 | connections | 4 | sk-deploy | 2 |
 | cron | 6 | sk-ops/sk-jobs | 1/9 |
@@ -550,8 +570,8 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | registrars | 6 | sk-dns/sk-registrars | 4 |
 | secrets | 2 | sk-workspaces | 1 |
 | security | 42 | sk-security | 5 |
-| server-templates | 12 | sk-fleet | 6 |
-| servers | 111 | sk-fleet | 6 |
+| server-templates | 14 | sk-fleet | 6 |
+| servers | 122 | sk-fleet | 6 |
 | shared | 11 | sk-workspaces | 1 |
 | source-connections | 18 | sk-deploy | 2 |
 | ssl | 14 | sk-acme/sk-web | 4 |
@@ -560,7 +580,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | system | 12 | sk-system | 9 |
 | telemetry | 8 | sk-telemetry | 1 |
 | templates | 10 | sk-templates | existing + parity |
-| tunnels | 5 | sk-fleet/sk-cloudflare | 6 |
+| tunnels | 7 | sk-fleet | 6 |
 | uptime | 7 | sk-status/sk-monitor | 4/7 |
 | vaults | 4 | sk-workspaces | 1 |
 | waf | 6 | sk-security/sk-web | 5 |

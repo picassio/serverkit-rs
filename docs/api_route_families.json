@@ -53,7 +53,7 @@
     "owner": "sk-deploy::builds"
   },
   "cloud": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 6,
     "owner": "sk-cloud"
   },
@@ -134,7 +134,7 @@
     "owner": "sk-security"
   },
   "fleet-monitor": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 6,
     "owner": "sk-fleet"
   },
@@ -220,7 +220,7 @@
     "owner": "sk-events::notifications"
   },
   "pairing": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 6,
     "owner": "sk-fleet"
   },
@@ -275,7 +275,7 @@
     "owner": "sk-security"
   },
   "server-templates": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 6,
     "owner": "sk-fleet"
   },
@@ -326,9 +326,9 @@
     "note": "Implemented routes exist; parity tests still required before marking implemented."
   },
   "tunnels": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 6,
-    "owner": "sk-fleet/sk-cloudflare"
+    "owner": "sk-fleet"
   },
   "uptime": {
     "status": "planned",

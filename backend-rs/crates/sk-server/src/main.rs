@@ -54,6 +54,8 @@ async fn main() -> anyhow::Result<()> {
     sk_web::ssl::ensure_schema(&pool).await?;
     sk_cloudflare::ensure_schema(&pool).await?;
     sk_security::ensure_schema(&pool).await?;
+    sk_fleet::ensure_schema(&pool).await?;
+    sk_cloud::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -130,6 +132,19 @@ async fn main() -> anyhow::Result<()> {
         .nest("/databases", routes::db::databases_router())
         .nest("/cron", routes::db::cron_router())
         .nest("/cloudflare", routes::cloudflare::router())
+        .nest("/cloud", routes::cloud::router())
+        .nest("/pairing", routes::fleet::pairing_router())
+        .route(
+            "/tunnels/",
+            get(routes::fleet::tunnels).post(routes::fleet::create_tunnel),
+        )
+        .nest("/tunnels", routes::fleet::tunnels_router())
+        .route(
+            "/server-templates/",
+            get(routes::fleet::templates).post(routes::fleet::create_template),
+        )
+        .nest("/server-templates", routes::fleet::templates_router())
+        .nest("/fleet-monitor", routes::fleet::monitor_router())
         .nest("/firewall", routes::security::firewall_router())
         .nest("/security", routes::security::security_router())
         .nest("/waf", routes::security::waf_router())

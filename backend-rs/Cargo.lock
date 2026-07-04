@@ -2547,6 +2547,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-cloud"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde_json",
+ "sk-core",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "sk-cloudflare"
 version = "0.1.6"
 dependencies = [
@@ -2646,6 +2658,18 @@ dependencies = [
  "serde_json",
  "sysinfo",
  "tracing",
+]
+
+[[package]]
+name = "sk-fleet"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rand 0.8.6",
+ "serde_json",
+ "sqlx",
+ "uuid",
 ]
 
 [[package]]
@@ -2773,6 +2797,7 @@ dependencies = [
  "sk-apps",
  "sk-auth",
  "sk-backups",
+ "sk-cloud",
  "sk-cloudflare",
  "sk-core",
  "sk-db",
@@ -2781,6 +2806,7 @@ dependencies = [
  "sk-docker",
  "sk-events",
  "sk-files",
+ "sk-fleet",
  "sk-jobs",
  "sk-magento",
  "sk-models",

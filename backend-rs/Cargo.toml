@@ -18,6 +18,8 @@ members = [
     "crates/sk-dns",
     "crates/sk-cloudflare",
     "crates/sk-security",
+    "crates/sk-fleet",
+    "crates/sk-cloud",
 ]
 
 [workspace.package]
@@ -50,6 +52,8 @@ sk-backups = { path = "crates/sk-backups" }
 sk-dns = { path = "crates/sk-dns" }
 sk-cloudflare = { path = "crates/sk-cloudflare" }
 sk-security = { path = "crates/sk-security" }
+sk-fleet = { path = "crates/sk-fleet" }
+sk-cloud = { path = "crates/sk-cloud" }
 
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["multipart"] }

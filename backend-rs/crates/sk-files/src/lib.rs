@@ -674,6 +674,219 @@ fn dir_size_recursive(path: &Path, max_depth: u32, depth: u32) -> u64 {
         .sum()
 }
 
+fn classify_ext(path: &Path) -> &'static str {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "ico" => "images",
+        "mp4" | "mov" | "avi" | "mkv" | "webm" => "videos",
+        "mp3" | "wav" | "ogg" | "flac" => "audio",
+        "zip" | "tar" | "gz" | "tgz" | "bz2" | "xz" | "7z" | "rar" => "archives",
+        "js" | "jsx" | "ts" | "tsx" | "py" | "rs" | "go" | "php" | "rb" | "java" | "c" | "cpp"
+        | "h" | "sh" | "css" | "html" | "sql" => "code",
+        "txt" | "md" | "pdf" | "doc" | "docx" | "xls" | "xlsx" | "csv" | "json" | "xml" | "yml"
+        | "yaml" | "toml" | "ini" | "conf" => "documents",
+        _ => "other",
+    }
+}
+
+fn walk_type_breakdown(
+    path: &Path,
+    max_depth: u32,
+    depth: u32,
+    counts: &mut std::collections::BTreeMap<String, (u64, u64)>,
+) {
+    if depth > max_depth {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Ok(ft) = entry.file_type() else { continue };
+        if ft.is_dir() {
+            walk_type_breakdown(&entry.path(), max_depth, depth + 1, counts);
+        } else if ft.is_file() {
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            let key = classify_ext(&entry.path()).to_string();
+            let bucket = counts.entry(key).or_insert((0, 0));
+            bucket.0 += 1;
+            bucket.1 += size;
+        }
+    }
+}
+
+pub fn type_breakdown(path: &str, max_depth: u32) -> Value {
+    if !is_path_allowed(path) {
+        return err(DENIED);
+    }
+    let p = Path::new(path);
+    if !p.exists() {
+        return err("Path not found");
+    }
+    if !p.is_dir() {
+        return err("Path is not a directory");
+    }
+    let mut counts = std::collections::BTreeMap::new();
+    walk_type_breakdown(p, max_depth, 0, &mut counts);
+    let total_size: u64 = counts.values().map(|(_, size)| *size).sum();
+    let total_count: u64 = counts.values().map(|(count, _)| *count).sum();
+    let mut breakdown: Vec<Value> = counts
+        .into_iter()
+        .map(|(category, (count, size))| {
+            json!({
+                "category": category,
+                "type": category,
+                "count": count,
+                "size": size,
+                "size_human": format_size(size),
+                "percent": if total_size > 0 { ((size as f64 / total_size as f64) * 1000.0).round() / 10.0 } else { 0.0 },
+            })
+        })
+        .collect();
+    breakdown
+        .sort_by_key(|v| std::cmp::Reverse(v.get("size").and_then(Value::as_u64).unwrap_or(0)));
+    json!({"success":true,"path":path,"max_depth":max_depth,"total_count":total_count,"total_size":total_size,"total_size_human":format_size(total_size),"breakdown":breakdown,"types":breakdown})
+}
+
+fn object_root() -> Option<PathBuf> {
+    std::env::var("SK_OBJECT_STORAGE_DIR")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(PathBuf::from)
+}
+
+pub fn object_storage_status() -> Value {
+    match object_root() {
+        Some(root) => {
+            json!({"configured":true,"provider":"local-object","root":root.to_string_lossy()})
+        }
+        None => {
+            json!({"configured":false,"provider":Value::Null,"message":"Object storage is not configured. Set SK_OBJECT_STORAGE_DIR to enable the /files/s3 local-object adapter."})
+        }
+    }
+}
+
+fn object_key_path(path: &str) -> Result<PathBuf, String> {
+    let root = object_root().ok_or_else(|| "Object storage is not configured".to_string())?;
+    let trimmed = path.trim_start_matches('/');
+    let mut out = root.clone();
+    for component in Path::new(trimmed).components() {
+        match component {
+            Component::Normal(part) => out.push(part),
+            Component::CurDir => {}
+            _ => return Err("Invalid object path".to_string()),
+        }
+    }
+    Ok(out)
+}
+
+pub fn object_browse(path: &str) -> Value {
+    let Ok(dir) = object_key_path(path) else {
+        return err("Object storage is not configured");
+    };
+    if !dir.exists() {
+        return json!({"success":true,"configured":true,"provider":"local-object","path":path,"files":[],"objects":[]});
+    }
+    if !dir.is_dir() {
+        return err("Object path is not a directory");
+    }
+    let mut files = Vec::new();
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return err("Permission denied");
+    };
+    for entry in entries.flatten() {
+        let Ok(meta) = entry.metadata() else { continue };
+        let name = entry.file_name().to_string_lossy().to_string();
+        let key = format!("{}/{}", path.trim_end_matches('/'), name).replace("//", "/");
+        files.push(json!({
+            "name": name,
+            "path": if key.starts_with('/') { key.clone() } else { format!("/{key}") },
+            "key": if key.starts_with('/') { key.trim_start_matches('/').to_string() } else { key.clone() },
+            "is_dir": meta.is_dir(),
+            "size": meta.len(),
+            "size_human": format_size(meta.len()),
+            "modified": meta.modified().ok().map(isoformat),
+        }));
+    }
+    json!({"success":true,"configured":true,"provider":"local-object","path":path,"files":files,"objects":files})
+}
+
+pub fn object_read(path: &str) -> Value {
+    let Ok(file) = object_key_path(path) else {
+        return err("Object storage is not configured");
+    };
+    if !file.exists() {
+        return err("Object not found");
+    }
+    if file.is_dir() {
+        return err("Object path is a directory");
+    }
+    match fs::read_to_string(&file) {
+        Ok(content) => {
+            json!({"success":true,"configured":true,"provider":"local-object","path":path,"content":content})
+        }
+        Err(e) => err(e.to_string()),
+    }
+}
+
+pub fn object_write(path: &str, content: &str) -> Value {
+    let Ok(file) = object_key_path(path) else {
+        return err("Object storage is not configured");
+    };
+    if let Some(parent) = file.parent() {
+        if let Err(e) = fs::create_dir_all(parent) {
+            return err(e.to_string());
+        }
+    }
+    match fs::write(&file, content) {
+        Ok(_) => {
+            json!({"success":true,"configured":true,"provider":"local-object","path":path,"size":content.len()})
+        }
+        Err(e) => err(e.to_string()),
+    }
+}
+
+pub fn object_delete(path: &str) -> Value {
+    let Ok(file) = object_key_path(path) else {
+        return err("Object storage is not configured");
+    };
+    let result = if file.is_dir() {
+        fs::remove_dir_all(&file)
+    } else {
+        fs::remove_file(&file)
+    };
+    match result {
+        Ok(_) => json!({"success":true,"configured":true,"provider":"local-object","path":path}),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => err("Object not found"),
+        Err(e) => err(e.to_string()),
+    }
+}
+
+pub fn object_write_bytes(path: &str, data: &[u8]) -> Value {
+    let Ok(file) = object_key_path(path) else {
+        return err("Object storage is not configured");
+    };
+    if let Some(parent) = file.parent() {
+        if let Err(e) = fs::create_dir_all(parent) {
+            return err(e.to_string());
+        }
+    }
+    match fs::write(&file, data) {
+        Ok(_) => {
+            json!({"success":true,"configured":true,"provider":"local-object","path":path,"size":data.len()})
+        }
+        Err(e) => err(e.to_string()),
+    }
+}
+
+pub fn object_file_path(path: &str) -> Result<PathBuf, String> {
+    object_key_path(path)
+}
+
 /// `FileService.analyze_directory_sizes`
 pub fn analyze(path: &str, depth: u32, limit: usize) -> Value {
     if !is_path_allowed(path) {

@@ -31,8 +31,16 @@ pub fn router() -> Router<SharedState> {
         .route("/disk-usage", get(disk_usage))
         .route("/disk-mounts", get(disk_mounts))
         .route("/analyze", get(analyze))
+        .route("/type-breakdown", get(type_breakdown))
         .route("/download", get(download))
         .route("/upload", post(upload))
+        .route("/s3/browse", get(s3_browse))
+        .route("/s3/read", get(s3_read))
+        .route("/s3/write", post(s3_write))
+        .route("/s3/delete", delete(s3_delete))
+        .route("/s3/download-url", get(s3_download_url))
+        .route("/s3/download", get(s3_download))
+        .route("/s3/upload", post(s3_upload))
 }
 
 /// Flask maps 'denied' errors to 403, everything else to 400.
@@ -331,6 +339,215 @@ async fn analyze(
     Ok(respond(
         blocking(move || sk_files::analyze(&path, depth, limit)).await?,
         StatusCode::OK,
+    ))
+}
+
+#[derive(Deserialize)]
+struct TypeBreakdownQuery {
+    path: Option<String>,
+    max_depth: Option<u32>,
+}
+
+async fn type_breakdown(
+    AuthUser(_u): AuthUser,
+    Query(q): Query<TypeBreakdownQuery>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let path = q.path.unwrap_or_else(|| "/home".into());
+    let max_depth = q.max_depth.unwrap_or(3);
+    Ok(respond(
+        blocking(move || sk_files::type_breakdown(&path, max_depth)).await?,
+        StatusCode::OK,
+    ))
+}
+
+fn object_respond(result: Value, ok: StatusCode) -> (StatusCode, Json<Value>) {
+    let success = result
+        .get("success")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let unconfigured = result
+        .get("error")
+        .and_then(|e| e.as_str())
+        .map(|e| e.contains("Object storage is not configured"))
+        .unwrap_or(false);
+    let status = if success {
+        ok
+    } else if unconfigured {
+        StatusCode::SERVICE_UNAVAILABLE
+    } else {
+        StatusCode::BAD_REQUEST
+    };
+    (status, Json(result))
+}
+
+async fn s3_browse(
+    AuthUser(_u): AuthUser,
+    Query(q): Query<PathQuery>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let path = q.path.unwrap_or_else(|| "/".into());
+    Ok(object_respond(
+        blocking(move || sk_files::object_browse(&path)).await?,
+        StatusCode::OK,
+    ))
+}
+
+async fn s3_read(
+    AuthUser(_u): AuthUser,
+    Query(q): Query<PathQuery>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let path = q
+        .path
+        .ok_or_else(|| ApiError::bad_request("Path is required"))?;
+    Ok(object_respond(
+        blocking(move || sk_files::object_read(&path)).await?,
+        StatusCode::OK,
+    ))
+}
+
+#[derive(Deserialize)]
+struct S3WriteBody {
+    path: Option<String>,
+    content: Option<String>,
+}
+
+async fn s3_write(
+    AuthUser(_u): AuthUser,
+    Json(b): Json<S3WriteBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let path = b
+        .path
+        .ok_or_else(|| ApiError::bad_request("Path is required"))?;
+    let content = b.content.unwrap_or_default();
+    Ok(object_respond(
+        blocking(move || sk_files::object_write(&path, &content)).await?,
+        StatusCode::OK,
+    ))
+}
+
+async fn s3_delete(
+    AuthUser(_u): AuthUser,
+    Query(q): Query<PathQuery>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let path = q
+        .path
+        .ok_or_else(|| ApiError::bad_request("Path is required"))?;
+    Ok(object_respond(
+        blocking(move || sk_files::object_delete(&path)).await?,
+        StatusCode::OK,
+    ))
+}
+
+fn encode_path(path: &str) -> String {
+    path.replace('%', "%25")
+        .replace(' ', "%20")
+        .replace('#', "%23")
+        .replace('?', "%3F")
+        .replace('&', "%26")
+}
+
+async fn s3_download_url(
+    AuthUser(_u): AuthUser,
+    Query(q): Query<PathQuery>,
+) -> ApiResult<Json<Value>> {
+    let path = q
+        .path
+        .ok_or_else(|| ApiError::bad_request("Path is required"))?;
+    let status = sk_files::object_storage_status();
+    if !status
+        .get("configured")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Ok(Json(serde_json::json!({
+            "success": false,
+            "configured": false,
+            "error": "Object storage is not configured",
+            "url": Value::Null,
+        })));
+    }
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "configured": true,
+        "provider": "local-object",
+        "url": format!("/api/v1/files/s3/download?path={}", encode_path(&path)),
+        "expires_in": Value::Null,
+    })))
+}
+
+async fn s3_download(AuthUser(_u): AuthUser, Query(q): Query<PathQuery>) -> ApiResult<Response> {
+    let path = q
+        .path
+        .ok_or_else(|| ApiError::bad_request("Path is required"))?;
+    let object_path = sk_files::object_file_path(&path).map_err(|e| {
+        if e.contains("configured") {
+            ApiError::new(StatusCode::SERVICE_UNAVAILABLE, e)
+        } else {
+            ApiError::bad_request(e)
+        }
+    })?;
+    if !object_path.exists() {
+        return Err(ApiError::not_found("Object not found"));
+    }
+    if object_path.is_dir() {
+        return Err(ApiError::bad_request("Cannot download directory"));
+    }
+    let file = tokio::fs::File::open(&object_path)
+        .await
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let name = object_path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "download".into());
+    let stream = tokio_util::io::ReaderStream::new(file);
+    Response::builder()
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{name}\""),
+        )
+        .body(Body::from_stream(stream))
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn s3_upload(
+    AuthUser(_u): AuthUser,
+    mut multipart: Multipart,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let mut file_bytes: Option<(String, Vec<u8>)> = None;
+    let mut destination: Option<String> = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?
+    {
+        match field.name() {
+            Some("file") => {
+                let filename = field.file_name().unwrap_or("").to_string();
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| ApiError::bad_request(e.to_string()))?;
+                file_bytes = Some((filename, data.to_vec()));
+            }
+            Some("destination") => destination = field.text().await.ok(),
+            _ => {}
+        }
+    }
+    let (filename, data) = file_bytes.ok_or_else(|| ApiError::bad_request("No file provided"))?;
+    if filename.is_empty() {
+        return Err(ApiError::bad_request("No file selected"));
+    }
+    if data.len() as u64 > sk_files::MAX_UPLOAD_SIZE {
+        return Err(ApiError::bad_request(
+            "File too large. Maximum size is 100.0 MB",
+        ));
+    }
+    let destination = destination.unwrap_or_else(|| "/".into());
+    let object_path =
+        format!("{}/{}", destination.trim_end_matches('/'), filename).replace("//", "/");
+    Ok(object_respond(
+        blocking(move || sk_files::object_write_bytes(&object_path, &data)).await?,
+        StatusCode::CREATED,
     ))
 }
 

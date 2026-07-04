@@ -125,7 +125,7 @@
     "owner": "sk-events::subscriptions"
   },
   "files": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 3,
     "owner": "sk-files"
   },

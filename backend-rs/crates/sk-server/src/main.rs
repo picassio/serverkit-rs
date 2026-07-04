@@ -60,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
     sk_ftp::ensure_schema(&pool).await?;
     sk_wordpress::ensure_schema(&pool).await?;
     sk_workflows::ensure_schema(&pool).await?;
+    sk_git::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -153,6 +154,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/ftp", routes::ftp::router())
         .nest("/wordpress", routes::wordpress::router())
         .nest("/workflows", routes::workflows::router())
+        .nest("/git", routes::git::router())
         .route(
             "/status/",
             get(routes::status::pages).post(routes::status::create_page),

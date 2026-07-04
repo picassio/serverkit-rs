@@ -144,7 +144,7 @@
     "owner": "sk-ftp"
   },
   "git": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 7,
     "owner": "sk-git"
   },

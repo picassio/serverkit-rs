@@ -2684,6 +2684,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-git"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rand 0.8.6",
+ "reqwest",
+ "serde_json",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "sk-gpu"
 version = "0.1.6"
 dependencies = [
@@ -2826,6 +2839,7 @@ dependencies = [
  "sk-files",
  "sk-fleet",
  "sk-ftp",
+ "sk-git",
  "sk-gpu",
  "sk-jobs",
  "sk-magento",

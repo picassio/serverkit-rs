@@ -474,6 +474,15 @@ Route family: `/git/*`
 
 Build install/status/start/stop/restart/version/requirements/repos/branches/commits/contents/stats/webhooks/deployments.
 
+Implemented 2026-07-04:
+
+- Added `sk-git`, boot-time schema creation, and `routes/git.rs` ownership for all 28 ledgered `/git/*` frontend routes plus the frontend `readme` helper route.
+- Git server install/status/lifecycle routes persist a managed Gitea compose project under `/var/lib/serverkit/gitea`, generate a real `compose.yaml` using Gitea + PostgreSQL, inspect Docker Compose status, and call `docker compose` for start/stop/restart/uninstall. Before install, lifecycle routes return typed `GIT_NOT_INSTALLED` state.
+- Repository/version/branch/commit/content/readme routes call a live Gitea API when the managed or `SK_GITEA_URL` instance is configured; otherwise they return explicit unconfigured/unreachable state instead of fake repositories.
+- Webhooks persist external repository sync/deploy configuration, generated secrets, active state, test logs, and webhook log history in SQLite.
+- Deployment routes persist app deployment/rollback requests with queued status and durable logs instead of claiming an unrecorded fake deploy.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status, requirements, version, repository adapters, all repo detail subroutes, lifecycle typed not-installed states, install/status/uninstall, webhook CRUD/toggle/test/logs, deployment list/detail/deploy/rollback, and smoke cleanup.
+
 ### 7.4 GPU (`sk-gpu`)
 
 Route family: `/gpu/*`

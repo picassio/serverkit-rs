@@ -13,6 +13,7 @@ pub mod events;
 pub mod files;
 pub mod fleet;
 pub mod ftp;
+pub mod git;
 pub mod gpu;
 pub mod jobs;
 pub mod magento;

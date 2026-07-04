@@ -39,6 +39,7 @@ sk-status = { workspace = true }
 sk-ftp = { workspace = true }
 sk-wordpress = { workspace = true }
 sk-workflows = { workspace = true }
+sk-git = { workspace = true }
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

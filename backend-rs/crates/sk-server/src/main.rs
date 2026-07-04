@@ -7,6 +7,7 @@
 mod bootstrap;
 mod db_backup;
 mod error;
+mod event_delivery;
 mod extract;
 mod le_renew;
 mod monitor;
@@ -68,6 +69,7 @@ async fn main() -> anyhow::Result<()> {
     le_renew::spawn(state.db.clone());
     db_backup::spawn(state.db.clone());
     monitor::spawn(state.db.clone());
+    event_delivery::spawn(state.db.clone());
 
     let api = Router::new()
         .route("/health", get(routes::health))
@@ -106,7 +108,11 @@ async fn main() -> anyhow::Result<()> {
         .nest("/metrics", routes::system::metrics_router())
         .merge(routes::stubs::router())
         .merge(routes::compat::router())
-        .with_state(state.clone());
+        .with_state(state.clone())
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            routes::events::api_analytics_middleware,
+        ));
 
     let index = format!("{}/index.html", config.frontend_dist);
     let spa = ServeDir::new(&config.frontend_dist).not_found_service(ServeFile::new(&index));

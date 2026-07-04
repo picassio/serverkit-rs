@@ -1,12 +1,16 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
+use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{Request, StatusCode};
+use axum::middleware::Next;
+use axum::response::Response;
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::time::Instant;
 
 fn require_admin(u: &sk_models::user::User) -> ApiResult<()> {
     if !u.is_admin() {
@@ -16,6 +20,35 @@ fn require_admin(u: &sk_models::user::User) -> ApiResult<()> {
 }
 fn nf(msg: &str) -> ApiError {
     ApiError::new(StatusCode::NOT_FOUND, msg)
+}
+
+pub async fn api_analytics_middleware(
+    State(state): State<SharedState>,
+    req: Request<Body>,
+    next: Next,
+) -> Response {
+    let started = Instant::now();
+    let method = req.method().as_str().to_string();
+    let path = req
+        .uri()
+        .path()
+        .strip_prefix("/api/v1")
+        .unwrap_or(req.uri().path())
+        .to_string();
+    let response = next.run(req).await;
+    let status = response.status().as_u16();
+    let latency_ms = started.elapsed().as_millis().min(i64::MAX as u128) as i64;
+    let error = (status >= 400).then(|| response.status().to_string());
+    let db = state.db.clone();
+    tokio::spawn(async move {
+        if let Err(e) =
+            sk_events::record_api_request(&db, &method, &path, status, latency_ms, error.as_deref())
+                .await
+        {
+            tracing::debug!(error = %e, "failed to record api analytics");
+        }
+    });
+    response
 }
 
 pub fn telemetry_router() -> Router<SharedState> {

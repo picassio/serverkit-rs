@@ -517,12 +517,16 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 - **Phase 1 jobs/queue foundation started**: added `sk-jobs`, SQLite schema bootstrapping, real `/jobs/*` and `/queue/*` routes, removed jobs/queue empty compat handlers, and marked `jobs` + `queue` as `implemented` in the ledger. VM 131 smoke test: created queue group + queue + message, received the message, completed it, and stats reported `completed: 1`.
 - **Phase 1 projects/workspaces/secrets foundation started**: added `sk-projects`, boot-time SQLite schema creation, and real routes for `projects`, `environments`, `workspaces`, `api-keys`, `vaults`, `secrets`, and `shared`. Secrets/API keys/variables are encrypted at rest via `sk_core::crypto`. Removed the stale `/workspaces/` stub and `/projects` compat handler. VM 131 smoke test: workspace → project → environment, API key creation, vault/secret reveal, shared tag, and variable-group variable all succeeded.
 - **Phase 1 durable events/notifications started**: added `sk-events`, boot-time SQLite schema creation, and real routes for `telemetry`, `notifications`, `event-subscriptions`, `webhooks`, and `api-analytics`. Removed stale notification/webhook empty handlers. VM 131 smoke test: telemetry event emit/read/stats, notification create/read, event subscription create/test/delivery listing, webhook endpoint create/list with encrypted secret, and API analytics overview all succeeded.
+- **Phase 1 event operations deepened**: API analytics middleware now records every `/api/v1/*` request; `emit_event` enqueues matching subscription/webhook deliveries; server background worker POSTs queued deliveries and marks them `delivered`/`failed`. VM 131 smoke: local POST receiver got a queued webhook delivery and the delivery row became `delivered` with `attempts=1`; analytics overview showed real request totals and endpoint breakdown.
 
 ## Immediate next engineering tasks
 
 1. Mark every remaining route in `compat.rs` and `stubs.rs` as debt in the ledger.
 2. Expand `sk-jobs` worker execution: leases, background workers, retries, cancellation of running tasks, job logs, scheduled-job runner.
 3. Expand `sk-events` workers: outbound webhook delivery, SMTP delivery, retry backoff, API analytics middleware capture, and event emission from jobs/projects/apps.
+   - **Started:** API analytics middleware captures every `/api/v1/*` request into `sk_api_analytics`.
+   - **Started:** `emit_event` enqueues matching event-subscription/webhook deliveries.
+   - **Started:** background delivery worker POSTs queued deliveries and records delivered/failed response status.
 4. Start Phase 2 `sk-apps` first-class app records, replacing the current Magento/template app aggregator.
 5. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
 6. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.

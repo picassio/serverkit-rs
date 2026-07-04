@@ -3,6 +3,7 @@
 use anyhow::Context;
 use chrono::{Duration, Utc};
 use rand::{distributions::Alphanumeric, Rng};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
@@ -123,8 +124,13 @@ fn delivery(row: &sqlx::sqlite::SqliteRow) -> Value {
 pub async fn emit_event(pool: &SqlitePool, body: &Value) -> anyhow::Result<Value> {
     let id = id();
     let ts = now();
-    sqlx::query("INSERT INTO sk_telemetry_events (id,source,event_type,severity,resource_type,resource_id,correlation_id,message,payload_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(&id).bind(s(body,"source","serverkit")).bind(s(body,"event_type","test.event")).bind(s(body,"severity","info")).bind(opt(body,"resource_type")).bind(opt(body,"resource_id")).bind(opt(body,"correlation_id")).bind(opt(body,"message")).bind(body.get("payload").cloned().unwrap_or_else(||body.clone()).to_string()).bind(&ts).execute(pool).await?;
-    get_event(pool, &id).await?.context("created event missing")
+    let event_type = s(body, "event_type", "test.event").to_string();
+    sqlx::query("INSERT INTO sk_telemetry_events (id,source,event_type,severity,resource_type,resource_id,correlation_id,message,payload_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(&id).bind(s(body,"source","serverkit")).bind(&event_type).bind(s(body,"severity","info")).bind(opt(body,"resource_type")).bind(opt(body,"resource_id")).bind(opt(body,"correlation_id")).bind(opt(body,"message")).bind(body.get("payload").cloned().unwrap_or_else(||body.clone()).to_string()).bind(&ts).execute(pool).await?;
+    let event = get_event(pool, &id)
+        .await?
+        .context("created event missing")?;
+    enqueue_event_deliveries(pool, &event_type, &event).await?;
+    Ok(event)
 }
 pub async fn list_events(pool: &SqlitePool) -> anyhow::Result<Value> {
     let rows = sqlx::query("SELECT * FROM sk_telemetry_events ORDER BY created_at DESC LIMIT 250")
@@ -184,6 +190,132 @@ pub async fn cleanup_events(pool: &SqlitePool, days: i64) -> anyhow::Result<Valu
         .execute(pool)
         .await?;
     Ok(json!({"deleted":r.rows_affected()}))
+}
+
+fn event_filter_matches(events_json: &str, event_type: &str) -> bool {
+    let parsed: Value = serde_json::from_str(events_json).unwrap_or(Value::Null);
+    parsed.as_array().is_none_or(|events| {
+        events.is_empty() || events.iter().any(|e| e.as_str() == Some(event_type))
+    })
+}
+
+async fn enqueue_event_deliveries(
+    pool: &SqlitePool,
+    event_type: &str,
+    event: &Value,
+) -> anyhow::Result<()> {
+    let subs = sqlx::query("SELECT id, events_json FROM sk_event_subscriptions WHERE enabled = 1")
+        .fetch_all(pool)
+        .await?;
+    for sub in subs {
+        let events_json: String = sub.get("events_json");
+        if event_filter_matches(&events_json, event_type) {
+            let did = id();
+            let ts = now();
+            sqlx::query("INSERT INTO sk_event_deliveries (id,subscription_id,event_id,status,request_json,attempts,created_at,updated_at) VALUES (?,?,?,'queued',?,0,?,?)")
+                .bind(&did)
+                .bind(sub.get::<String, _>("id"))
+                .bind(event["id"].as_str())
+                .bind(event.to_string())
+                .bind(&ts)
+                .bind(&ts)
+                .execute(pool)
+                .await?;
+        }
+    }
+    let endpoints =
+        sqlx::query("SELECT id, events_json FROM sk_webhook_endpoints WHERE enabled = 1")
+            .fetch_all(pool)
+            .await?;
+    for endpoint in endpoints {
+        let events_json: String = endpoint.get("events_json");
+        if event_filter_matches(&events_json, event_type) {
+            let did = id();
+            let ts = now();
+            sqlx::query("INSERT INTO sk_event_deliveries (id,endpoint_id,event_id,status,request_json,attempts,created_at,updated_at) VALUES (?,?,?,'queued',?,0,?,?)")
+                .bind(&did)
+                .bind(endpoint.get::<String, _>("id"))
+                .bind(event["id"].as_str())
+                .bind(event.to_string())
+                .bind(&ts)
+                .bind(&ts)
+                .execute(pool)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryTask {
+    pub id: String,
+    pub target_id: String,
+    pub target_kind: String,
+    pub url: String,
+    pub secret: Option<String>,
+    pub request: Value,
+    pub attempts: i64,
+}
+
+pub async fn queued_delivery_tasks(
+    pool: &SqlitePool,
+    limit: i64,
+) -> anyhow::Result<Vec<DeliveryTask>> {
+    let rows = sqlx::query(
+        r#"
+        SELECT d.id, d.attempts, d.request_json,
+               COALESCE(s.id, w.id) AS target_id,
+               CASE WHEN s.id IS NOT NULL THEN 'subscription' ELSE 'webhook' END AS target_kind,
+               COALESCE(s.url, w.url) AS url,
+               COALESCE(s.secret_encrypted, w.secret_encrypted) AS secret_encrypted
+          FROM sk_event_deliveries d
+          LEFT JOIN sk_event_subscriptions s ON s.id = d.subscription_id
+          LEFT JOIN sk_webhook_endpoints w ON w.id = d.endpoint_id
+         WHERE d.status = 'queued'
+         ORDER BY d.created_at ASC
+         LIMIT ?
+        "#,
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    let mut tasks = Vec::new();
+    for row in rows {
+        let secret = row
+            .try_get::<Option<String>, _>("secret_encrypted")
+            .ok()
+            .flatten()
+            .and_then(|v| sk_core::crypto::decrypt(&v));
+        tasks.push(DeliveryTask {
+            id: row.get("id"),
+            target_id: row.get("target_id"),
+            target_kind: row.get("target_kind"),
+            url: row.get("url"),
+            secret,
+            request: j(row
+                .try_get::<Option<String>, _>("request_json")
+                .ok()
+                .flatten()),
+            attempts: row.get("attempts"),
+        });
+    }
+    Ok(tasks)
+}
+
+pub async fn mark_delivery_result(
+    pool: &SqlitePool,
+    id: &str,
+    success: bool,
+    response: Value,
+) -> anyhow::Result<()> {
+    sqlx::query("UPDATE sk_event_deliveries SET status = ?, response_json = ?, attempts = attempts + 1, updated_at = ? WHERE id = ?")
+        .bind(if success { "delivered" } else { "failed" })
+        .bind(response.to_string())
+        .bind(now())
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn create_notification(
@@ -415,38 +547,95 @@ pub async fn webhook_deliveries(pool: &SqlitePool, id: &str) -> anyhow::Result<V
     Ok(json!({"deliveries":rows.iter().map(delivery).collect::<Vec<_>>() }))
 }
 
+pub async fn record_api_request(
+    pool: &SqlitePool,
+    method: &str,
+    path: &str,
+    status: u16,
+    latency_ms: i64,
+    error: Option<&str>,
+) -> anyhow::Result<()> {
+    sqlx::query("INSERT INTO sk_api_analytics (id, method, path, status, latency_ms, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind(id())
+        .bind(method)
+        .bind(path)
+        .bind(status as i64)
+        .bind(latency_ms)
+        .bind(error)
+        .bind(now())
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn api_analytics_overview(pool: &SqlitePool) -> anyhow::Result<Value> {
-    let total: i64 = sqlx::query("SELECT COUNT(*) n FROM sk_api_analytics")
+    let row = sqlx::query("SELECT COUNT(*) total, SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) errors, AVG(latency_ms) avg_latency FROM sk_api_analytics")
         .fetch_one(pool)
-        .await?
-        .get("n");
-    Ok(json!({"total_requests":total,"error_rate":0,"period":"all"}))
+        .await?;
+    let total: i64 = row.get("total");
+    let errors: i64 = row.get::<Option<i64>, _>("errors").unwrap_or(0);
+    let avg_latency_ms = row.get::<Option<f64>, _>("avg_latency").unwrap_or(0.0);
+    Ok(json!({
+        "total_requests": total,
+        "error_count": errors,
+        "error_rate": if total > 0 { errors as f64 / total as f64 } else { 0.0 },
+        "avg_latency_ms": avg_latency_ms,
+        "period": "all"
+    }))
 }
+
 pub async fn api_analytics_endpoints(pool: &SqlitePool) -> anyhow::Result<Value> {
-    let rows = sqlx::query(
-        "SELECT path, COUNT(*) n FROM sk_api_analytics GROUP BY path ORDER BY n DESC LIMIT 50",
-    )
-    .fetch_all(pool)
-    .await?;
-    Ok(
-        json!({"endpoints":rows.into_iter().map(|r|json!({"path":r.get::<String,_>("path"),"requests":r.get::<i64,_>("n")})).collect::<Vec<_>>() }),
-    )
+    let rows = sqlx::query("SELECT path, method, COUNT(*) n, AVG(latency_ms) avg_latency, SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) errors FROM sk_api_analytics GROUP BY path, method ORDER BY n DESC LIMIT 50")
+        .fetch_all(pool)
+        .await?;
+    Ok(json!({"endpoints": rows.into_iter().map(|r|json!({
+        "path": r.get::<String,_>("path"),
+        "method": r.get::<String,_>("method"),
+        "requests": r.get::<i64,_>("n"),
+        "avg_latency_ms": r.get::<Option<f64>,_>("avg_latency").unwrap_or(0.0),
+        "errors": r.get::<Option<i64>,_>("errors").unwrap_or(0)
+    })).collect::<Vec<_>>() }))
 }
+
 pub async fn api_analytics_errors(pool: &SqlitePool) -> anyhow::Result<Value> {
     let rows = sqlx::query(
         "SELECT * FROM sk_api_analytics WHERE status >= 400 ORDER BY created_at DESC LIMIT 100",
     )
     .fetch_all(pool)
     .await?;
+    Ok(json!({"errors": rows.into_iter().map(|r|json!({
+        "method": r.get::<String,_>("method"),
+        "path": r.get::<String,_>("path"),
+        "status": r.get::<i64,_>("status"),
+        "error": r.try_get::<Option<String>,_>("error").ok().flatten(),
+        "latency_ms": r.try_get::<Option<i64>,_>("latency_ms").ok().flatten(),
+        "created_at": r.get::<String,_>("created_at")
+    })).collect::<Vec<_>>() }))
+}
+
+pub async fn api_analytics_timeseries(pool: &SqlitePool) -> anyhow::Result<Value> {
+    let rows = sqlx::query("SELECT substr(created_at, 1, 13) bucket, COUNT(*) n, SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) errors FROM sk_api_analytics GROUP BY bucket ORDER BY bucket")
+        .fetch_all(pool)
+        .await?;
+    Ok(json!({"points": rows.into_iter().map(|r|json!({
+        "bucket": r.get::<String,_>("bucket"),
+        "requests": r.get::<i64,_>("n"),
+        "errors": r.get::<Option<i64>,_>("errors").unwrap_or(0)
+    })).collect::<Vec<_>>() }))
+}
+
+pub async fn api_key_usage(pool: &SqlitePool, id: &str) -> anyhow::Result<Value> {
+    let rows = sqlx::query("SELECT path, COUNT(*) n FROM sk_api_analytics WHERE api_key_id = ? GROUP BY path ORDER BY n DESC")
+        .bind(id)
+        .fetch_all(pool)
+        .await?;
+    let usage: Vec<Value> = rows
+        .into_iter()
+        .map(|r| json!({"path": r.get::<String,_>("path"), "requests": r.get::<i64,_>("n")}))
+        .collect();
     Ok(
-        json!({"errors":rows.into_iter().map(|r|json!({"path":r.get::<String,_>("path"),"status":r.get::<i64,_>("status"),"error":r.try_get::<Option<String>,_>("error").ok().flatten(),"created_at":r.get::<String,_>("created_at")})).collect::<Vec<_>>() }),
+        json!({"total": usage.iter().filter_map(|u| u["requests"].as_i64()).sum::<i64>(), "usage": usage}),
     )
-}
-pub async fn api_analytics_timeseries(_pool: &SqlitePool) -> anyhow::Result<Value> {
-    Ok(json!({"points":[]}))
-}
-pub async fn api_key_usage(_pool: &SqlitePool, _id: &str) -> anyhow::Result<Value> {
-    Ok(json!({"usage":[],"total":0}))
 }
 
 #[cfg(test)]

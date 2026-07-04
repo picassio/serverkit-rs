@@ -129,7 +129,7 @@
     "owner": "sk-files"
   },
   "firewall": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 5,
     "owner": "sk-security"
   },
@@ -270,7 +270,7 @@
     "owner": "sk-projects::vaults"
   },
   "security": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 5,
     "owner": "sk-security"
   },
@@ -341,7 +341,7 @@
     "owner": "sk-projects::vaults"
   },
   "waf": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 5,
     "owner": "sk-security/sk-web"
   },

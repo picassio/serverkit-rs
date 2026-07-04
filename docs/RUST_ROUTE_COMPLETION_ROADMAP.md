@@ -368,6 +368,18 @@ Build:
 - Failed-login parsing and security event store.
 - Unified security score from real checks.
 
+Implemented 2026-07-04 in `sk-security`:
+
+- Added `sk-security` with persisted security config, events, scan history, quarantine records, integrity baselines, IP lists, and WAF policy/event tables.
+- `/firewall/*`, `/security/*`, and `/waf/*` are now owned by `routes/security.rs` + `sk-security`, not `compat.rs`.
+- Firewall routes use real UFW status/rule parsing and UFW commands; enable preserves the safety rule of allowing SSH and the panel port before enabling. Install/zones/default-zone expose real UFW adapter state or typed unavailable state.
+- Security routes expose real command-backed status/actions for ClamAV, fail2ban, Lynis, unattended-upgrades, failed-login journal parsing, SSH authorized_keys, file integrity hashing, quarantine moves, scan history/status, audit, and event store.
+- Scanner/tool install routes return typed unavailable states when packages are absent instead of fake install success.
+- Scan routes run `clamscan` when installed or persist an unavailable scan record when it is not installed.
+- WAF routes persist per-app ModSecurity/nginx desired state and application events, and report typed not-installed state when ModSecurity is absent.
+- Removed firewall and security placeholders from `compat.rs`.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered firewall status/rules/install/zones/default/allow/blocked cleanup check, security status/config update/clamav typed status/scan file/status/history/quarantine/integrity/failed-logins/events/audit/fail2ban/ssh keys/IP lists/Lynis/auto-updates, WAF status/install/policy/apply/events, and verified no `65534` firewall rule residue remained.
+
 ## Phase 6 — Fleet, servers, remote access, and cloud providers
 
 ### 6.1 Fleet agent protocol (`sk-fleet`)
@@ -510,7 +522,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | environments | 3 | sk-projects | 1 |
 | event-subscriptions | 6 | sk-telemetry/sk-notifications | 1 |
 | files | 21 | sk-files | 3 |
-| firewall | 13 | sk-security | 5 |
+| firewall | 14 | sk-security | 5 |
 | fleet-monitor | 11 | sk-fleet | 6 |
 | ftp | 13 | sk-ftp | 7 |
 | git | 25 | sk-git | 7 |
@@ -537,7 +549,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | queue | 16 | sk-queue | 1 |
 | registrars | 6 | sk-dns/sk-registrars | 4 |
 | secrets | 2 | sk-workspaces | 1 |
-| security | 39 | sk-security | 5 |
+| security | 42 | sk-security | 5 |
 | server-templates | 12 | sk-fleet | 6 |
 | servers | 111 | sk-fleet | 6 |
 | shared | 11 | sk-workspaces | 1 |
@@ -551,7 +563,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | tunnels | 5 | sk-fleet/sk-cloudflare | 6 |
 | uptime | 7 | sk-status/sk-monitor | 4/7 |
 | vaults | 4 | sk-workspaces | 1 |
-| waf | 5 | sk-security/sk-web | 4/5 |
+| waf | 6 | sk-security/sk-web | 5 |
 | webhooks | 5 | sk-webhooks/sk-telemetry | 1 |
 | wordpress | 7 | sk-wordpress | 7 |
 | workflows | 8 | sk-workflows | 7 |
@@ -601,7 +613,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 5. Continue Phase 2 `sk-deploy`: implement live GitHub/GitLab/Bitbucket API repository listing once provider tokens are configured, real git clone/pull operations, real build execution, deployment log streaming, and rollback materialization.
 6. Deepen `sk-runtimes`: add NVM/NodeSource installation for requested Node versions, add process logs, add package-manager lockfile detection, and wire runtime apps into `sk-apps` adoption/assignment.
 7. Deepen `sk-apps` image updates: add authenticated registry manifest lookup using stored registry credentials, multi-image compose reporting, and UI surfacing of explicit `unknown` reasons.
-8. Continue Phase 5 with security/firewall/WAF route families now that Phase 4 web/domains/DNS/registrars/SSL/Cloudflare is complete.
+8. Continue Phase 6 with fleet/servers/remote access/cloud route families now that Phase 5 security/firewall/WAF is complete.
 9. Deepen `databases`: add authenticated PostgreSQL password support, richer Docker app-to-container mapping, and physical managed-record drop workflows with explicit credentials.
 10. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
 11. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.

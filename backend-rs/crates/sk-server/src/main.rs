@@ -53,6 +53,7 @@ async fn main() -> anyhow::Result<()> {
     sk_web::domains::ensure_schema(&pool).await?;
     sk_web::ssl::ensure_schema(&pool).await?;
     sk_cloudflare::ensure_schema(&pool).await?;
+    sk_security::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -129,6 +130,9 @@ async fn main() -> anyhow::Result<()> {
         .nest("/databases", routes::db::databases_router())
         .nest("/cron", routes::db::cron_router())
         .nest("/cloudflare", routes::cloudflare::router())
+        .nest("/firewall", routes::security::firewall_router())
+        .nest("/security", routes::security::security_router())
+        .nest("/waf", routes::security::waf_router())
         .nest("/domains", routes::web::domains_router())
         .nest("/ssl", routes::web::ssl_router())
         .nest("/nginx", routes::web::nginx_router())

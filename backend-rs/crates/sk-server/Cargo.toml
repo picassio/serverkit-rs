@@ -31,6 +31,7 @@ sk-runtimes = { workspace = true }
 sk-backups = { workspace = true }
 sk-dns = { workspace = true }
 sk-cloudflare = { workspace = true }
+sk-security = { workspace = true }
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

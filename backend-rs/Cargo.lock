@@ -2745,6 +2745,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-security"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "hex",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "sk-server"
 version = "0.1.6"
 dependencies = [
@@ -2775,6 +2788,7 @@ dependencies = [
  "sk-ops",
  "sk-projects",
  "sk-runtimes",
+ "sk-security",
  "sk-system",
  "sk-templates",
  "sk-terminal",

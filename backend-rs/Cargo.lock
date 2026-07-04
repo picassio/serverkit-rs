@@ -2841,6 +2841,7 @@ dependencies = [
  "sk-terminal",
  "sk-web",
  "sk-wordpress",
+ "sk-workflows",
  "socketioxide",
  "sqlx",
  "tokio",
@@ -2920,6 +2921,17 @@ dependencies = [
 
 [[package]]
 name = "sk-wordpress"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde_json",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
+name = "sk-workflows"
 version = "0.1.6"
 dependencies = [
  "anyhow",

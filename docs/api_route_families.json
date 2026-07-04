@@ -356,7 +356,7 @@
     "owner": "sk-wordpress"
   },
   "workflows": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 7,
     "owner": "sk-workflows"
   },

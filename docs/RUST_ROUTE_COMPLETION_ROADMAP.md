@@ -526,6 +526,14 @@ Route family: `/workflows/*`
 
 Build workflow definitions, validation, deploy, execute, executions, logs. Use `sk-jobs` for execution.
 
+Implemented 2026-07-04:
+
+- Added `sk-workflows`, boot-time schema creation, and `routes/workflows.rs` ownership for all 11 `/workflows/*` frontend routes.
+- Workflow definitions are persisted in SQLite with draft/deployed state and validation for required names and step shape.
+- Deploy records deployed state/time; execute creates a persisted execution record and log entry instead of fake success.
+- Execution detail/list/log routes read persisted execution/log state; delete cleans workflow executions and logs.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered list, validate, create, get, update, deploy, execute, execution list/detail/logs, and delete.
+
 ## Phase 8 — Plugin, extension, and marketplace system
 
 Route families:

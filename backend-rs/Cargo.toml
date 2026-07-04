@@ -15,6 +15,7 @@ members = [
     "crates/sk-deploy",
     "crates/sk-runtimes",
     "crates/sk-backups",
+    "crates/sk-dns",
 ]
 
 [workspace.package]
@@ -44,6 +45,7 @@ sk-apps = { path = "crates/sk-apps" }
 sk-deploy = { path = "crates/sk-deploy" }
 sk-runtimes = { path = "crates/sk-runtimes" }
 sk-backups = { path = "crates/sk-backups" }
+sk-dns = { path = "crates/sk-dns" }
 
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["multipart"] }

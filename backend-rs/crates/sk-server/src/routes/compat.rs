@@ -22,9 +22,6 @@ pub fn router() -> Router<SharedState> {
         .route("/firewall/blocked-ips", get(async |AuthUser(_u): AuthUser| Json(json!({ "blocked": [] }))))
         // ── Marketplace registry (remote packages) ──────────────────────
         .route("/marketplace/registry", get(async |AuthUser(_u): AuthUser| Json(json!({ "items": [] }))))
-        // ── DNS / registrars ────────────────────────────────────────────
-        .route("/dns/portfolio", get(async |AuthUser(_u): AuthUser| Json(json!({ "domains": [] }))))
-        .route("/registrars/domains", get(async |AuthUser(_u): AuthUser| Json(json!({ "domains": [] }))))
         // ── Plugins / extensions ────────────────────────────────────────
         .route("/plugins", get(async |AuthUser(_u): AuthUser| Json(json!({ "plugins": [] }))))
         .route("/plugins/", get(async |AuthUser(_u): AuthUser| Json(json!({ "plugins": [] }))))

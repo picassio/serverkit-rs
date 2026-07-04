@@ -78,7 +78,7 @@
     "owner": "sk-db"
   },
   "ddns": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 4,
     "owner": "sk-dns"
   },
@@ -93,7 +93,7 @@
     "owner": "sk-deploy::deployment_jobs"
   },
   "dns": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 4,
     "owner": "sk-dns"
   },
@@ -260,9 +260,9 @@
     "owner": "sk-jobs::queue"
   },
   "registrars": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 4,
-    "owner": "sk-registrars"
+    "owner": "sk-dns/sk-registrars"
   },
   "secrets": {
     "status": "implemented",

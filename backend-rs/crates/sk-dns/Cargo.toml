@@ -1,0 +1,15 @@
+[package]
+name = "sk-dns"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sk-core.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+rand.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

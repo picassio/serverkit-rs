@@ -49,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
     sk_deploy::ensure_schema(&pool).await?;
     sk_runtimes::ensure_schema(&pool).await?;
     sk_backups::ensure_schema(&pool).await?;
+    sk_dns::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -115,6 +116,13 @@ async fn main() -> anyhow::Result<()> {
         .nest("/node", routes::runtimes::node_router())
         .nest("/python", routes::runtimes::python_router())
         .merge(routes::templates::router())
+        .route(
+            "/dns/",
+            get(routes::dns::zones).post(routes::dns::create_zone),
+        )
+        .nest("/dns", routes::dns::dns_router())
+        .nest("/ddns", routes::dns::ddns_router())
+        .nest("/registrars", routes::dns::registrars_router())
         .nest("/databases", routes::db::databases_router())
         .nest("/cron", routes::db::cron_router())
         .nest("/nginx", routes::web::nginx_router())

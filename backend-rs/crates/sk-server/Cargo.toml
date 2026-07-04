@@ -29,6 +29,7 @@ sk-apps = { workspace = true }
 sk-deploy = { workspace = true }
 sk-runtimes = { workspace = true }
 sk-backups = { workspace = true }
+sk-dns = { workspace = true }
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

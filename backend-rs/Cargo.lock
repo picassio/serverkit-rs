@@ -2587,6 +2587,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-dns"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rand 0.8.6",
+ "reqwest",
+ "serde_json",
+ "sk-core",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "sk-docker"
 version = "0.1.6"
 dependencies = [
@@ -2737,6 +2751,7 @@ dependencies = [
  "sk-core",
  "sk-db",
  "sk-deploy",
+ "sk-dns",
  "sk-docker",
  "sk-events",
  "sk-files",

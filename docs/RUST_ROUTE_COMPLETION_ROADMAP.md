@@ -285,6 +285,17 @@ Build:
 - Registrar connection records, test, sync, domains.
 - DDNS hosts/token regeneration/update endpoint.
 
+Implemented 2026-07-04 in `sk-dns`:
+
+- Added persisted DNS zones, records, change log, DDNS hosts, registrar connections, and registrar-domain tables.
+- `/dns/*`, `/ddns/*`, and `/registrars/*` are now owned by `routes/dns.rs` + `sk-dns`, not compat placeholders.
+- DNS CRUD persists zones/records; presets create real records; import/export operate on simple zone-file text; managed/mirror/portfolio derive from stored DNS/registrar state.
+- Propagation checks query Cloudflare DoH; registration lookup uses RDAP (`rdap.org`).
+- Provider-records returns explicit `configured:false`/unconfigured status until a live DNS provider adapter is configured, not fake provider records.
+- DDNS hosts persist host metadata and encrypted tokens; token regeneration mutates stored encrypted state and reveals only the new token once.
+- Registrar connections persist encrypted provider config; manual-domain sync performs RDAP lookups for configured domains and persists registrar-domain records.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered trailing-slash `/dns/` create, zone/record CRUD, preset, export, mirror, managed list, provider-unconfigured response, DoH propagation, DDNS create/regenerate/delete, registrar connection test/sync/domains/delete, and final post-deploy health/DNS empty-state checks.
+
 ### 4.3 Cloudflare (`sk-cloudflare`)
 
 Route families:
@@ -453,10 +464,10 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | connections | 4 | sk-deploy | 2 |
 | cron | 6 | sk-ops/sk-jobs | 1/9 |
 | databases | 42 | sk-db | 3 |
-| ddns | 3 | sk-dns | 4 |
+| ddns | 4 | sk-dns | 4 |
 | deploy | 10 | sk-deploy | 2 |
 | deployment-jobs | 2 | sk-jobs | 1 |
-| dns | 16 | sk-dns | 4 |
+| dns | 20 | sk-dns | 4 |
 | docker | 32 | sk-docker | existing + parity |
 | domains | 11 | sk-web/sk-dns | 4 |
 | email | 30 | sk-email | 7 |
@@ -488,7 +499,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | projects | 2 | sk-projects | 1 |
 | python | 17 | sk-runtime-python | 2 |
 | queue | 16 | sk-queue | 1 |
-| registrars | 5 | sk-registrars | 4 |
+| registrars | 6 | sk-dns/sk-registrars | 4 |
 | secrets | 2 | sk-workspaces | 1 |
 | security | 39 | sk-security | 5 |
 | server-templates | 12 | sk-fleet | 6 |
@@ -536,6 +547,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 - **Phase 3 files route family completed**: `sk-files` now owns all frontend-referenced `/files/*` routes. Added `/files/type-breakdown` for real recursive file type/category summaries. Added S3-shaped `/files/s3/*` routes as an honest object-storage adapter: when `SK_OBJECT_STORAGE_DIR` is set they operate against a local object-store root; when not configured they return typed `503 Object storage is not configured` instead of fake empty buckets or fake writes. Existing local browse/read/write/create/mkdir/delete/rename/copy/move/chmod/search/disk/analyze/download/upload routes remain backed by real filesystem operations and allowed-root checks. VM 131 smoke: mkdir/write/read/type-breakdown succeeded and unconfigured object storage returned 503.
 - **Phase 3 databases route family completed**: `sk-db` now owns all frontend-referenced `/databases/*` routes. Added missing password generation, MySQL table-structure, Docker aggregate/app discovery, PostgreSQL live-command adapter, SQLite live adapter, and durable managed database records with encrypted secrets and explicit connection-URI reveal. PostgreSQL routes call real `psql`/`createdb`/`dropdb`/`pg_dump`/`psql -f` commands and return typed connection errors when PostgreSQL is not running. SQLite routes use `sqlx` against allowed filesystem paths. Managed records persist in `sk_managed_databases`; physical drops intentionally require engine-specific delete endpoints. VM 131 smoke: status/password, SQLite tables/structure/query, managed create/get/reveal/protect, Docker aggregate, and PostgreSQL typed-not-running response succeeded.
 - **Phase 3 backups route family completed**: `sk-backups` now owns all 25 frontend-referenced `/backups/*` routes. Added persisted backup records, schedules, retention config, encrypted storage config, cost rates, file/app/database backup actions, restore/delete/cleanup/upload/verify/remote-list/remote-download. File/app paths perform real tar archives under allowed roots; MySQL/SQLite database actions use real engine/file operations; unsupported engines return explicit unavailable errors. Remote storage is an honest local object-store adapter via persisted `remote_dir` config or `SK_BACKUP_REMOTE_DIR`; unconfigured remote routes report that remote storage is not configured. Removed Magento-only backup compat aggregation and the backup-storage stub. Local gates plus VM 131 and VM 130 API smoke passed, including upload/verify/list/download.
+- **Phase 4 DNS/DDNS/registrars slice completed**: `sk-dns` owns all 20 `/dns/*`, 4 `/ddns/*`, and 6 `/registrars/*` frontend routes. Added persisted DNS zones/records/change log, DDNS hosts with encrypted token regeneration, registrar connections with encrypted config, manual-domain RDAP sync, DoH propagation checks, zone import/export, presets, managed/mirror/portfolio views, and explicit unconfigured provider-record responses. Local gates plus VM 131 and VM 130 API smoke passed.
 
 ## Immediate next engineering tasks
 
@@ -550,7 +562,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 5. Continue Phase 2 `sk-deploy`: implement live GitHub/GitLab/Bitbucket API repository listing once provider tokens are configured, real git clone/pull operations, real build execution, deployment log streaming, and rollback materialization.
 6. Deepen `sk-runtimes`: add NVM/NodeSource installation for requested Node versions, add process logs, add package-manager lockfile detection, and wire runtime apps into `sk-apps` adoption/assignment.
 7. Deepen `sk-apps` image updates: add authenticated registry manifest lookup using stored registry credentials, multi-image compose reporting, and UI surfacing of explicit `unknown` reasons.
-8. Continue Phase 4 with web/domains/SSL/DNS/Cloudflare route families now that Phase 3 files/databases/backups are complete.
+8. Continue Phase 4 with the remaining web/domains/SSL/nginx/Cloudflare route families now that Phase 3 and the DNS/DDNS/registrars slice are complete.
 9. Deepen `databases`: add authenticated PostgreSQL password support, richer Docker app-to-container mapping, and physical managed-record drop workflows with explicit credentials.
 10. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
 11. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.

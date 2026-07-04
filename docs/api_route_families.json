@@ -155,9 +155,9 @@
     "owner": "sk-gpu"
   },
   "image-updates": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 2,
-    "owner": "sk-apps"
+    "owner": "sk-apps::image_updates"
   },
   "jobs": {
     "status": "implemented",
@@ -196,9 +196,9 @@
     "owner": "sk-telemetry/sk-notifications"
   },
   "modules": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 2,
-    "owner": "sk-apps/sk-plugins"
+    "owner": "sk-apps::modules"
   },
   "monitoring": {
     "status": "planned",

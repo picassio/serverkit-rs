@@ -37,11 +37,6 @@ pub fn router() -> Router<SharedState> {
             "/admin/settings",
             get(async |AuthUser(_u): AuthUser| Json(json!({ "settings": [] }))),
         )
-        // app/api/modules.py list_modules
-        .route(
-            "/modules",
-            get(async |AuthUser(_u): AuthUser| Json(json!({ "modules": [] }))),
-        )
         // app/api/gpu.py GpuService.info()
         .route(
             "/gpu/",

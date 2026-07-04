@@ -18,6 +18,58 @@ fn nf(msg: &str) -> ApiError {
     ApiError::new(StatusCode::NOT_FOUND, msg)
 }
 
+async fn modules(State(s): State<SharedState>, AuthUser(_u): AuthUser) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_apps::modules(&s.db).await?))
+}
+
+async fn set_module(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(name): Path<String>,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(
+        sk_apps::set_module(
+            &s.db,
+            &name,
+            b.get("enabled").and_then(Value::as_bool).unwrap_or(true),
+        )
+        .await?,
+    ))
+}
+
+async fn image_update(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_apps::image_update(&s.db, &id).await?))
+}
+
+async fn check_image_update(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_apps::check_image_update(&s.db, &id).await?))
+}
+
+pub fn modules_router() -> Router<SharedState> {
+    Router::new()
+        .route("/", get(modules))
+        .route("/{name}", axum::routing::put(set_module))
+}
+
+pub fn image_updates_router() -> Router<SharedState> {
+    Router::new().route(
+        "/applications/{id}",
+        get(image_update).post(check_image_update),
+    )
+}
+
 pub fn router() -> Router<SharedState> {
     Router::new()
         .route("/", get(list).post(create))
@@ -79,7 +131,7 @@ pub fn router() -> Router<SharedState> {
         .route("/{id}/scale/evaluate", post(simple_ok))
         .route("/{id}/sleep", post(simple_ok))
         .route("/{id}/wake", post(simple_ok))
-        .route("/{id}/image-update/apply", post(simple_ok))
+        .route("/{id}/image-update/apply", post(apply_image_update))
         .route("/{id}/previews", get(previews))
         .route(
             "/{id}/previews/settings",
@@ -565,6 +617,14 @@ async fn snapshot(
 async fn snapshot_diff(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
     Ok(Json(json!({"diff":[]})))
+}
+async fn apply_image_update(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_apps::apply_image_update(&s.db, &id).await?))
 }
 async fn simple_ok(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&u)?;

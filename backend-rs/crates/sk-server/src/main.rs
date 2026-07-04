@@ -82,6 +82,8 @@ async fn main() -> anyhow::Result<()> {
         .nest("/files", routes::files::router())
         .nest("/ai", routes::ai::router())
         .nest("/apps", routes::apps::router())
+        .nest("/modules", routes::apps::modules_router())
+        .nest("/image-updates", routes::apps::image_updates_router())
         .nest("/magento", routes::magento::router())
         .nest("/monitoring", routes::monitoring::router())
         .nest("/jobs", routes::jobs::jobs_router())

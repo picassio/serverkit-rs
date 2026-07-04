@@ -69,6 +69,13 @@ pub async fn ensure_schema(pool: &SqlitePool) -> anyhow::Result<()> {
         CREATE TABLE IF NOT EXISTS sk_app_snapshots (
             id TEXT PRIMARY KEY, app_id TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS sk_modules (
+            name TEXT PRIMARY KEY, label TEXT NOT NULL, description TEXT, enabled INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sk_app_image_updates (
+            app_id TEXT PRIMARY KEY, status TEXT NOT NULL, update_available INTEGER NOT NULL DEFAULT 0,
+            image TEXT, current_digest TEXT, latest_digest TEXT, checked_at TEXT NOT NULL, error TEXT, metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
     "#).execute(pool).await.context("ensure sk-apps schema")?;
     Ok(())
 }
@@ -532,6 +539,257 @@ pub async fn set_policy(
 ) -> anyhow::Result<Value> {
     sqlx::query("INSERT INTO sk_app_policies (app_id,kind,policy_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(app_id,kind) DO UPDATE SET policy_json=excluded.policy_json, updated_at=excluded.updated_at").bind(app_id).bind(kind).bind(body.to_string()).bind(now()).execute(pool).await?;
     Ok(json!({"success":true,"policy":body}))
+}
+
+fn module_defs() -> Vec<(&'static str, &'static str, &'static str, bool)> {
+    vec![
+        (
+            "email",
+            "Email",
+            "Email accounts, mailbox tools, and delivery-related feature areas.",
+            true,
+        ),
+        (
+            "wordpress",
+            "WordPress",
+            "WordPress site-management and pipeline feature areas.",
+            true,
+        ),
+    ]
+}
+
+pub async fn ensure_default_modules(pool: &SqlitePool) -> anyhow::Result<()> {
+    let ts = now();
+    for (name, label, description, enabled) in module_defs() {
+        sqlx::query("INSERT INTO sk_modules(name,label,description,enabled,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(name) DO NOTHING")
+            .bind(name)
+            .bind(label)
+            .bind(description)
+            .bind(if enabled { 1 } else { 0 })
+            .bind(&ts)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn modules(pool: &SqlitePool) -> anyhow::Result<Value> {
+    ensure_default_modules(pool).await?;
+    let rows = sqlx::query("SELECT * FROM sk_modules ORDER BY label")
+        .fetch_all(pool)
+        .await?;
+    Ok(json!({"modules":rows.iter().map(|r|json!({
+        "name":r.get::<String,_>("name"),
+        "label":r.get::<String,_>("label"),
+        "description":r.try_get::<Option<String>,_>("description").ok().flatten(),
+        "enabled":r.get::<i64,_>("enabled") != 0,
+        "updated_at":r.get::<String,_>("updated_at"),
+    })).collect::<Vec<_>>() }))
+}
+
+pub async fn set_module(pool: &SqlitePool, name: &str, enabled: bool) -> anyhow::Result<Value> {
+    ensure_default_modules(pool).await?;
+    sqlx::query("UPDATE sk_modules SET enabled=?, updated_at=? WHERE name=?")
+        .bind(if enabled { 1 } else { 0 })
+        .bind(now())
+        .bind(name)
+        .execute(pool)
+        .await?;
+    let row = sqlx::query("SELECT * FROM sk_modules WHERE name=?")
+        .bind(name)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row
+        .as_ref()
+        .map(|r| {
+            json!({
+                "name":r.get::<String,_>("name"),
+                "label":r.get::<String,_>("label"),
+                "description":r.try_get::<Option<String>,_>("description").ok().flatten(),
+                "enabled":r.get::<i64,_>("enabled") != 0,
+                "updated_at":r.get::<String,_>("updated_at"),
+            })
+        })
+        .unwrap_or_else(|| json!({"success":false,"error":"module not found"})))
+}
+
+fn command_out(cmd: &str, args: &[&str]) -> (bool, String, String) {
+    match std::process::Command::new(cmd).args(args).output() {
+        Ok(o) => (
+            o.status.success(),
+            String::from_utf8_lossy(&o.stdout).trim().to_string(),
+            String::from_utf8_lossy(&o.stderr).trim().to_string(),
+        ),
+        Err(e) => (false, String::new(), e.to_string()),
+    }
+}
+
+fn first_image_from_compose(compose: &str) -> Option<String> {
+    let (ok, stdout, _) = command_out("docker", &["compose", "-f", compose, "config", "--images"]);
+    if !ok {
+        return None;
+    }
+    stdout
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(str::to_string)
+}
+
+fn docker_current_digest(image: &str) -> Option<String> {
+    let (ok, stdout, _) = command_out(
+        "docker",
+        &[
+            "image",
+            "inspect",
+            "--format",
+            "{{json .RepoDigests}}",
+            image,
+        ],
+    );
+    if !ok {
+        return None;
+    }
+    serde_json::from_str::<Vec<String>>(&stdout)
+        .ok()
+        .and_then(|items| items.into_iter().find(|d| d.contains("@sha256:")))
+        .and_then(|d| d.split('@').nth(1).map(str::to_string))
+}
+
+fn find_digest(v: &Value) -> Option<String> {
+    match v {
+        Value::Object(map) => {
+            if let Some(d) = map.get("digest").and_then(Value::as_str) {
+                if d.starts_with("sha256:") {
+                    return Some(d.to_string());
+                }
+            }
+            for value in map.values() {
+                if let Some(d) = find_digest(value) {
+                    return Some(d);
+                }
+            }
+            None
+        }
+        Value::Array(items) => items.iter().find_map(find_digest),
+        _ => None,
+    }
+}
+
+fn docker_latest_digest(image: &str) -> Result<Option<String>, String> {
+    let (ok, stdout, stderr) = command_out("docker", &["manifest", "inspect", image]);
+    if !ok {
+        return Err(if stderr.is_empty() {
+            "docker manifest inspect failed".to_string()
+        } else {
+            stderr
+        });
+    }
+    Ok(serde_json::from_str::<Value>(&stdout)
+        .ok()
+        .and_then(|v| find_digest(&v)))
+}
+
+async fn persist_image_update(pool: &SqlitePool, app_id: &str, info: &Value) -> anyhow::Result<()> {
+    sqlx::query("INSERT INTO sk_app_image_updates(app_id,status,update_available,image,current_digest,latest_digest,checked_at,error,metadata_json) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(app_id) DO UPDATE SET status=excluded.status,update_available=excluded.update_available,image=excluded.image,current_digest=excluded.current_digest,latest_digest=excluded.latest_digest,checked_at=excluded.checked_at,error=excluded.error,metadata_json=excluded.metadata_json")
+        .bind(app_id)
+        .bind(info.get("status").and_then(Value::as_str).unwrap_or("unknown"))
+        .bind(if info.get("update_available").and_then(Value::as_bool).unwrap_or(false) { 1 } else { 0 })
+        .bind(info.get("image").and_then(Value::as_str))
+        .bind(info.get("current_digest").and_then(Value::as_str))
+        .bind(info.get("latest_digest").and_then(Value::as_str))
+        .bind(info.get("checked_at").and_then(Value::as_str).unwrap_or(&now()))
+        .bind(info.get("error").and_then(Value::as_str))
+        .bind(info.to_string())
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn image_update(pool: &SqlitePool, app_id: &str) -> anyhow::Result<Value> {
+    if let Some(row) = sqlx::query("SELECT * FROM sk_app_image_updates WHERE app_id=?")
+        .bind(app_id)
+        .fetch_optional(pool)
+        .await?
+    {
+        return Ok(json!({
+            "app_id":app_id,
+            "status":row.get::<String,_>("status"),
+            "update_available":row.get::<i64,_>("update_available") != 0,
+            "image":row.try_get::<Option<String>,_>("image").ok().flatten(),
+            "current_digest":row.try_get::<Option<String>,_>("current_digest").ok().flatten(),
+            "latest_digest":row.try_get::<Option<String>,_>("latest_digest").ok().flatten(),
+            "checked_at":row.get::<String,_>("checked_at"),
+            "error":row.try_get::<Option<String>,_>("error").ok().flatten(),
+            "metadata":j(row.try_get::<Option<String>,_>("metadata_json").ok().flatten()),
+        }));
+    }
+    Ok(
+        json!({"app_id":app_id,"status":"unknown","update_available":false,"current_digest":Value::Null,"latest_digest":Value::Null,"checked_at":Value::Null}),
+    )
+}
+
+pub async fn check_image_update(pool: &SqlitePool, app_id: &str) -> anyhow::Result<Value> {
+    let Some(app) = get(pool, app_id).await? else {
+        return Ok(json!({"success":false,"error":"app not found"}));
+    };
+    let compose = app
+        .get("root_path")
+        .and_then(Value::as_str)
+        .map(|r| format!("{r}/docker-compose.yml"));
+    let ts = now();
+    let Some(compose) = compose.filter(|p| std::path::Path::new(p).exists()) else {
+        let info = json!({"app_id":app_id,"status":"unknown","update_available":false,"checked_at":ts,"error":"app has no docker-compose.yml to inspect"});
+        persist_image_update(pool, app_id, &info).await?;
+        return Ok(info);
+    };
+    let Some(image) = first_image_from_compose(&compose) else {
+        let info = json!({"app_id":app_id,"status":"unknown","update_available":false,"checked_at":ts,"error":"compose file has no image reference"});
+        persist_image_update(pool, app_id, &info).await?;
+        return Ok(info);
+    };
+    let current = docker_current_digest(&image);
+    let latest = docker_latest_digest(&image);
+    let (status, update_available, error) = match (&current, &latest) {
+        (Some(c), Ok(Some(l))) if c == l => ("up_to_date", false, None),
+        (Some(_), Ok(Some(_))) => ("update_available", true, None),
+        (_, Err(e)) => ("unknown", false, Some(e.clone())),
+        _ => (
+            "unknown",
+            false,
+            Some("could not determine current or latest image digest".to_string()),
+        ),
+    };
+    let info = json!({
+        "app_id":app_id,"status":status,"update_available":update_available,"image":image,
+        "current_digest":current,"latest_digest":latest.ok().flatten(),"checked_at":ts,"error":error,
+    });
+    persist_image_update(pool, app_id, &info).await?;
+    Ok(info)
+}
+
+pub async fn apply_image_update(pool: &SqlitePool, app_id: &str) -> anyhow::Result<Value> {
+    let Some(compose) = compose_path(pool, app_id).await? else {
+        return Ok(json!({"success":false,"error":"compose app not found"}));
+    };
+    let (pull_ok, pull_out, pull_err) = command_out("docker", &["compose", "-f", &compose, "pull"]);
+    if !pull_ok {
+        return Ok(json!({"success":false,"error":pull_err,"output":pull_out}));
+    }
+    let (up_ok, up_out, up_err) = command_out("docker", &["compose", "-f", &compose, "up", "-d"]);
+    if up_ok {
+        sqlx::query("UPDATE sk_apps SET status='running', updated_at=? WHERE id=?")
+            .bind(now())
+            .bind(app_id)
+            .execute(pool)
+            .await?;
+        let checked = check_image_update(pool, app_id).await?;
+        Ok(
+            json!({"success":true,"message":"Image pulled and app recreated","pull_output":pull_out,"up_output":up_out,"image_update":checked}),
+        )
+    } else {
+        Ok(json!({"success":false,"error":up_err,"output":up_out}))
+    }
 }
 
 pub async fn previews(pool: &SqlitePool, app_id: &str) -> anyhow::Result<Value> {

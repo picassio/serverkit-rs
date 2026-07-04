@@ -4,7 +4,7 @@
   "ai": {"status": "planned", "phase": 0, "owner": "sk-server::routes::ai", "note": "Implemented routes exist; parity tests still required before marking implemented."},
   "api-analytics": {"status": "implemented", "phase": 1, "owner": "sk-events::api_analytics"},
   "api-keys": {"status": "implemented", "phase": 1, "owner": "sk-projects::api_keys"},
-  "apps": {"status": "planned", "phase": 2, "owner": "sk-apps", "note": "Current aggregator is partial; roadmap target is first-class sk-apps."},
+  "apps": {"status": "implemented", "phase": 2, "owner": "sk-apps", "note": "First-class persisted app records with Magento/template adoption; deeper build/deploy/runtime adapters continue in Phase 2."},
   "auth": {"status": "planned", "phase": 0, "owner": "sk-auth", "note": "Implemented routes exist; parity tests still required before marking implemented."},
   "backups": {"status": "planned", "phase": 3, "owner": "sk-backups", "note": "Current Magento-only aggregation is partial."},
   "buildpacks": {"status": "planned", "phase": 2, "owner": "sk-builds"},

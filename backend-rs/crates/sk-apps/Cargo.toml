@@ -1,0 +1,20 @@
+[package]
+name = "sk-apps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sk-core.workspace = true
+sk-magento.workspace = true
+sk-templates.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

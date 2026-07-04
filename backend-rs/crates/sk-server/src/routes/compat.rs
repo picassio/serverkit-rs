@@ -6,19 +6,13 @@
 
 use crate::extract::AuthUser;
 use crate::state::SharedState;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::{json, Value};
 
 pub fn router() -> Router<SharedState> {
     Router::new()
-        // ── Apps / Services: real — Magento stores + installed template apps ─
-        .route("/apps", get(apps_list))
-        .route("/apps/{id}", get(app_detail))
-        .route("/apps/{id}/start", post(app_start))
-        .route("/apps/{id}/stop", post(app_stop))
-        .route("/apps/{id}/restart", post(app_restart))
         // ── Domains: real, from nginx vhosts ────────────────────────────
         .route("/domains", get(domains))
         // ── Firewall: real, from ufw ────────────────────────────────────
@@ -236,133 +230,6 @@ async fn firewall_del_rule(AuthUser(u): AuthUser, Json(b): Json<Value>) -> Json<
         Some(n) => ufw_run(&["--force".into(), "delete".into(), n.to_string()]),
         None => Json(json!({ "success": false, "error": "rule index required" })),
     }
-}
-
-// ── Apps / Services: Magento stores + installed template apps ───────────────
-fn apps_dir() -> String {
-    std::env::var("SK_APPS_DIR").unwrap_or_else(|_| "/var/www/serverkit-apps".into())
-}
-
-/// Running if `docker compose ps -q` lists any container.
-fn compose_status(compose: &str) -> &'static str {
-    let out = std::process::Command::new("docker")
-        .args(["compose", "-f", compose, "ps", "-q"])
-        .output();
-    match out {
-        Ok(o) if o.status.success() && !o.stdout.trim_ascii().is_empty() => "running",
-        _ => "stopped",
-    }
-}
-
-async fn collect_apps(s: &SharedState) -> Vec<Value> {
-    let mut apps = Vec::new();
-    if let Ok(stores) = sk_magento::store::list(&s.db).await {
-        for st in stores {
-            apps.push(json!({
-                "id": format!("magento-{}", st.id),
-                "name": st.name,
-                "app_type": "magento",
-                "status": st.status,
-                "domains": [st.domain],
-                "root_path": st.root_path,
-                "source": "magento",
-                "version": st.magento_version,
-                "project_name": Value::Null, "environment_name": Value::Null,
-                "last_deploy_at": Value::Null, "deploy_repo_url": Value::Null,
-                "upload_path": Value::Null,
-            }));
-        }
-    }
-    let dir = apps_dir();
-    for app in sk_templates::list_installed() {
-        let name = app
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let compose = format!("{dir}/{name}/docker-compose.yml");
-        apps.push(json!({
-            "id": format!("app-{}", name),
-            "name": name,
-            "app_type": "docker",
-            "status": compose_status(&compose),
-            "domains": app.get("domains").cloned().unwrap_or_else(|| json!([])),
-            "root_path": format!("{dir}/{name}"),
-            "source": "template",
-            "version": app.get("template").cloned().unwrap_or(Value::Null),
-            "project_name": Value::Null, "environment_name": Value::Null,
-            "last_deploy_at": Value::Null, "deploy_repo_url": Value::Null,
-            "upload_path": Value::Null,
-        }));
-    }
-    apps
-}
-
-async fn apps_list(State(s): State<SharedState>, AuthUser(_u): AuthUser) -> Json<Value> {
-    Json(json!({ "apps": collect_apps(&s).await }))
-}
-
-async fn app_detail(
-    State(s): State<SharedState>,
-    AuthUser(_u): AuthUser,
-    Path(id): Path<String>,
-) -> Json<Value> {
-    let app = collect_apps(&s)
-        .await
-        .into_iter()
-        .find(|a| a["id"] == json!(id));
-    Json(app.unwrap_or_else(|| json!({ "error": "not found" })))
-}
-
-/// Resolve an app id to its docker-compose.yml path.
-async fn app_compose(s: &SharedState, id: &str) -> Option<String> {
-    if let Some(sid) = id.strip_prefix("magento-") {
-        let sid: i64 = sid.parse().ok()?;
-        let stores = sk_magento::store::list(&s.db).await.ok()?;
-        let st = stores.into_iter().find(|x| x.id == sid)?;
-        Some(format!("{}/docker-compose.yml", st.root_path))
-    } else {
-        id.strip_prefix("app-")
-            .map(|name| format!("{}/{}/docker-compose.yml", apps_dir(), name))
-    }
-}
-
-async fn app_compose_action(s: &SharedState, id: &str, action: &str) -> Json<Value> {
-    let Some(compose) = app_compose(s, id).await else {
-        return Json(json!({ "success": false, "error": "unknown app" }));
-    };
-    let out = std::process::Command::new("docker")
-        .args(["compose", "-f", &compose, action])
-        .output();
-    match out {
-        Ok(o) if o.status.success() => Json(
-            json!({ "success": true, "status": if action == "stop" { "stopped" } else { "running" } }),
-        ),
-        Ok(o) => Json(json!({ "success": false, "error": String::from_utf8_lossy(&o.stderr) })),
-        Err(e) => Json(json!({ "success": false, "error": e.to_string() })),
-    }
-}
-
-async fn app_start(
-    State(s): State<SharedState>,
-    AuthUser(_u): AuthUser,
-    Path(id): Path<String>,
-) -> Json<Value> {
-    app_compose_action(&s, &id, "start").await
-}
-async fn app_stop(
-    State(s): State<SharedState>,
-    AuthUser(_u): AuthUser,
-    Path(id): Path<String>,
-) -> Json<Value> {
-    app_compose_action(&s, &id, "stop").await
-}
-async fn app_restart(
-    State(s): State<SharedState>,
-    AuthUser(_u): AuthUser,
-    Path(id): Path<String>,
-) -> Json<Value> {
-    app_compose_action(&s, &id, "restart").await
 }
 
 // ── Backups: real Magento database backups ──────────────────────────────────

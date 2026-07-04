@@ -11,6 +11,7 @@ members = [
     "crates/sk-jobs",
     "crates/sk-projects",
     "crates/sk-events",
+    "crates/sk-apps",
 ]
 
 [workspace.package]
@@ -36,6 +37,7 @@ sk-templates = { path = "crates/sk-templates" }
 sk-jobs = { path = "crates/sk-jobs" }
 sk-projects = { path = "crates/sk-projects" }
 sk-events = { path = "crates/sk-events" }
+sk-apps = { path = "crates/sk-apps" }
 
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["multipart"] }

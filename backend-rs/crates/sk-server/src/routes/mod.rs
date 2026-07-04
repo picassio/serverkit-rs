@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod apps;
 pub mod auth;
 pub mod compat;
 pub mod db;

@@ -2496,6 +2496,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-apps"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "sk-core",
+ "sk-magento",
+ "sk-templates",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "sk-auth"
 version = "0.1.6"
 dependencies = [
@@ -2670,6 +2687,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sk-apps",
  "sk-auth",
  "sk-core",
  "sk-db",

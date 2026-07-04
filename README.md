@@ -75,11 +75,15 @@ SK_BOOTSTRAP_ADMIN_EMAIL=you@example.com \
 SK_BOOTSTRAP_ADMIN_PASSWORD='at-least-8-chars' sudo ./install.sh
 ```
 
-The installer:
-1. builds (or uses the prebuilt binary), installs to `/opt/serverkit-rs`,
-2. generates `SECRET_KEY` / `JWT_SECRET_KEY` / `SERVERKIT_ENCRYPTION_KEY` into `/etc/serverkit/serverkit.env` (chmod 600),
-3. installs + starts the `serverkit` systemd service,
-4. bootstraps the first admin (interactively or via `SK_BOOTSTRAP_ADMIN_*`).
+On a **fresh Ubuntu/Debian VM** the installer is self-contained — piped from `curl` it
+downloads the latest release (or clones + builds from source if there is none), then:
+1. installs prerequisites — **docker, node, nginx, php-fpm** (+ Rust if building from source),
+2. tunes the OS for Magento/OpenSearch — `vm.max_map_count=262144`, `vm.swappiness`, file limits, THP off,
+3. installs to `/opt/serverkit-rs` and generates `SECRET_KEY` / `JWT_SECRET_KEY` / `SERVERKIT_ENCRYPTION_KEY` into `/etc/serverkit/serverkit.env` (chmod 600),
+4. installs + starts the `serverkit` systemd service,
+5. bootstraps the first admin (interactively or via `SK_BOOTSTRAP_ADMIN_*`).
+
+(`SK_SKIP_PREPARE=1` skips steps 1-2 if the machine is already provisioned.)
 
 Then open `http://<host>:5000`. If you didn't bootstrap, the **first account you register becomes admin**.
 

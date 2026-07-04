@@ -2823,6 +2823,7 @@ dependencies = [
  "sk-projects",
  "sk-runtimes",
  "sk-security",
+ "sk-status",
  "sk-system",
  "sk-templates",
  "sk-terminal",
@@ -2836,6 +2837,18 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "sk-status"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "reqwest",
+ "serde_json",
+ "sqlx",
+ "uuid",
 ]
 
 [[package]]

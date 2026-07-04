@@ -56,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
     sk_security::ensure_schema(&pool).await?;
     sk_fleet::ensure_schema(&pool).await?;
     sk_cloud::ensure_schema(&pool).await?;
+    sk_status::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -146,6 +147,12 @@ async fn main() -> anyhow::Result<()> {
         .nest("/server-templates", routes::fleet::templates_router())
         .nest("/fleet-monitor", routes::fleet::monitor_router())
         .route("/gpu", get(routes::gpu::info))
+        .route(
+            "/status/",
+            get(routes::status::pages).post(routes::status::create_page),
+        )
+        .nest("/status", routes::status::status_router())
+        .nest("/uptime", routes::status::uptime_router())
         .nest("/firewall", routes::security::firewall_router())
         .nest("/security", routes::security::security_router())
         .nest("/waf", routes::security::waf_router())

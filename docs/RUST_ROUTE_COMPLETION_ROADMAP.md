@@ -479,11 +479,24 @@ Implemented 2026-07-04:
 - Removed the old `/gpu/` stub from `routes/stubs.rs`.
 - Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 `/gpu` smoke returned JSON with `available`, `gpus`, and `tools` fields from real host detection.
 
-### 7.5 Status pages (`sk-status`)
+### 7.5 Status pages and uptime (`sk-status`)
 
-Route family: `/status/*`
+Route families:
 
-Build status pages, components, incidents, public status, badges, checks/history.
+- `/status/*`
+- `/uptime/*`
+
+Build status pages, components, incidents, public status, badges, checks/history, app status aggregation, and host uptime tracking current/history/stats/graph.
+
+Implemented 2026-07-04:
+
+- Added `sk-status`, boot-time schema creation, and `routes/status.rs` ownership for all 19 `/status/*` and 7 `/uptime/*` frontend routes.
+- Status pages persist page records, components, check history, and incidents in SQLite; `/status/public/{slug}` and `/status/badge/{slug}` are backed by those records.
+- Component checks perform real HTTP or TCP probes when a target is configured, measure latency, update component status, and persist check history.
+- `/status/apps` and `/status/app/{id}` read the real `sk_apps` inventory instead of returning synthetic app status.
+- Uptime routes sample `/proc/uptime` and `/proc/loadavg`, persist samples, and expose current/stats/history/graph plus persisted tracking start/stop/status.
+- Added explicit `/status/` root alias because the React API calls the status-page root with a trailing slash.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status page CRUD, public page, badge, component CRUD/check/history, incident CRUD, app status endpoints, uptime tracking start/status/current/stats/graph/history/stop.
 
 ### 7.6 Workflows (`sk-workflows`)
 
@@ -592,12 +605,12 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | source-connections | 18 | sk-deploy | 2 |
 | ssl | 14 | sk-acme/sk-web | 4 |
 | sso | 9 | sk-sso | 9 |
-| status | 12 | sk-status | 7 |
+| status | 19 | sk-status | 7 |
 | system | 12 | sk-system | 9 |
 | telemetry | 8 | sk-telemetry | 1 |
 | templates | 10 | sk-templates | existing + parity |
 | tunnels | 7 | sk-fleet | 6 |
-| uptime | 7 | sk-status/sk-monitor | 4/7 |
+| uptime | 7 | sk-status | 7 |
 | vaults | 4 | sk-workspaces | 1 |
 | waf | 6 | sk-security/sk-web | 5 |
 | webhooks | 5 | sk-webhooks/sk-telemetry | 1 |

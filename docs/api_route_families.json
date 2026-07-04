@@ -305,7 +305,7 @@
     "owner": "sk-sso"
   },
   "status": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 7,
     "owner": "sk-status"
   },
@@ -331,9 +331,9 @@
     "owner": "sk-fleet"
   },
   "uptime": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 7,
-    "owner": "sk-status/sk-monitor"
+    "owner": "sk-status"
   },
   "vaults": {
     "status": "implemented",

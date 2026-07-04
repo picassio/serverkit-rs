@@ -30,8 +30,6 @@ pub fn router() -> Router<SharedState> {
         .route("/backups/cost-summary", get(async |AuthUser(_u): AuthUser| Json(json!({ "total_usd": 0, "items": [] }))))
         .route("/backups/schedules", get(async |AuthUser(_u): AuthUser| Json(json!({ "schedules": [] }))))
         .route("/backups/stats", get(backups_stats))
-        // ── Deployments ────────────────────────────────────────────────
-        .route("/deployment-jobs", get(async |AuthUser(_u): AuthUser| Json(json!({ "jobs": [] }))))
         // ── DNS / registrars ────────────────────────────────────────────
         .route("/dns/portfolio", get(async |AuthUser(_u): AuthUser| Json(json!({ "domains": [] }))))
         .route("/registrars/domains", get(async |AuthUser(_u): AuthUser| Json(json!({ "domains": [] }))))

@@ -2557,6 +2557,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-deploy"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rand 0.8.6",
+ "serde_json",
+ "sk-core",
+ "sk-jobs",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "sk-docker"
 version = "0.1.6"
 dependencies = [
@@ -2691,6 +2706,7 @@ dependencies = [
  "sk-auth",
  "sk-core",
  "sk-db",
+ "sk-deploy",
  "sk-docker",
  "sk-events",
  "sk-files",

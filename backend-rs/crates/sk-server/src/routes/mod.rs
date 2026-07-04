@@ -3,6 +3,7 @@ pub mod apps;
 pub mod auth;
 pub mod compat;
 pub mod db;
+pub mod deploy;
 pub mod docker;
 pub mod events;
 pub mod files;

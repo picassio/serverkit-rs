@@ -140,17 +140,24 @@ const AISettingsTab = () => {
 
                 <div className="form-group">
                     <label htmlFor="ai-model">Model</label>
-                    <input
+                    <select
                         id="ai-model"
-                        type="text"
-                        list="ai-model-options"
-                        placeholder="e.g. gpt-4o"
                         value={settings.model}
+                        disabled={!settings.provider}
                         onChange={(e) => setSettings((s) => ({ ...s, model: e.target.value }))}
-                    />
-                    <datalist id="ai-model-options">
-                        {models.map((m) => <option key={m} value={m} />)}
-                    </datalist>
+                    >
+                        <option value="">
+                            {!settings.provider
+                                ? 'Select a provider first…'
+                                : models.length
+                                    ? 'Select a model…'
+                                    : 'No models available for this provider'}
+                        </option>
+                        {settings.model && !models.includes(settings.model) && (
+                            <option value={settings.model}>{settings.model} (current)</option>
+                        )}
+                        {models.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
                 </div>
 
                 {needsKey && (

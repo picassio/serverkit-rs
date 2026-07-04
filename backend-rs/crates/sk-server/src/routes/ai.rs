@@ -10,7 +10,7 @@
 use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::response::sse::{Event, Sse};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
@@ -254,14 +254,28 @@ async fn put_settings(AuthUser(u): AuthUser, Json(data): Json<Value>) -> ApiResu
 
 async fn providers(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
-    // pi manages providers/keys itself; expose the common ones for the picker.
-    Ok(Json(
-        json!({ "providers": ["anthropic", "google", "openai"] }),
-    ))
+    // Real catalog from the sidecar's model registry; static fallback otherwise.
+    if let Ok(v) = sidecar_call(reqwest::Method::GET, "/providers", None).await {
+        return Ok(v);
+    }
+    Ok(Json(json!({ "providers": [
+        { "id": "anthropic", "label": "Anthropic (Claude)", "needs_key": false, "supports_endpoint": false },
+        { "id": "google", "label": "Google (Gemini)", "needs_key": true, "supports_endpoint": false },
+        { "id": "openai", "label": "OpenAI", "needs_key": true, "supports_endpoint": false }
+    ] })))
 }
-async fn models(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
+async fn models(AuthUser(u): AuthUser, Query(q): Query<std::collections::HashMap<String, String>>) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
+    let provider = q.get("provider").cloned().unwrap_or_default();
+    if let Ok(v) = sidecar_call(reqwest::Method::GET, &format!("/models?provider={}", urlencoding_min(&provider)), None).await {
+        return Ok(v);
+    }
     Ok(Json(json!({ "models": [] })))
+}
+
+/// minimal query-value encoder (provider ids are simple slugs)
+fn urlencoding_min(s: &str) -> String {
+    s.chars().map(|c| if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') { c.to_string() } else { format!("%{:02X}", c as u32) }).collect()
 }
 async fn tools(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&u)?;

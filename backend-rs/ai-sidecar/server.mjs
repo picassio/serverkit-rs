@@ -115,6 +115,31 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── provider + model catalog (feeds the Settings dropdowns) ─────────
+  if (req.method === "GET" && req.url === "/providers") {
+    const all = modelRegistry.getAll() || [];
+    const oauthIds = new Set(authStorage.getOAuthProviders().map((p) => p.id));
+    const ids = [...new Set(all.map((m) => m.provider))].sort();
+    const providers = ids.map((id) => ({
+      id,
+      label: (typeof modelRegistry.getProviderDisplayName === "function" && modelRegistry.getProviderDisplayName(id)) || id,
+      needs_key: !oauthIds.has(id),
+      supports_endpoint: false,
+    }));
+    sendJson(res, { providers });
+    return;
+  }
+  if (req.method === "GET" && req.url.startsWith("/models")) {
+    const provider = new URL(req.url, "http://x").searchParams.get("provider") || "";
+    const models = [...new Set(
+      (modelRegistry.getAll() || [])
+        .filter((m) => !provider || m.provider === provider)
+        .map((m) => m.id),
+    )].sort();
+    sendJson(res, { models });
+    return;
+  }
+
   // ── provider auth (login flow surfaced in the ServerKit web UI) ──────
   if (req.method === "GET" && req.url === "/auth/status") {
     const providers = authStorage.getOAuthProviders().map((p) => ({

@@ -403,7 +403,7 @@ pub async fn user_privileges(
 }
 
 /// `_is_readonly_query`
-pub(crate) fn is_readonly_query(query: &str) -> bool {
+pub fn is_readonly_query(query: &str) -> bool {
     query
         .trim()
         .to_uppercase()

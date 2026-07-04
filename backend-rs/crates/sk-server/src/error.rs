@@ -53,4 +53,11 @@ impl From<anyhow::Error> for ApiError {
     }
 }
 
+impl From<sqlx::Error> for ApiError {
+    fn from(err: sqlx::Error) -> Self {
+        tracing::error!(error = %err, "database error");
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+    }
+}
+
 pub type ApiResult<T> = Result<T, ApiError>;

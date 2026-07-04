@@ -74,7 +74,7 @@
     "owner": "sk-ops/sk-jobs"
   },
   "databases": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 3,
     "owner": "sk-db"
   },

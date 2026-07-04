@@ -295,7 +295,7 @@
     "owner": "sk-deploy::source_connections"
   },
   "ssl": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 4,
     "owner": "sk-acme/sk-web"
   },

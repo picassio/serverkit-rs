@@ -48,6 +48,23 @@ pub fn domains_router() -> Router<SharedState> {
         .route("/{id}/verify", get(domain_verify))
 }
 
+pub fn ssl_router() -> Router<SharedState> {
+    Router::new()
+        .route("/status", get(ssl_status))
+        .route("/certificates", get(ssl_certificates).post(ssl_obtain))
+        .route("/certificates/renew-all", post(ssl_renew_all))
+        .route("/certificates/{domain}", delete(ssl_delete))
+        .route("/certificates/{domain}/renew", post(ssl_renew))
+        .route("/auto-renewal", post(ssl_auto_renewal))
+        .route("/install-certbot", post(ssl_install_certbot))
+        .route("/profiles", get(ssl_profiles))
+        .route("/wildcard", post(ssl_wildcard))
+        .route("/san", post(ssl_san))
+        .route("/upload", post(ssl_upload))
+        .route("/health/{domain}", get(ssl_health))
+        .route("/expiry-alerts", get(ssl_expiry_alerts))
+}
+
 pub fn php_router() -> Router<SharedState> {
     Router::new()
         .route("/versions", get(php_versions))
@@ -398,6 +415,111 @@ async fn domains_ssl_status(
     AuthUser(_u): AuthUser,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(sk_web::domains::ssl_status(&s.db).await?))
+}
+
+// ==================== SSL ====================
+
+async fn ssl_status(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_web::ssl::status(&s.db).await?))
+}
+async fn ssl_certificates(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_web::ssl::list(&s.db).await?))
+}
+async fn ssl_obtain(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::obtain(&s.db, &b).await?))
+}
+async fn ssl_renew(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(domain): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::renew(&s.db, &domain).await?))
+}
+async fn ssl_renew_all(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::renew_all(&s.db).await?))
+}
+async fn ssl_delete(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(domain): Path<String>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::delete(&s.db, &domain).await?))
+}
+async fn ssl_auto_renewal(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::setup_auto_renewal(&s.db, &b).await?))
+}
+async fn ssl_install_certbot(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::install_certbot().await?))
+}
+async fn ssl_profiles(AuthUser(_u): AuthUser) -> Json<Value> {
+    Json(sk_web::ssl::profiles())
+}
+async fn ssl_wildcard(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::wildcard(&s.db, &b).await?))
+}
+async fn ssl_san(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::san(&s.db, &b).await?))
+}
+async fn ssl_upload(
+    State(s): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Json(b): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::ssl::upload(&s.db, &b).await?))
+}
+async fn ssl_health(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(domain): Path<String>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(sk_web::ssl::health(&s.db, &domain).await?))
+}
+#[derive(Deserialize)]
+struct ExpiryQuery {
+    days: Option<i64>,
+}
+async fn ssl_expiry_alerts(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Query(q): Query<ExpiryQuery>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(
+        sk_web::ssl::expiry_alerts(&s.db, q.days.unwrap_or(30)).await?,
+    ))
 }
 
 // ==================== PHP ====================

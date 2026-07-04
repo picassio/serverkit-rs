@@ -4,6 +4,7 @@
 pub mod domains;
 pub mod nginx;
 pub mod php;
+pub mod ssl;
 
 use tokio::process::Command;
 

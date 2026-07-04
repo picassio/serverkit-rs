@@ -283,6 +283,18 @@ Implemented 2026-07-04 for `domains` + `nginx`:
 - Removed the previous `/domains` compat route.
 - Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered nginx status, LB methods, domain create/get/verify/list/base/suggest/nginx-sites/ssl-status/ssl-disable/typed-renew/delete, nginx site create/list/test/enable/disable/delete, advanced diff/proxy-get/logs, and advanced proxy create/rules/delete.
 
+Implemented 2026-07-04 for `ssl`:
+
+- Added `sk-web::ssl` with persisted `sk_ssl_certificates` and `sk_ssl_settings` tables.
+- `/ssl/*` is now owned by `routes/web.rs` + `sk-web::ssl` + `sk-acme`.
+- Status/list/health/expiry-alert routes read real persisted certificate metadata and filesystem paths.
+- Certificate obtain supports real self-signed certificate generation via `openssl` and real ACME HTTP-01/DNS-01 issuance through the existing Rust `sk-acme` client when required configuration is supplied.
+- Upload writes real certificate/key PEMs under `SK_CERT_DIR`/`/etc/serverkit/certs` and protects private-key permissions.
+- Renew regenerates self-signed certificates or re-runs stored ACME metadata; uploaded certs return a typed cannot-renew error.
+- Wildcard/SAN routes call the same issuance path and return explicit configuration errors when DNS-01 or HTTP-01 prerequisites are missing.
+- Auto-renewal settings persist in SQLite; install-certbot reports real certbot presence or a typed message that the Rust ACME client is used.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status, profiles, auto-renewal persistence, certbot typed status, self-signed obtain/list/health/alerts/renew/renew-all/delete, wildcard typed-unconfigured response, upload, and upload delete.
+
 ### 4.2 DNS, registrars, DDNS (`sk-dns`, `sk-registrars`)
 
 Route families:
@@ -520,7 +532,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 | servers | 111 | sk-fleet | 6 |
 | shared | 11 | sk-workspaces | 1 |
 | source-connections | 18 | sk-deploy | 2 |
-| ssl | 13 | sk-acme/sk-web | 4 |
+| ssl | 14 | sk-acme/sk-web | 4 |
 | sso | 9 | sk-sso | 9 |
 | status | 12 | sk-status | 7 |
 | system | 12 | sk-system | 9 |
@@ -563,6 +575,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 - **Phase 3 backups route family completed**: `sk-backups` now owns all 25 frontend-referenced `/backups/*` routes. Added persisted backup records, schedules, retention config, encrypted storage config, cost rates, file/app/database backup actions, restore/delete/cleanup/upload/verify/remote-list/remote-download. File/app paths perform real tar archives under allowed roots; MySQL/SQLite database actions use real engine/file operations; unsupported engines return explicit unavailable errors. Remote storage is an honest local object-store adapter via persisted `remote_dir` config or `SK_BACKUP_REMOTE_DIR`; unconfigured remote routes report that remote storage is not configured. Removed Magento-only backup compat aggregation and the backup-storage stub. Local gates plus VM 131 and VM 130 API smoke passed, including upload/verify/list/download.
 - **Phase 4 DNS/DDNS/registrars slice completed**: `sk-dns` owns all 20 `/dns/*`, 4 `/ddns/*`, and 6 `/registrars/*` frontend routes. Added persisted DNS zones/records/change log, DDNS hosts with encrypted token regeneration, registrar connections with encrypted config, manual-domain RDAP sync, DoH propagation checks, zone import/export, presets, managed/mirror/portfolio views, and explicit unconfigured provider-record responses. Local gates plus VM 131 and VM 130 API smoke passed.
 - **Phase 4 domains/nginx slice completed**: `sk-web` now owns all 14 `/domains/*` and 15 `/nginx/*` frontend routes. Added persisted domain/base-domain state, nginx vhost adoption into domain records, domain create/update/delete/verify, base-domain and subdomain helpers, domain SSL metadata/actions with typed unconfigured renewal, and advanced nginx proxy/diff/log/LB routes. Removed the `/domains` compat route. Local gates plus VM 131 and VM 130 API smoke passed.
+- **Phase 4 SSL route family completed**: `sk-web::ssl` + `sk-acme` now own all 14 `/ssl/*` frontend routes. Added persisted certificate/settings records, real self-signed generation, PEM upload, ACME HTTP-01/DNS-01 issuance hooks, renewal/delete/health/expiry alerts, profiles, auto-renewal settings, and typed certbot/DNS-01 unavailable states. Local gates plus VM 131 and VM 130 API smoke passed.
 
 ## Immediate next engineering tasks
 
@@ -577,7 +590,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 5. Continue Phase 2 `sk-deploy`: implement live GitHub/GitLab/Bitbucket API repository listing once provider tokens are configured, real git clone/pull operations, real build execution, deployment log streaming, and rollback materialization.
 6. Deepen `sk-runtimes`: add NVM/NodeSource installation for requested Node versions, add process logs, add package-manager lockfile detection, and wire runtime apps into `sk-apps` adoption/assignment.
 7. Deepen `sk-apps` image updates: add authenticated registry manifest lookup using stored registry credentials, multi-image compose reporting, and UI surfacing of explicit `unknown` reasons.
-8. Continue Phase 4 with the remaining SSL and Cloudflare route families now that Phase 3 plus DNS/DDNS/registrars and domains/nginx are complete.
+8. Continue Phase 4 with the remaining Cloudflare route family now that Phase 3 plus DNS/DDNS/registrars, domains/nginx, and SSL are complete.
 9. Deepen `databases`: add authenticated PostgreSQL password support, richer Docker app-to-container mapping, and physical managed-record drop workflows with explicit credentials.
 10. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
 11. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.

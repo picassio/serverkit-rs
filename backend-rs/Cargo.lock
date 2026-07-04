@@ -2824,6 +2824,7 @@ dependencies = [
  "chrono",
  "regex",
  "serde_json",
+ "sk-acme",
  "sqlx",
  "tokio",
  "tracing",

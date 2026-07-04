@@ -2,6 +2,8 @@
 
 This document outlines the development roadmap for ServerKit. Features are organized by phases and priority.
 
+> **serverkit-rs note:** this upstream/product roadmap describes the feature surface. The Rust backend parity plan is tracked separately in [`docs/RUST_ROUTE_COMPLETION_ROADMAP.md`](docs/RUST_ROUTE_COMPLETION_ROADMAP.md), including the no-fallback rule and route-family implementation phases.
+
 ---
 
 ## Current Version: v1.6.0 (In Development)

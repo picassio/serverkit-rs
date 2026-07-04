@@ -27,6 +27,7 @@ pub mod stubs;
 pub mod system;
 pub mod templates;
 pub mod web;
+pub mod wordpress;
 
 use axum::Json;
 use serde_json::{json, Value};

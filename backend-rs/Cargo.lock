@@ -2840,6 +2840,7 @@ dependencies = [
  "sk-templates",
  "sk-terminal",
  "sk-web",
+ "sk-wordpress",
  "socketioxide",
  "sqlx",
  "tokio",
@@ -2914,6 +2915,17 @@ dependencies = [
  "sqlx",
  "tokio",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "sk-wordpress"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde_json",
+ "sqlx",
  "uuid",
 ]
 

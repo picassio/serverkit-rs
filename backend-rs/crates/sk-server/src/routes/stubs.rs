@@ -31,12 +31,6 @@ pub fn router() -> Router<SharedState> {
             "/admin/settings",
             get(async |AuthUser(_u): AuthUser| Json(json!({ "settings": [] }))),
         )
-        // serverkit-wordpress standalone status (extension not ported — we
-        // target Magento instead; nav entry stays dormant)
-        .route(
-            "/wordpress/standalone/status",
-            get(async |AuthUser(_u): AuthUser| Json(json!({ "installed": false }))),
-        )
         // app/api/admin.py activity feed
         .route(
             "/admin/activity/feed",

@@ -506,7 +506,21 @@ Implemented 2026-07-04:
 - Added explicit `/status/` root alias because the React API calls the status-page root with a trailing slash.
 - Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status page CRUD, public page, badge, component CRUD/check/history, incident CRUD, app status endpoints, uptime tracking start/status/current/stats/graph/history/stop.
 
-### 7.6 Workflows (`sk-workflows`)
+### 7.6 WordPress standalone (`sk-wordpress`)
+
+Route family: `/wordpress/standalone/*`
+
+Implemented 2026-07-04:
+
+- Added `sk-wordpress`, boot-time schema creation, and `routes/wordpress.rs` ownership for all 7 `/wordpress/standalone/*` frontend routes.
+- Requirements inspect real Docker and Docker Compose availability plus data-dir readiness.
+- Install persists a standalone WordPress record, creates a real compose project directory under `/var/lib/serverkit/wordpress-standalone`, and writes `compose.yaml` instead of returning fake installed state.
+- Start/stop/restart call real `docker compose` when installed; before install they return typed `WORDPRESS_NOT_INSTALLED` state.
+- Uninstall runs `docker compose down`, deletes the persisted record, and optionally removes data under the managed ServerKit WordPress directory.
+- Removed the old `/wordpress/standalone/status` stub from `routes/stubs.rs`.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status, requirements, start/stop/restart typed not-installed states, install, status after install, uninstall with data removal, and final not-installed status.
+
+### 7.7 Workflows (`sk-workflows`)
 
 Route family: `/workflows/*`
 

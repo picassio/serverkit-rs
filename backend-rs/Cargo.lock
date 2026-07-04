@@ -2561,6 +2561,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-jobs"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "sk-magento"
 version = "0.1.6"
 dependencies = [
@@ -2632,6 +2645,7 @@ dependencies = [
  "sk-db",
  "sk-docker",
  "sk-files",
+ "sk-jobs",
  "sk-magento",
  "sk-models",
  "sk-monitor",

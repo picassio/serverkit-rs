@@ -22,6 +22,7 @@ sk-db.workspace = true
 sk-magento.workspace = true
 sk-monitor = { workspace = true }
 sk-templates = { workspace = true }
+sk-jobs = { workspace = true }
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

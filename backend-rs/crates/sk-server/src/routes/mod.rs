@@ -4,6 +4,7 @@ pub mod compat;
 pub mod db;
 pub mod docker;
 pub mod files;
+pub mod jobs;
 pub mod magento;
 pub mod monitoring;
 pub mod ops;

@@ -511,11 +511,15 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 - **v0.9.0:** Plugins/marketplace/agent-plugins complete.
 - **v1.0.0:** Route ledger has zero `planned`, zero `stub`, zero `compat-empty`; `routes/stubs.rs` deleted; full browser/API sweep and upgrade path validated.
 
+## Progress
+
+- **Phase 0 started (commit `eef67c4`)**: added `scripts/audit_frontend_routes.py`, `scripts/check_route_ledger.py`, `docs/API_ROUTE_LEDGER.md`, `docs/api_route_families.json`, and a CI route-ledger gate. The ledger currently tracks 1064 frontend method+path API uses across 69 route families.
+- **Phase 1 jobs/queue foundation started**: added `sk-jobs`, SQLite schema bootstrapping, real `/jobs/*` and `/queue/*` routes, removed jobs/queue empty compat handlers, and marked `jobs` + `queue` as `implemented` in the ledger. VM 131 smoke test: created queue group + queue + message, received the message, completed it, and stats reported `completed: 1`.
+
 ## Immediate next engineering tasks
 
-1. Implement Phase 0 scripts and `docs/API_ROUTE_LEDGER.md`.
-2. Mark every existing route in `compat.rs` and `stubs.rs` as debt in the ledger.
-3. Build `sk-jobs` and migrate long-running work to it.
-4. Build `sk-projects`/`sk-workspaces` because many route families require project/environment ownership.
+1. Mark every existing route in `compat.rs` and `stubs.rs` as debt in the ledger.
+2. Expand `sk-jobs` worker execution: leases, background workers, retries, cancellation of running tasks, job logs, scheduled-job runner.
+3. Build `sk-projects`/`sk-workspaces` because many route families require project/environment ownership.
 5. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
 6. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.

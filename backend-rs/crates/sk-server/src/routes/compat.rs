@@ -36,14 +36,8 @@ pub fn router() -> Router<SharedState> {
         .route("/backups/cost-summary", get(async |AuthUser(_u): AuthUser| Json(json!({ "total_usd": 0, "items": [] }))))
         .route("/backups/schedules", get(async |AuthUser(_u): AuthUser| Json(json!({ "schedules": [] }))))
         .route("/backups/stats", get(backups_stats))
-        // ── Deployments / jobs / queue ──────────────────────────────────
+        // ── Deployments ────────────────────────────────────────────────
         .route("/deployment-jobs", get(async |AuthUser(_u): AuthUser| Json(json!({ "jobs": [] }))))
-        .route("/jobs", get(async |AuthUser(_u): AuthUser| Json(json!({ "jobs": [], "total": 0 }))))
-        .route("/jobs/kinds", get(async |AuthUser(_u): AuthUser| Json(json!({ "kinds": [] }))))
-        .route("/jobs/scheduled", get(async |AuthUser(_u): AuthUser| Json(json!({ "scheduled": [] }))))
-        .route("/jobs/stats", get(async |AuthUser(_u): AuthUser| Json(json!({ "total": 0, "running": 0, "queued": 0, "failed": 0, "completed": 0 }))))
-        .route("/queue/groups", get(async |AuthUser(_u): AuthUser| Json(json!({ "groups": [] }))))
-        .route("/queue/stats", get(async |AuthUser(_u): AuthUser| Json(json!({ "total": 0, "pending": 0, "active": 0, "completed": 0, "failed": 0 }))))
         // ── DNS / registrars ────────────────────────────────────────────
         .route("/dns/portfolio", get(async |AuthUser(_u): AuthUser| Json(json!({ "domains": [] }))))
         .route("/registrars/domains", get(async |AuthUser(_u): AuthUser| Json(json!({ "domains": [] }))))

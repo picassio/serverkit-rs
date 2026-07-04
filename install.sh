@@ -172,9 +172,16 @@ gen_fernet() {
 # ---------------------------------------------------------------------------
 mkdir -p "$INSTALL_DIR" "$DATA_DIR" "$ENV_DIR"
 
+# Replace the (possibly running) binary atomically: write a temp file then
+# rename over it. Overwriting a busy executable in place fails with ETXTBSY.
+install_binary() {
+  install -m755 "$1" "$INSTALL_DIR/sk-server.new"
+  mv -f "$INSTALL_DIR/sk-server.new" "$INSTALL_DIR/sk-server"
+}
+
 if [ "$BUILD_FROM_SOURCE" = "0" ]; then
   log "Installing prebuilt binary from release tarball"
-  cp "$HERE/sk-server" "$INSTALL_DIR/sk-server"
+  install_binary "$HERE/sk-server"
   cp -r "$HERE/frontend"  "$INSTALL_DIR/"
   cp -r "$HERE/ai-sidecar" "$INSTALL_DIR/"
   cp -r "$HERE/templates"  "$INSTALL_DIR/"
@@ -184,14 +191,14 @@ else
   command -v cargo >/dev/null || die "cargo (Rust) is required to build from source."
   ( cd "$HERE/backend-rs" && cargo build --release --bin sk-server )
   ( cd "$HERE/frontend" && npm ci && npm run build )
-  cp "$HERE/backend-rs/target/release/sk-server" "$INSTALL_DIR/sk-server"
+  install_binary "$HERE/backend-rs/target/release/sk-server"
   mkdir -p "$INSTALL_DIR/frontend"
   cp -r "$HERE/frontend/dist" "$INSTALL_DIR/frontend/dist"
   cp -r "$HERE/backend-rs/ai-sidecar" "$INSTALL_DIR/ai-sidecar"
   rm -rf "$INSTALL_DIR/ai-sidecar/node_modules"
   cp -r "$HERE/backend/templates" "$INSTALL_DIR/templates"
 fi
-chmod +x "$INSTALL_DIR/sk-server" "$INSTALL_DIR/ai-sidecar/start.sh"
+chmod +x "$INSTALL_DIR/ai-sidecar/start.sh"
 
 # ---------------------------------------------------------------------------
 # Stage 3 — env file (secrets generated once), systemd, admin bootstrap

@@ -43,6 +43,7 @@ async fn main() -> anyhow::Result<()> {
     sk_magento::store::ensure_schema(&pool).await?;
     sk_jobs::ensure_schema(&pool).await?;
     sk_projects::ensure_schema(&pool).await?;
+    sk_events::ensure_schema(&pool).await?;
     // one-time: encrypt any plaintext store secrets left at rest
     sk_magento::store::encrypt_existing(&pool).await?;
     // optional non-interactive admin bootstrap (SK_BOOTSTRAP_ADMIN_*)
@@ -86,6 +87,14 @@ async fn main() -> anyhow::Result<()> {
         .nest("/vaults", routes::projects::vaults_router())
         .nest("/secrets", routes::projects::secrets_router())
         .nest("/shared", routes::projects::shared_router())
+        .nest("/telemetry", routes::events::telemetry_router())
+        .nest("/notifications", routes::events::notifications_router())
+        .nest(
+            "/event-subscriptions",
+            routes::events::event_subscriptions_router(),
+        )
+        .nest("/webhooks", routes::events::webhooks_router())
+        .nest("/api-analytics", routes::events::api_analytics_router())
         .merge(routes::templates::router())
         .nest("/databases", routes::db::databases_router())
         .nest("/cron", routes::db::cron_router())

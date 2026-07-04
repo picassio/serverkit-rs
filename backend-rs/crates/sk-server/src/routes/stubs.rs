@@ -13,11 +13,6 @@ use serde_json::{json, Value};
 
 pub fn router() -> Router<SharedState> {
     Router::new()
-        // app/api/notifications.py get_inbox
-        .route(
-            "/notifications/inbox",
-            get(async |AuthUser(_u): AuthUser| Json(json!({ "items": [], "unread_count": 0 }))),
-        )
         // app/api/plugins.py get_contributions
         .route(
             "/plugins/contributions",

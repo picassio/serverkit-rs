@@ -49,9 +49,7 @@ pub fn router() -> Router<SharedState> {
         // ── Security ────────────────────────────────────────────────────
         .route("/security/status", get(async |AuthUser(_u): AuthUser| Json(json!({ "score": 0, "max_score": 0, "checks": [] }))))
         .route("/security/clamav/status", get(async |AuthUser(_u): AuthUser| Json(json!({ "installed": false, "running": false, "last_scan": null, "definitions": null }))))
-        // (servers/* live in the nested servers router to avoid a nest conflict)
-        // ── Webhooks ────────────────────────────────────────────────────
-        .route("/webhooks/endpoints", get(async |AuthUser(_u): AuthUser| Json(json!({ "endpoints": [] }))))
+    // (servers/* live in the nested servers router to avoid a nest conflict)
 }
 
 /// GET /domains — map nginx vhosts to the Domains page's domain objects.

@@ -2550,6 +2550,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-events"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "sk-core",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "sk-files"
 version = "0.1.6"
 dependencies = [
@@ -2659,6 +2674,7 @@ dependencies = [
  "sk-core",
  "sk-db",
  "sk-docker",
+ "sk-events",
  "sk-files",
  "sk-jobs",
  "sk-magento",

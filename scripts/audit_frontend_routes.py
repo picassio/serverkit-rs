@@ -76,6 +76,7 @@ def normalize_path(path: str) -> str | None:
     # represent query-string builders, not path parameters.
     path = re.sub(r"(?<=/)([A-Za-z0-9_-]+)\{id\}(?=/|$)", r"\1", path)
     path = re.sub(r"\{id\}(?=[A-Za-z_$])", "{id}/", path)
+    path = re.sub(r"(?:\{id\}){2,}", "{id}", path)
     path = re.sub(r"//+", "/", path)
     if len(path) > 1:
         path = path.rstrip("/")

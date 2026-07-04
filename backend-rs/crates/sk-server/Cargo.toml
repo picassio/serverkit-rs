@@ -24,6 +24,7 @@ sk-monitor = { workspace = true }
 sk-templates = { workspace = true }
 sk-jobs = { workspace = true }
 sk-projects = { workspace = true }
+sk-events = { workspace = true }
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

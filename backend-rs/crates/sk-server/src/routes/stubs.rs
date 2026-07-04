@@ -32,6 +32,18 @@ pub fn router() -> Router<SharedState> {
         // (ai/* is now served by routes::ai, backed by the pi-SDK sidecar)
         // app/api/apps.py list (empty until sk-apps lands)
         .route("/apps", get(async |AuthUser(_u): AuthUser| Json(json!([]))))
+        // app/api/backups.py get_storage_config — Files page reads this to offer
+        // S3/B2 targets; no backend backup-storage yet, so report "none".
+        .route(
+            "/backups/storage",
+            get(async |AuthUser(_u): AuthUser| Json(json!({ "provider": null }))),
+        )
+        // app/api/admin.py get_settings — Settings page reads the system settings
+        // map; empty list until an admin-settings store is ported.
+        .route(
+            "/admin/settings",
+            get(async |AuthUser(_u): AuthUser| Json(json!({ "settings": [] }))),
+        )
         // app/api/modules.py list_modules
         .route(
             "/modules",

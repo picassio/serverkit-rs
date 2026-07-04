@@ -109,7 +109,7 @@
     "owner": "sk-web/sk-dns"
   },
   "email": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 7,
     "owner": "sk-email"
   },

@@ -2635,6 +2635,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-email"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "reqwest",
+ "serde_json",
+ "sk-core",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "sk-events"
 version = "0.1.6"
 dependencies = [
@@ -2835,6 +2848,7 @@ dependencies = [
  "sk-deploy",
  "sk-dns",
  "sk-docker",
+ "sk-email",
  "sk-events",
  "sk-files",
  "sk-fleet",

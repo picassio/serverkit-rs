@@ -9,6 +9,7 @@ pub mod db;
 pub mod deploy;
 pub mod dns;
 pub mod docker;
+pub mod email;
 pub mod events;
 pub mod files;
 pub mod fleet;

@@ -454,6 +454,16 @@ Route family: `/email/*`
 
 Build domains/accounts/aliases/forwarding/relay/spam/webmail/status/logs/queue/service controls/DNS deploy+verify.
 
+Implemented 2026-07-04:
+
+- Added `sk-email`, boot-time schema creation, and `routes/email.rs` ownership for all 42 `/email/*` frontend routes.
+- Managed email install persists a docker-mailserver compose project under `/var/lib/serverkit/email`, writes a real `mailserver/docker-mailserver` compose file, and status/service routes inspect or call real Docker Compose; uninstalled service controls return typed `EMAIL_NOT_INSTALLED`.
+- Domains, mailboxes, aliases, forwarding rules, DNS providers, relay config, and SpamAssassin config persist in SQLite; mailbox, relay, and DNS provider secrets are encrypted with `sk_core::crypto` and redacted in responses.
+- DNS verification uses real `dig` when present; Cloudflare DNS provider test/zones call real Cloudflare APIs with encrypted token material; unconfigured/adaptor gaps return typed states.
+- Queue/log routes use real `postqueue`/`postsuper`/`journalctl` or docker-mailserver `docker compose exec/logs` adapters; SpamAssassin rule updates call `sa-update` when installed.
+- Roundcube webmail install rewrites managed compose with a real Roundcube service; webmail control/proxy routes persist desired state or call Docker Compose.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 smoke covered status, service typed state, relay CRUD/test, spam config/rule update, webmail status/install/control/proxy, install/status, DNS provider CRUD/test/zones, domain CRUD/DNS verify/deploy, account CRUD/password, alias CRUD, forwarding CRUD, queue flush/delete, logs, and cleanup.
+
 ### 7.2 FTP (`sk-ftp`)
 
 Route family: `/ftp/*`

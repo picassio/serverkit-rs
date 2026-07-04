@@ -38,11 +38,14 @@ die()  { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "please run as root (sudo). Example: curl -fsSL .../install.sh | sudo bash"
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo /tmp)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo /tmp)"
 
 # ---------------------------------------------------------------------------
 # Stage 0 — self-bootstrap: if we have neither the binary nor the source here
-# (i.e. we were piped from curl), fetch the project and re-exec from there.
+# (i.e. we were piped from curl), fetch the project's ASSETS and point $HERE at
+# them. We keep running THIS (always-latest) script — we do NOT run the version
+# of install.sh bundled in the download, so an older release still installs the
+# current way.
 # ---------------------------------------------------------------------------
 if [ ! -x "$HERE/sk-server" ] && [ ! -d "$HERE/backend-rs" ]; then
   command -v curl >/dev/null || die "curl is required."
@@ -57,15 +60,14 @@ if [ ! -x "$HERE/sk-server" ] && [ ! -d "$HERE/backend-rs" ]; then
     log "Downloading $URL"
     curl -fsSL -o "$TMP/pack.tar.gz" "$URL"
     tar -C "$TMP" -xzf "$TMP/pack.tar.gz"
-    SRC="$(find "$TMP" -maxdepth 1 -type d -name 'serverkit-rs-*' | head -1)"
+    HERE="$(find "$TMP" -maxdepth 1 -type d -name 'serverkit-rs-*' | head -1)"
   else
     log "No release found — cloning source (will build from source)"
     command -v git >/dev/null || { apt-get update -qq && apt-get install -y -qq git; }
     git clone --depth 1 "https://github.com/$REPO.git" "$TMP/src"
-    SRC="$TMP/src"
+    HERE="$TMP/src"
   fi
-  [ -d "$SRC" ] || die "could not obtain ServerKit-RS sources"
-  exec bash "$SRC/install.sh" "$@"
+  [ -d "$HERE" ] || die "could not obtain ServerKit-RS sources"
 fi
 
 # Decide install mode now (affects which prerequisites we need).

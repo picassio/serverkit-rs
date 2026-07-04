@@ -502,7 +502,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 ## Suggested release slicing
 
 - **v0.2.0:** Phase 0 + Phase 1 jobs/projects/workspaces/notifications baseline. Stubs still exist but are barred from new route families.
-- **v0.3.0:** Apps/builds/deploy/source connections/runtime adapters.
+- **v0.3.0:** Apps/builds/deploy/source connections/runtime adapters (PHP/Python/Node.js started).
 - **v0.4.0:** Databases/backups/files complete.
 - **v0.5.0:** Web/domains/SSL/DNS/Cloudflare complete.
 - **v0.6.0:** Security/firewall complete.
@@ -520,6 +520,7 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 - **Phase 1 event operations deepened**: API analytics middleware now records every `/api/v1/*` request; `emit_event` enqueues matching subscription/webhook deliveries; server background worker POSTs queued deliveries and marks them `delivered`/`failed`. VM 131 smoke: local POST receiver got a queued webhook delivery and the delivery row became `delivered` with `attempts=1`; analytics overview showed real request totals and endpoint breakdown.
 - **Phase 2 apps foundation started**: added `sk-apps`, boot-time SQLite schema creation, and real `/apps/*` route ownership. It adopts Magento stores and installed template apps into first-class records, replacing the compat aggregator. Implemented persistent app CRUD, project/environment/workspace assignment, env vars/history/import/export/clear, grants, private URLs, links, volumes, scale/sleep/preview policies, previews, snapshots, status/logs, compose-service discovery, and compose-backed start/stop/restart. Route ledger marks the `apps` family implemented. VM 131 smoke: create app, env secret/masked list/export, grant, private URL, volume, scale policy, status, and multiple route samples all succeeded.
 - **Phase 2 deploy/build foundation started**: added `sk-deploy`, boot-time SQLite schema, and real route ownership for `buildpacks`, `builds`, `deploy`, `deployment-jobs`, `source-connections`, `connections`, and `migrations`. It persists provider configs, registry credentials (encrypted), build/deploy configs, deployment records/logs, migration records, and creates `sk-jobs` entries for deployments. Provider-backed repo listing returns explicit `configured:false` until a provider token exists; no silent fake repositories. VM 131 smoke: buildpack detect, source status, registry create/list, app deploy config, build config, build deployment record/detail/logs, and migration backup/status all succeeded.
+- **Phase 2 runtime adapters started**: added `sk-runtimes`, boot-time SQLite schema, and real route ownership for the frontend-referenced `python` family; marked the already-real `php` family implemented through `sk-web::php`. Added Node.js runtime support under `/node/*` for future UI/API use even though the current frontend has no `/node` route family. Python and Node apps persist records/env/packages, encrypt env values, create app directories, run commands from app roots, enqueue `sk-jobs` for runtime operations, and use systemd units for start/stop/restart. VM 131 smoke: PHP/Python/Node version detection, Node app create/env/run/status/start/stop, and Python app create/env/run succeeded.
 
 ## Immediate next engineering tasks
 
@@ -532,5 +533,6 @@ Generated from `frontend/src/services/api/*.js` before manual normalization. Cou
 4. Start Phase 2 `sk-apps` first-class app records, replacing the current Magento/template app aggregator.
    - **Started:** `sk-apps` now owns the full `/apps/*` frontend route family with persisted app records, Magento/template adoption, env vars/history/import/export, grants, private URLs, app links, volumes, policies, previews, snapshots, status/logs, and compose lifecycle actions.
 5. Continue Phase 2 `sk-deploy`: implement live GitHub/GitLab/Bitbucket API repository listing once provider tokens are configured, real git clone/pull operations, real build execution, deployment log streaming, and rollback materialization.
-5. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
-6. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.
+6. Deepen `sk-runtimes`: add UI/client bindings for `/node/*`, add NVM/NodeSource installation for requested Node versions, add process logs, and wire runtime apps into `sk-apps` adoption/assignment.
+7. Replace `/projects`, `/environments`, `/workspaces`, `/api-keys`, `/vaults`, `/secrets`, `/webhooks`, `/notifications`, `/telemetry`, `/jobs`, and `/queue` compatibility routes first.
+8. Add a CI release gate that prevents tagging if any frontend route remains `unknown` or if any route marked complete points to `stubs.rs`/empty compat handlers.

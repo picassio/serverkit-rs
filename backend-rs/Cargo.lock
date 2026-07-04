@@ -2690,6 +2690,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-runtimes"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde_json",
+ "sk-core",
+ "sk-jobs",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "sk-server"
 version = "0.1.6"
 dependencies = [
@@ -2716,6 +2730,7 @@ dependencies = [
  "sk-monitor",
  "sk-ops",
  "sk-projects",
+ "sk-runtimes",
  "sk-system",
  "sk-templates",
  "sk-terminal",

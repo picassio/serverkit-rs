@@ -27,6 +27,7 @@ sk-projects = { workspace = true }
 sk-events = { workspace = true }
 sk-apps = { workspace = true }
 sk-deploy = { workspace = true }
+sk-runtimes = { workspace = true }
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

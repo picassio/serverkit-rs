@@ -245,6 +245,7 @@ pub async fn tables(container: &str, database: &str, user: &str, password: Optio
 }
 
 /// `docker_mysql_execute_query` — SQL console against a container.
+#[allow(clippy::too_many_arguments)]
 pub async fn execute_query(
     container: &str,
     database: &str,

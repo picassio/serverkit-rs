@@ -98,6 +98,7 @@ fn sidecar_url() -> Option<String> {
 /// Proxy one turn to the pi-SDK sidecar, forwarding its SSE into `tx` and
 /// returning the accumulated assistant text (for persistence). Rust owns the
 /// open/done envelope, so those sidecar events are dropped here.
+#[allow(clippy::too_many_arguments)]
 async fn proxy_sidecar(
     base: &str,
     conv: &str,
@@ -161,9 +162,7 @@ async fn proxy_sidecar(
                         .await;
                 }
                 other => {
-                    let _ = tx
-                        .send(Ok(Event::default().event(other.to_string()).data(data)))
-                        .await;
+                    let _ = tx.send(Ok(Event::default().event(other).data(data))).await;
                 }
             }
         }
@@ -278,10 +277,19 @@ async fn providers(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
         { "id": "openai", "label": "OpenAI", "needs_key": true, "supports_endpoint": false }
     ] })))
 }
-async fn models(AuthUser(u): AuthUser, Query(q): Query<std::collections::HashMap<String, String>>) -> ApiResult<Json<Value>> {
+async fn models(
+    AuthUser(u): AuthUser,
+    Query(q): Query<std::collections::HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
     let provider = q.get("provider").cloned().unwrap_or_default();
-    if let Ok(v) = sidecar_call(reqwest::Method::GET, &format!("/models?provider={}", urlencoding_min(&provider)), None).await {
+    if let Ok(v) = sidecar_call(
+        reqwest::Method::GET,
+        &format!("/models?provider={}", urlencoding_min(&provider)),
+        None,
+    )
+    .await
+    {
         return Ok(v);
     }
     Ok(Json(json!({ "models": [] })))
@@ -289,7 +297,15 @@ async fn models(AuthUser(u): AuthUser, Query(q): Query<std::collections::HashMap
 
 /// minimal query-value encoder (provider ids are simple slugs)
 fn urlencoding_min(s: &str) -> String {
-    s.chars().map(|c| if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') { c.to_string() } else { format!("%{:02X}", c as u32) }).collect()
+    s.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c.to_string()
+            } else {
+                format!("%{:02X}", c as u32)
+            }
+        })
+        .collect()
 }
 async fn tools(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
@@ -301,7 +317,8 @@ async fn list_conversations(
     State(s): State<SharedState>,
     AuthUser(u): AuthUser,
 ) -> ApiResult<Json<Value>> {
-    let rows: Vec<(String, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
+    type ConversationRow = (String, Option<String>, Option<String>, Option<String>);
+    let rows: Vec<ConversationRow> = sqlx::query_as(
         "SELECT id, title, mode, updated_at FROM ai_conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 100",
     )
     .bind(u.id)

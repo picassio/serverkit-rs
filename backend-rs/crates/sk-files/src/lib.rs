@@ -529,10 +529,8 @@ pub fn search(directory: &str, pattern: &str, max_results: usize) -> Value {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
             let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-            if is_dir {
-                if !name.starts_with('.') {
-                    stack.push(entry.path());
-                }
+            if is_dir && !name.starts_with('.') {
+                stack.push(entry.path());
             }
             if name.to_lowercase().contains(&needle) {
                 let full = entry.path().to_string_lossy().into_owned();
@@ -718,7 +716,7 @@ pub fn analyze(path: &str, depth: u32, limit: usize) -> Value {
         ));
     }
 
-    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.0));
     let with_pct = |mut v: Value, size: u64| {
         v["percent"] = json!(if total_size > 0 {
             ((size as f64 / total_size as f64) * 1000.0).round() / 10.0

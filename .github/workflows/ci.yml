@@ -11,6 +11,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  route-ledger:
+    name: API route ledger gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify frontend route ledger
+        run: python3 scripts/check_route_ledger.py --check-ledger
+
   backend:
     name: Rust backend (build + test)
     runs-on: ubuntu-latest
@@ -40,7 +51,6 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
-        continue-on-error: true
 
       - name: Test
         run: cargo test --all

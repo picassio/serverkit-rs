@@ -5,7 +5,7 @@ use crate::error::{ApiError, ApiResult};
 use crate::extract::AuthUser;
 use crate::state::SharedState;
 use axum::extract::Query;
-use axum::routing::{delete, get, post, put};
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};

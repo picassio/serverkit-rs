@@ -69,7 +69,12 @@ async fn domains(AuthUser(_u): AuthUser) -> Json<Value> {
         .into_iter()
         .map(|s| {
             let list = s.get("domains").cloned().unwrap_or_else(|| json!([]));
-            let primary = list.as_array().and_then(|a| a.first()).and_then(|d| d.as_str()).unwrap_or("").to_string();
+            let primary = list
+                .as_array()
+                .and_then(|a| a.first())
+                .and_then(|d| d.as_str())
+                .unwrap_or("")
+                .to_string();
             json!({
                 "name": s.get("name").and_then(|v| v.as_str()).unwrap_or(""),
                 "domain": primary,
@@ -98,7 +103,10 @@ async fn firewall_status(AuthUser(_u): AuthUser) -> Json<Value> {
     let installed = which_ufw();
     let out = ufw(&["status", "verbose"]).unwrap_or_default();
     let enabled = out.contains("Status: active");
-    let default_line = out.lines().find(|l| l.starts_with("Default:")).unwrap_or("");
+    let default_line = out
+        .lines()
+        .find(|l| l.starts_with("Default:"))
+        .unwrap_or("");
     Json(json!({
         "installed": installed,
         "enabled": enabled,
@@ -117,7 +125,15 @@ async fn firewall_rules(AuthUser(_u): AuthUser) -> Json<Value> {
         if let Some(rest) = l.strip_prefix('[') {
             if let Some((num, body)) = rest.split_once(']') {
                 let body = body.trim();
-                let action = if body.contains("ALLOW") { "allow" } else if body.contains("DENY") { "deny" } else if body.contains("REJECT") { "reject" } else { "" };
+                let action = if body.contains("ALLOW") {
+                    "allow"
+                } else if body.contains("DENY") {
+                    "deny"
+                } else if body.contains("REJECT") {
+                    "reject"
+                } else {
+                    ""
+                };
                 rules.push(json!({
                     "index": num.trim().parse::<u32>().unwrap_or(0),
                     "action": action,
@@ -130,14 +146,22 @@ async fn firewall_rules(AuthUser(_u): AuthUser) -> Json<Value> {
 }
 
 fn which_ufw() -> bool {
-    std::process::Command::new("sh").args(["-c", "command -v ufw"]).output().map(|o| o.status.success()).unwrap_or(false)
+    std::process::Command::new("sh")
+        .args(["-c", "command -v ufw"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 fn ufw_run(args: &[String]) -> Json<Value> {
     let out = std::process::Command::new("ufw").args(args).output();
     match out {
-        Ok(o) if o.status.success() => Json(json!({ "success": true, "output": String::from_utf8_lossy(&o.stdout).trim() })),
-        Ok(o) => Json(json!({ "success": false, "error": String::from_utf8_lossy(&o.stderr).trim() })),
+        Ok(o) if o.status.success() => {
+            Json(json!({ "success": true, "output": String::from_utf8_lossy(&o.stdout).trim() }))
+        }
+        Ok(o) => {
+            Json(json!({ "success": false, "error": String::from_utf8_lossy(&o.stderr).trim() }))
+        }
         Err(e) => Json(json!({ "success": false, "error": e.to_string() })),
     }
 }
@@ -147,23 +171,31 @@ fn admin_or(u: &sk_models::user::User) -> Option<Json<Value>> {
 }
 
 async fn firewall_enable(AuthUser(u): AuthUser) -> Json<Value> {
-    if let Some(e) = admin_or(&u) { return e; }
+    if let Some(e) = admin_or(&u) {
+        return e;
+    }
     // SAFETY: allow SSH + the panel port BEFORE enabling, or a default-deny
     // policy locks the operator (and this panel) out of the box.
     let port = std::env::var("PORT").unwrap_or_else(|_| "5000".into());
     for spec in ["22/tcp".to_string(), format!("{port}/tcp")] {
-        let _ = std::process::Command::new("ufw").args(["allow", &spec]).status();
+        let _ = std::process::Command::new("ufw")
+            .args(["allow", &spec])
+            .status();
     }
     ufw_run(&["--force".into(), "enable".into()])
 }
 async fn firewall_disable(AuthUser(u): AuthUser) -> Json<Value> {
-    if let Some(e) = admin_or(&u) { return e; }
+    if let Some(e) = admin_or(&u) {
+        return e;
+    }
     ufw_run(&["disable".into()])
 }
 
 /// POST /firewall/rules — build a ufw spec from {action, port, protocol, from}.
 async fn firewall_add_rule(AuthUser(u): AuthUser, Json(b): Json<Value>) -> Json<Value> {
-    if let Some(e) = admin_or(&u) { return e; }
+    if let Some(e) = admin_or(&u) {
+        return e;
+    }
     let action = b["action"].as_str().unwrap_or("allow");
     if !matches!(action, "allow" | "deny" | "reject" | "limit") {
         return Json(json!({ "success": false, "error": "invalid action" }));
@@ -173,16 +205,29 @@ async fn firewall_add_rule(AuthUser(u): AuthUser, Json(b): Json<Value>) -> Json<
         args.push("from".into());
         args.push(from.to_string());
     }
-    let port = b["port"].as_str().map(|s| s.to_string()).or_else(|| b["port"].as_i64().map(|n| n.to_string()));
+    let port = b["port"]
+        .as_str()
+        .map(|s| s.to_string())
+        .or_else(|| b["port"].as_i64().map(|n| n.to_string()));
     if let Some(port) = port.filter(|p| !p.is_empty()) {
-        let proto = b["protocol"].as_str().filter(|p| matches!(*p, "tcp" | "udp"));
+        let proto = b["protocol"]
+            .as_str()
+            .filter(|p| matches!(*p, "tcp" | "udp"));
         // `ufw allow from <ip> to any port <p>` vs `ufw allow <p>/tcp`
         if b["from"].as_str().map(|x| !x.is_empty()).unwrap_or(false) {
-            args.push("to".into()); args.push("any".into());
-            args.push("port".into()); args.push(port);
-            if let Some(p) = proto { args.push("proto".into()); args.push(p.into()); }
+            args.push("to".into());
+            args.push("any".into());
+            args.push("port".into());
+            args.push(port);
+            if let Some(p) = proto {
+                args.push("proto".into());
+                args.push(p.into());
+            }
         } else {
-            args.push(match proto { Some(p) => format!("{port}/{p}"), None => port });
+            args.push(match proto {
+                Some(p) => format!("{port}/{p}"),
+                None => port,
+            });
         }
     }
     ufw_run(&args)
@@ -190,8 +235,12 @@ async fn firewall_add_rule(AuthUser(u): AuthUser, Json(b): Json<Value>) -> Json<
 
 /// DELETE /firewall/rules — delete by {index}/{number}.
 async fn firewall_del_rule(AuthUser(u): AuthUser, Json(b): Json<Value>) -> Json<Value> {
-    if let Some(e) = admin_or(&u) { return e; }
-    let idx = b["index"].as_u64().or_else(|| b["number"].as_u64())
+    if let Some(e) = admin_or(&u) {
+        return e;
+    }
+    let idx = b["index"]
+        .as_u64()
+        .or_else(|| b["number"].as_u64())
         .or_else(|| b["index"].as_str().and_then(|s| s.parse().ok()));
     match idx {
         Some(n) => ufw_run(&["--force".into(), "delete".into(), n.to_string()]),
@@ -236,7 +285,11 @@ async fn collect_apps(s: &SharedState) -> Vec<Value> {
     }
     let dir = apps_dir();
     for app in sk_templates::list_installed() {
-        let name = app.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let name = app
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         let compose = format!("{dir}/{name}/docker-compose.yml");
         apps.push(json!({
             "id": format!("app-{}", name),
@@ -259,8 +312,15 @@ async fn apps_list(State(s): State<SharedState>, AuthUser(_u): AuthUser) -> Json
     Json(json!({ "apps": collect_apps(&s).await }))
 }
 
-async fn app_detail(State(s): State<SharedState>, AuthUser(_u): AuthUser, Path(id): Path<String>) -> Json<Value> {
-    let app = collect_apps(&s).await.into_iter().find(|a| a["id"] == json!(id));
+async fn app_detail(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> Json<Value> {
+    let app = collect_apps(&s)
+        .await
+        .into_iter()
+        .find(|a| a["id"] == json!(id));
     Json(app.unwrap_or_else(|| json!({ "error": "not found" })))
 }
 
@@ -271,10 +331,9 @@ async fn app_compose(s: &SharedState, id: &str) -> Option<String> {
         let stores = sk_magento::store::list(&s.db).await.ok()?;
         let st = stores.into_iter().find(|x| x.id == sid)?;
         Some(format!("{}/docker-compose.yml", st.root_path))
-    } else if let Some(name) = id.strip_prefix("app-") {
-        Some(format!("{}/{}/docker-compose.yml", apps_dir(), name))
     } else {
-        None
+        id.strip_prefix("app-")
+            .map(|name| format!("{}/{}/docker-compose.yml", apps_dir(), name))
     }
 }
 
@@ -286,19 +345,33 @@ async fn app_compose_action(s: &SharedState, id: &str, action: &str) -> Json<Val
         .args(["compose", "-f", &compose, action])
         .output();
     match out {
-        Ok(o) if o.status.success() => Json(json!({ "success": true, "status": if action == "stop" { "stopped" } else { "running" } })),
+        Ok(o) if o.status.success() => Json(
+            json!({ "success": true, "status": if action == "stop" { "stopped" } else { "running" } }),
+        ),
         Ok(o) => Json(json!({ "success": false, "error": String::from_utf8_lossy(&o.stderr) })),
         Err(e) => Json(json!({ "success": false, "error": e.to_string() })),
     }
 }
 
-async fn app_start(State(s): State<SharedState>, AuthUser(_u): AuthUser, Path(id): Path<String>) -> Json<Value> {
+async fn app_start(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> Json<Value> {
     app_compose_action(&s, &id, "start").await
 }
-async fn app_stop(State(s): State<SharedState>, AuthUser(_u): AuthUser, Path(id): Path<String>) -> Json<Value> {
+async fn app_stop(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> Json<Value> {
     app_compose_action(&s, &id, "stop").await
 }
-async fn app_restart(State(s): State<SharedState>, AuthUser(_u): AuthUser, Path(id): Path<String>) -> Json<Value> {
+async fn app_restart(
+    State(s): State<SharedState>,
+    AuthUser(_u): AuthUser,
+    Path(id): Path<String>,
+) -> Json<Value> {
     app_compose_action(&s, &id, "restart").await
 }
 
@@ -331,7 +404,11 @@ async fn backups_list(State(s): State<SharedState>, AuthUser(_u): AuthUser) -> J
 async fn backups_stats(State(s): State<SharedState>, AuthUser(_u): AuthUser) -> Json<Value> {
     let backups = collect_backups(&s).await;
     let total_size: u64 = backups.iter().filter_map(|b| b["size"].as_u64()).sum();
-    let last = backups.iter().filter_map(|b| b["timestamp"].as_str()).max().map(|s| s.to_string());
+    let last = backups
+        .iter()
+        .filter_map(|b| b["timestamp"].as_str())
+        .max()
+        .map(|s| s.to_string());
     Json(json!({
         "total_backups": backups.len(),
         "total_size_bytes": total_size,

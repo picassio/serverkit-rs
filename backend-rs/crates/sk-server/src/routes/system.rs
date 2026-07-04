@@ -58,14 +58,21 @@ async fn version(AuthUser(_user): AuthUser) -> Json<Value> {
 fn is_newer(latest: &str, current: &str) -> bool {
     let parse = |s: &str| -> Vec<u64> {
         s.trim_start_matches('v')
-            .split(|c: char| c == '.' || c == '-')
-            .map(|p| p.chars().take_while(|c| c.is_ascii_digit()).collect::<String>())
+            .split(['.', '-'])
+            .map(|p| {
+                p.chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect::<String>()
+            })
             .map(|p| p.parse().unwrap_or(0))
             .collect()
     };
     let (a, b) = (parse(latest), parse(current));
     for i in 0..a.len().max(b.len()) {
-        let (x, y) = (a.get(i).copied().unwrap_or(0), b.get(i).copied().unwrap_or(0));
+        let (x, y) = (
+            a.get(i).copied().unwrap_or(0),
+            b.get(i).copied().unwrap_or(0),
+        );
         if x != y {
             return x > y;
         }
@@ -123,7 +130,14 @@ async fn upgrade(AuthUser(user): AuthUser) -> ApiResult<Json<Value>> {
     let logged = format!("{script} > /var/log/serverkit-upgrade.log 2>&1");
     // Prefer systemd-run (separate cgroup: survives `systemctl restart serverkit`).
     let via_systemd = std::process::Command::new("systemd-run")
-        .args(["--collect", "--unit=serverkit-upgrade", "--property=Type=oneshot", "bash", "-lc", &logged])
+        .args([
+            "--collect",
+            "--unit=serverkit-upgrade",
+            "--property=Type=oneshot",
+            "bash",
+            "-lc",
+            &logged,
+        ])
         .spawn()
         .is_ok();
     if !via_systemd {

@@ -78,12 +78,12 @@ pub fn list(category: Option<&str>, search: Option<&str>) -> Vec<J> {
     catalog()
         .into_iter()
         .filter(|t| {
-            let cat_ok = category.map_or(true, |c| {
+            let cat_ok = category.is_none_or(|c| {
                 t["categories"]
                     .as_array()
-                    .map_or(false, |arr| arr.iter().any(|x| x.as_str() == Some(c)))
+                    .is_some_and(|arr| arr.iter().any(|x| x.as_str() == Some(c)))
             });
-            let search_ok = search.map_or(true, |s| {
+            let search_ok = search.is_none_or(|s| {
                 let s = s.to_lowercase();
                 let hay = format!(
                     "{} {}",

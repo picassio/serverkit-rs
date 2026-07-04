@@ -359,14 +359,14 @@ async fn download(AuthUser(_u): AuthUser, Query(q): Query<PathQuery>) -> ApiResu
         .unwrap_or_else(|| "download".into());
     let stream = tokio_util::io::ReaderStream::new(file);
 
-    Ok(Response::builder()
+    Response::builder()
         .header(header::CONTENT_TYPE, "application/octet-stream")
         .header(
             header::CONTENT_DISPOSITION,
             format!("attachment; filename=\"{name}\""),
         )
         .body(Body::from_stream(stream))
-        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?)
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// POST /files/upload — multipart with `file` + `destination` fields.
@@ -448,7 +448,7 @@ async fn upload(
         }
     })
     .await
-    .map_err(|e| anyhow::Error::from(e))?;
+    .map_err(anyhow::Error::from)?;
 
     Ok((result.0, Json(result.1)))
 }

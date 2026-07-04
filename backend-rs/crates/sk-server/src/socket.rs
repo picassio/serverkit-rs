@@ -13,7 +13,7 @@
 use crate::state::SharedState;
 use serde_json::{json, Value};
 use sk_auth::jwt::{decode_token, TokenType};
-use socketioxide::extract::{Data, SocketRef, TryData};
+use socketioxide::extract::{SocketRef, TryData};
 use socketioxide::SocketIo;
 use tokio::sync::mpsc::UnboundedReceiver;
 

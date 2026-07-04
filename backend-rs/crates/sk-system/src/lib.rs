@@ -213,7 +213,7 @@ pub fn system_info() -> Value {
     let boot_local = Local
         .timestamp_opt(boot_ts, 0)
         .single()
-        .unwrap_or_else(|| Local::now());
+        .unwrap_or_else(Local::now);
     let uptime_secs = System::uptime();
 
     let kernel = System::kernel_version().unwrap_or_else(|| "Unknown".into());

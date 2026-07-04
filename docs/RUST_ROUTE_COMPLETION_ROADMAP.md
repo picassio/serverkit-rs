@@ -433,7 +433,16 @@ Implemented 2026-07-04:
 - Cloud server create/resize/delete and snapshot create/list/delete persist desired state and return typed unconfigured/provider-action metadata instead of fake cloud success.
 - Validation on VM 131 and VM 130 covered provider create/list/options/delete, provider secret redaction, cloud server create/get/resize/delete, snapshot create/list/delete, costs, pairing typed states, tunnel create/service/list/delete, template library/CRUD/assign/check/remediate/compliance/delete, and fleet monitor threshold/heatmap/comparison/alerts/anomalies/forecast/search/delete.
 
-Remaining Phase 6 work: full `/servers/*` fleet-agent route family and remote execution gateway.
+Implemented `/servers/*` 2026-07-04:
+
+- Extended `sk-fleet` with persisted server records, server groups, allowed IPs, registration tokens, fleet command queue, agent versions, rollouts, discovery records, and security-alert views.
+- Replaced the narrow terminal-only `routes/servers.rs` with first-class ownership for all 122 `/servers/*` frontend routes while preserving local PTY terminal behavior.
+- Local server routes use real host adapters where safe: Docker/status/log/stats/image/network/volume discovery and actions, file browse/read/write under allowed roots, cron status/list, package search/info, systemd status/logs/daemon-reload/actions, runtime detection, cloudflared status/list, system info/metrics, and onboarding/status.
+- Agent-dependent or unsafe remote actions persist `sk_fleet_commands` and return typed `AGENT_OFFLINE` queued-command state instead of fake success.
+- Server CRUD, groups, registration, workspace assignment, token regeneration, fleet health/versions/rollouts/discovery/diagnostics/queued commands, metrics retention/cleanup/compare, proxy overview, allowed IPs, and security alert count/status routes are backed by persisted state.
+- Validation: local route ledger/fmt/clippy/release build passed; VM 131 and VM 130 broad smoke hit representative requests across the full 122-route `/servers/*` ledger, including CRUD cleanup, local adapters, and queued remote commands. Temporary smoke files/server records were cleaned.
+
+Phase 6 is complete: `/cloud/*`, `/fleet-monitor/*`, `/pairing/*`, `/server-templates/*`, `/servers/*`, and `/tunnels/*` are implemented.
 
 ## Phase 7 — Built-in extensions as Rust crates
 

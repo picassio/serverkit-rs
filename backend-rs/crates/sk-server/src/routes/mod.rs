@@ -12,6 +12,7 @@ pub mod docker;
 pub mod events;
 pub mod files;
 pub mod fleet;
+pub mod gpu;
 pub mod jobs;
 pub mod magento;
 pub mod monitoring;

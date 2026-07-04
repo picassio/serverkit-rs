@@ -145,6 +145,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .nest("/server-templates", routes::fleet::templates_router())
         .nest("/fleet-monitor", routes::fleet::monitor_router())
+        .route("/gpu", get(routes::gpu::info))
         .nest("/firewall", routes::security::firewall_router())
         .nest("/security", routes::security::security_router())
         .nest("/waf", routes::security::waf_router())

@@ -31,11 +31,6 @@ pub fn router() -> Router<SharedState> {
             "/admin/settings",
             get(async |AuthUser(_u): AuthUser| Json(json!({ "settings": [] }))),
         )
-        // app/api/gpu.py GpuService.info()
-        .route(
-            "/gpu/",
-            get(async |AuthUser(_u): AuthUser| Json(json!({ "available": false, "gpus": [] }))),
-        )
         // serverkit-wordpress standalone status (extension not ported — we
         // target Magento instead; nav entry stays dormant)
         .route(

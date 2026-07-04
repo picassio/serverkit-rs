@@ -472,6 +472,13 @@ Route family: `/gpu/*`
 
 Build GPU inventory via `nvidia-smi`/rocm-smi detection and empty-but-real state when no GPU exists.
 
+Implemented 2026-07-04:
+
+- Added `sk-gpu` and `routes/gpu.rs`; `/gpu` is now backed by real hardware/tool detection instead of the stale stub.
+- GPU inventory probes `nvidia-smi`, `rocm-smi`, and `lspci`, returns parsed NVIDIA rows when available, falls back to PCI display-controller inventory, and reports explicit tool availability/errors.
+- Removed the old `/gpu/` stub from `routes/stubs.rs`.
+- Validation: local route ledger/fmt/clippy/tests/release build passed; VM 131 and VM 130 `/gpu` smoke returned JSON with `available`, `gpus`, and `tools` fields from real host detection.
+
 ### 7.5 Status pages (`sk-status`)
 
 Route family: `/status/*`

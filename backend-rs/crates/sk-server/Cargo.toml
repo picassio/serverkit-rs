@@ -34,6 +34,7 @@ sk-cloudflare = { workspace = true }
 sk-security = { workspace = true }
 sk-fleet = { workspace = true }
 sk-cloud = { workspace = true }
+sk-gpu = { workspace = true }
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

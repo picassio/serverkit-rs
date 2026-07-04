@@ -2673,6 +2673,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-gpu"
+version = "0.1.6"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "sk-jobs"
 version = "0.1.6"
 dependencies = [
@@ -2807,6 +2814,7 @@ dependencies = [
  "sk-events",
  "sk-files",
  "sk-fleet",
+ "sk-gpu",
  "sk-jobs",
  "sk-magento",
  "sk-models",

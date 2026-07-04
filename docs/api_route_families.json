@@ -149,7 +149,7 @@
     "owner": "sk-git"
   },
   "gpu": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 7,
     "owner": "sk-gpu"
   },

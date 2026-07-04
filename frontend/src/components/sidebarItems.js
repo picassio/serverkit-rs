@@ -284,10 +284,7 @@ export function getHiddenItemIds(sidebarConfig) {
 // implement. Their pages call endpoints that 404, so they are removed from the
 // navigation entirely (even 'alwaysVisible' ones). Re-enable an id here once the
 // backend implements it. Pages stay routable via deep link.
-export const UNAVAILABLE_ITEM_IDS = [
-    'organization', 'servers', 'domains', 'services',
-    'backups', 'security', 'queue', 'jobs', 'webhooks', 'marketplace',
-];
+export const UNAVAILABLE_ITEM_IDS = [];
 
 // Get visible items based on config
 export function getVisibleItems(sidebarConfig) {

@@ -15,6 +15,10 @@ use serde_json::{json, Value};
 
 pub fn router() -> Router<SharedState> {
     Router::new()
+        // Single-node fleet: this box only. Empty until the fleet gateway lands.
+        .route("/", get(async |AuthUser(_u): AuthUser| Json(json!([]))))
+        .route("/groups", get(async |AuthUser(_u): AuthUser| Json(json!([]))))
+        .route("/fleet/health", get(async |AuthUser(_u): AuthUser| Json(json!({ "healthy": 0, "total": 0, "servers": [] }))))
         .route("/available", get(available))
         .route("/terminal/sessions", get(list_sessions))
         .route("/terminal/{sid}/input", post(terminal_input))

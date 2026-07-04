@@ -85,6 +85,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/system", routes::system::router())
         .nest("/metrics", routes::system::metrics_router())
         .merge(routes::stubs::router())
+        .merge(routes::compat::router())
         .with_state(state.clone());
 
     let index = format!("{}/index.html", config.frontend_dist);

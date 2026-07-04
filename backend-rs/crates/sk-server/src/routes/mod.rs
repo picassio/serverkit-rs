@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod auth;
+pub mod compat;
 pub mod db;
 pub mod docker;
 pub mod files;

@@ -6,7 +6,6 @@
 
 use crate::extract::AuthUser;
 use crate::state::SharedState;
-use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::{json, Value};
@@ -23,13 +22,6 @@ pub fn router() -> Router<SharedState> {
         .route("/firewall/blocked-ips", get(async |AuthUser(_u): AuthUser| Json(json!({ "blocked": [] }))))
         // ── Marketplace registry (remote packages) ──────────────────────
         .route("/marketplace/registry", get(async |AuthUser(_u): AuthUser| Json(json!({ "items": [] }))))
-        // ── Backups: real — Magento database backups ────────────────────
-        .route("/backups", get(backups_list))
-        .route("/backups/config", get(async |AuthUser(_u): AuthUser| Json(json!({ "enabled": false, "schedule": null, "retention_days": 7, "targets": [] }))))
-        .route("/backups/cost-rates", get(async |AuthUser(_u): AuthUser| Json(json!({ "rates": [] }))))
-        .route("/backups/cost-summary", get(async |AuthUser(_u): AuthUser| Json(json!({ "total_usd": 0, "items": [] }))))
-        .route("/backups/schedules", get(async |AuthUser(_u): AuthUser| Json(json!({ "schedules": [] }))))
-        .route("/backups/stats", get(backups_stats))
         // ── DNS / registrars ────────────────────────────────────────────
         .route("/dns/portfolio", get(async |AuthUser(_u): AuthUser| Json(json!({ "domains": [] }))))
         .route("/registrars/domains", get(async |AuthUser(_u): AuthUser| Json(json!({ "domains": [] }))))
@@ -228,45 +220,4 @@ async fn firewall_del_rule(AuthUser(u): AuthUser, Json(b): Json<Value>) -> Json<
         Some(n) => ufw_run(&["--force".into(), "delete".into(), n.to_string()]),
         None => Json(json!({ "success": false, "error": "rule index required" })),
     }
-}
-
-// ── Backups: real Magento database backups ──────────────────────────────────
-async fn collect_backups(s: &SharedState) -> Vec<Value> {
-    let mut out = Vec::new();
-    if let Ok(stores) = sk_magento::store::list(&s.db).await {
-        for st in &stores {
-            for b in sk_magento::backup::list_backups(st) {
-                out.push(json!({
-                    "name": b.get("filename").cloned().unwrap_or(Value::Null),
-                    "type": "database",
-                    "path": b.get("path").cloned().unwrap_or(Value::Null),
-                    "size": b.get("size").cloned().unwrap_or(json!(0)),
-                    "size_human": b.get("size_human").cloned().unwrap_or(Value::Null),
-                    "timestamp": b.get("created_at").cloned().unwrap_or(Value::Null),
-                    "app_name": st.name.clone(),
-                    "remote_status": Value::Null,
-                }));
-            }
-        }
-    }
-    out
-}
-
-async fn backups_list(State(s): State<SharedState>, AuthUser(_u): AuthUser) -> Json<Value> {
-    Json(json!({ "backups": collect_backups(&s).await }))
-}
-
-async fn backups_stats(State(s): State<SharedState>, AuthUser(_u): AuthUser) -> Json<Value> {
-    let backups = collect_backups(&s).await;
-    let total_size: u64 = backups.iter().filter_map(|b| b["size"].as_u64()).sum();
-    let last = backups
-        .iter()
-        .filter_map(|b| b["timestamp"].as_str())
-        .max()
-        .map(|s| s.to_string());
-    Json(json!({
-        "total_backups": backups.len(),
-        "total_size_bytes": total_size,
-        "last_backup": last,
-    }))
 }

@@ -2532,6 +2532,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sk-backups"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde_json",
+ "sk-apps",
+ "sk-core",
+ "sk-db",
+ "sk-files",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
 name = "sk-core"
 version = "0.1.6"
 dependencies = [
@@ -2718,6 +2733,7 @@ dependencies = [
  "serde_json",
  "sk-apps",
  "sk-auth",
+ "sk-backups",
  "sk-core",
  "sk-db",
  "sk-deploy",

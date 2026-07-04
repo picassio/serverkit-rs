@@ -1,0 +1,16 @@
+[package]
+name = "sk-backups"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sk-core.workspace = true
+sk-db.workspace = true
+sk-apps.workspace = true
+sk-files.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true

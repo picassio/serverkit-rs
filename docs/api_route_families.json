@@ -38,10 +38,9 @@
     "note": "Implemented routes exist; parity tests still required before marking implemented."
   },
   "backups": {
-    "status": "planned",
+    "status": "implemented",
     "phase": 3,
-    "owner": "sk-backups",
-    "note": "Current Magento-only aggregation is partial."
+    "owner": "sk-backups"
   },
   "buildpacks": {
     "status": "implemented",

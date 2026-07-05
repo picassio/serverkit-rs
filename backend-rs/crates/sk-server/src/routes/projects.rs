@@ -116,14 +116,14 @@ pub fn shared_router() -> Router<SharedState> {
         .route("/resolved/hierarchical", get(resolved_variables))
 }
 
-async fn list_projects(
+pub async fn list_projects(
     State(s): State<SharedState>,
     AuthUser(u): AuthUser,
 ) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
     Ok(Json(sk_projects::list_projects(&s.db).await?))
 }
-async fn create_project(
+pub async fn create_project(
     State(s): State<SharedState>,
     AuthUser(u): AuthUser,
     Json(b): Json<Value>,
@@ -137,11 +137,12 @@ async fn get_project(
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
-    Ok(Json(
-        sk_projects::get_project(&s.db, &id)
-            .await?
-            .ok_or_else(|| nf("project not found"))?,
-    ))
+    let mut project = sk_projects::get_project(&s.db, &id)
+        .await?
+        .ok_or_else(|| nf("project not found"))?;
+    let envs = sk_projects::project_environments(&s.db, &id).await?;
+    project["environments"] = envs["environments"].clone();
+    Ok(Json(json!({"project": project})))
 }
 async fn update_project(
     State(s): State<SharedState>,
@@ -219,7 +220,7 @@ async fn reorder_environments(
     Ok(Json(sk_projects::reorder_environments(&s.db, &b).await?))
 }
 
-async fn list_workspaces(
+pub async fn list_workspaces(
     State(s): State<SharedState>,
     AuthUser(u): AuthUser,
     Query(q): Query<HashMap<String, String>>,
@@ -229,7 +230,7 @@ async fn list_workspaces(
         sk_projects::list_workspaces(&s.db, q.contains_key("include_archived")).await?,
     ))
 }
-async fn create_workspace(
+pub async fn create_workspace(
     State(s): State<SharedState>,
     AuthUser(u): AuthUser,
     Json(b): Json<Value>,

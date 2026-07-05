@@ -289,6 +289,15 @@ pub async fn get_project(pool: &SqlitePool, id: &str) -> anyhow::Result<Option<V
         .await?;
     Ok(r.as_ref().map(project))
 }
+
+pub async fn project_environments(pool: &SqlitePool, project_id: &str) -> anyhow::Result<Value> {
+    let rows =
+        sqlx::query("SELECT * FROM sk_environments WHERE project_id=? ORDER BY sort_order, name")
+            .bind(project_id)
+            .fetch_all(pool)
+            .await?;
+    Ok(json!({"environments": rows.iter().map(environment).collect::<Vec<_>>() }))
+}
 pub async fn update_project(
     pool: &SqlitePool,
     id: &str,

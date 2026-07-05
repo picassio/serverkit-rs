@@ -79,7 +79,7 @@ const ProjectDetail = () => {
         [next[idx], next[target]] = [next[target], next[idx]];
         setEnvironments(next);
         try {
-            await api.reorderEnvironments(Number(id), next.map(e => e.id));
+            await api.reorderEnvironments(id, next.map(e => e.id));
         } catch (err) {
             toast.error(err.message || 'Failed to reorder environments');
             loadProject();
@@ -241,7 +241,7 @@ const ProjectDetail = () => {
             </div>
 
             <CreateEnvironmentDialog
-                projectId={Number(id)}
+                projectId={id}
                 open={showCreateEnv}
                 onOpenChange={setShowCreateEnv}
                 onCreated={() => {

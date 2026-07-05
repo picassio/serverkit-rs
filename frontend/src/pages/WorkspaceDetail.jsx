@@ -46,7 +46,7 @@ const asServerList = (data) => (Array.isArray(data) ? data : (data?.servers || [
 
 const WorkspaceDetail = () => {
     const { id } = useParams();
-    const wsId = Number(id);
+    const wsId = id;
     const navigate = useNavigate();
     const toast = useToast();
     const { user } = useAuth();
@@ -191,10 +191,10 @@ const WorkspaceDetail = () => {
         );
     }
 
-    const appsIn = apps.filter(a => a.workspace_id === wsId);
-    const appsOut = apps.filter(a => a.workspace_id !== wsId);
-    const srvIn = servers.filter(s => s.workspace_id === wsId);
-    const srvOut = servers.filter(s => s.workspace_id !== wsId);
+    const appsIn = apps.filter(a => String(a.workspace_id) === String(wsId));
+    const appsOut = apps.filter(a => String(a.workspace_id) !== String(wsId));
+    const srvIn = servers.filter(s => String(s.workspace_id) === String(wsId));
+    const srvOut = servers.filter(s => String(s.workspace_id) !== String(wsId));
     const services = appsIn.filter(a => a.app_type !== 'wordpress');
     const sites = appsIn.filter(a => a.app_type === 'wordpress');
     const since = formatSince(ws.created_at);

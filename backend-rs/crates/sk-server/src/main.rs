@@ -111,8 +111,16 @@ async fn main() -> anyhow::Result<()> {
         .nest("/mobile", routes::mobile::router())
         .nest("/jobs", routes::jobs::jobs_router())
         .nest("/queue", routes::jobs::queue_router())
+        .route(
+            "/projects/",
+            get(routes::projects::list_projects).post(routes::projects::create_project),
+        )
         .nest("/projects", routes::projects::projects_router())
         .nest("/environments", routes::projects::environments_router())
+        .route(
+            "/workspaces/",
+            get(routes::projects::list_workspaces).post(routes::projects::create_workspace),
+        )
         .nest("/workspaces", routes::projects::workspaces_router())
         .nest("/api-keys", routes::projects::api_keys_router())
         .nest("/vaults", routes::projects::vaults_router())

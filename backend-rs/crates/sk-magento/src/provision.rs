@@ -111,6 +111,9 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     let db_pw = s.db_password_plain().unwrap_or_default();
     let admin_pw = s.admin_password_plain().unwrap_or_default();
     let php = format!("php{}", s.php_version);
+    let src = s.magento_src();
+    let https = s.ssl_mode != "none";
+    let scheme = if https { "https" } else { "http" };
 
     std::fs::create_dir_all(root).map_err(|e| e.to_string())?;
     log_line(
@@ -165,41 +168,43 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
         wait_healthy(root, &format!("magento-{}-rabbitmq", s.name), 60).await?;
     }
 
-    // ── 2. exact composer ────────────────────────────────────────────
-    store::set_status(
-        &pool,
-        s.id,
-        "provisioning",
-        &format!("installing composer {}", s.composer_version),
-    )
-    .await;
+    // ── 2. exact composer (only when ServerKit initializes Magento) ──
     let composer = format!("{root}/composer.phar");
-    if !std::path::Path::new(&composer).exists() {
-        let url = format!(
-            "https://getcomposer.org/download/{}/composer.phar",
-            s.composer_version
-        );
-        run_logged(
-            root,
-            "curl",
-            &["-fsSL", "-o", &composer, &url],
-            None,
-            &[],
-            300,
+    if s.install_magento {
+        store::set_status(
+            &pool,
+            s.id,
+            "provisioning",
+            &format!("installing composer {}", s.composer_version),
         )
-        .await?;
+        .await;
+        if !std::path::Path::new(&composer).exists() {
+            let url = format!(
+                "https://getcomposer.org/download/{}/composer.phar",
+                s.composer_version
+            );
+            run_logged(
+                root,
+                "curl",
+                &["-fsSL", "-o", &composer, &url],
+                None,
+                &[],
+                300,
+            )
+            .await?;
+        }
     }
 
-    // ── 3. create-project ────────────────────────────────────────────
-    store::set_status(
-        &pool,
-        s.id,
-        "provisioning",
-        "composer create-project (this takes several minutes)",
-    )
-    .await;
-    let src = format!("{root}/src");
-    if !std::path::Path::new(&format!("{src}/bin/magento")).exists() {
+    // ── 3. optional create-project ───────────────────────────────────
+    let magento_bin = format!("{src}/bin/magento");
+    if s.install_magento && !std::path::Path::new(&magento_bin).exists() {
+        store::set_status(
+            &pool,
+            s.id,
+            "provisioning",
+            "composer create-project (this takes several minutes)",
+        )
+        .await;
         // mage-os = the Mage-OS *mirror* of the official packages: identical
         // magento/project-community-edition at exact Magento versions, no
         // repo.magento.com auth keys needed.
@@ -227,110 +232,125 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
             args.push(&version_arg);
         }
         run_logged(root, &php, &args, None, &[("COMPOSER_HOME", root)], 3600).await?;
-    } else {
+    } else if std::path::Path::new(&magento_bin).exists() {
         log_line(
             root,
-            "src/bin/magento already present — skipping create-project",
+            &format!("{magento_bin} already present — skipping create-project"),
         );
+    } else {
+        store::set_status(
+            &pool,
+            s.id,
+            "running",
+            "data services ready; Magento initialization skipped",
+        )
+        .await;
+        log_line(
+            root,
+            "DONE — data services are running; Magento init skipped",
+        );
+        return Ok(());
     }
 
-    // ── 4. setup:install ─────────────────────────────────────────────
-    store::set_status(&pool, s.id, "provisioning", "bin/magento setup:install").await;
-    // The data plane is always freshly created by this pipeline, so a stale
-    // env.php from a previous attempt is invalid (old crypt key/db config)
-    // and makes setup:install fail with merged-config errors. Remove it.
+    // ── 4. optional setup:install ────────────────────────────────────
     let env_php = format!("{src}/app/etc/env.php");
-    if std::path::Path::new(&env_php).exists() {
-        log_line(root, "removing stale app/etc/env.php from previous attempt");
-        let _ = std::fs::remove_file(&env_php);
-        let _ = run_privileged(&["rm", "-f", &env_php]).await; // in case www-data owns it
-    }
-    let db_port = base.to_string();
-    let os_port = (base + 1).to_string();
-    let redis_port = (base + 2).to_string();
-    let amqp_port = (base + 3).to_string();
-    let https = s.ssl_mode != "none";
-    let scheme = if https { "https" } else { "http" };
-    let base_url = format!("{scheme}://{}/", s.domain);
-    let admin_email = format!("admin@{}", s.domain);
-    let db_host = format!("127.0.0.1:{db_port}");
-
-    let mut install_args: Vec<String> = vec![
-        format!("{src}/bin/magento"),
-        "setup:install".into(),
-        format!("--base-url={base_url}"),
-        format!("--db-host={db_host}"),
-        "--db-name=magento".into(),
-        "--db-user=magento".into(),
-        format!("--db-password={db_pw}"),
-        "--admin-firstname=Admin".into(),
-        "--admin-lastname=User".into(),
-        format!("--admin-email={admin_email}"),
-        "--admin-user=admin".into(),
-        format!("--admin-password={admin_pw}"),
-        "--language=en_US".into(),
-        "--currency=USD".into(),
-        "--timezone=UTC".into(),
-        "--use-rewrites=1".into(),
-        "--search-engine=opensearch".into(),
-        "--opensearch-host=127.0.0.1".into(),
-        format!("--opensearch-port={os_port}"),
-        "--session-save=redis".into(),
-        "--session-save-redis-host=127.0.0.1".into(),
-        format!("--session-save-redis-port={redis_port}"),
-        "--session-save-redis-db=2".into(),
-        "--cache-backend=redis".into(),
-        "--cache-backend-redis-server=127.0.0.1".into(),
-        format!("--cache-backend-redis-port={redis_port}"),
-        "--cache-backend-redis-db=0".into(),
-        "--page-cache=redis".into(),
-        "--page-cache-redis-server=127.0.0.1".into(),
-        format!("--page-cache-redis-port={redis_port}"),
-        "--page-cache-redis-db=1".into(),
-        "--no-interaction".into(),
-    ];
-    if https {
-        install_args.push(format!("--base-url-secure={base_url}"));
-        install_args.push("--use-secure=1".into());
-        install_args.push("--use-secure-admin=1".into());
-    }
-    if s.use_rabbitmq {
-        install_args.extend([
-            "--amqp-host=127.0.0.1".into(),
-            format!("--amqp-port={amqp_port}"),
-            "--amqp-user=magento".into(),
-            format!("--amqp-password={db_pw}"),
-            "--amqp-virtualhost=/".into(),
-        ]);
-    }
-    let arg_refs: Vec<&str> = install_args.iter().map(String::as_str).collect();
-    let out = run_logged(root, &php, &arg_refs, Some(&src), &[], 1800).await?;
-
-    // capture the generated admin URI (line: "Magento Admin URI: /admin_xyz")
     let mut admin_path = "/admin".to_string();
-    if let Some(line) = out.lines().find(|l| l.contains("Admin URI")) {
-        if let Some(uri) = line.split("Admin URI:").nth(1) {
-            admin_path = uri.trim().to_string();
-            let admin_url = format!("{scheme}://{}{}", s.domain, admin_path);
-            store::set_admin_url(&pool, s.id, &admin_url).await;
-            log_line(root, &format!("admin url: {admin_url}"));
+    if s.install_magento {
+        store::set_status(&pool, s.id, "provisioning", "bin/magento setup:install").await;
+        // The data plane is always freshly created by this pipeline, so a stale
+        // env.php from a previous attempt is invalid (old crypt key/db config)
+        // and makes setup:install fail with merged-config errors. Remove it.
+        if std::path::Path::new(&env_php).exists() {
+            log_line(root, "removing stale app/etc/env.php from previous attempt");
+            let _ = std::fs::remove_file(&env_php);
+            let _ = run_privileged(&["rm", "-f", &env_php]).await; // in case www-data owns it
+        }
+        let db_port = base.to_string();
+        let os_port = (base + 1).to_string();
+        let redis_port = (base + 2).to_string();
+        let amqp_port = (base + 3).to_string();
+        let base_url = format!("{scheme}://{}/", s.domain);
+        let admin_email = format!("admin@{}", s.domain);
+        let db_host = format!("127.0.0.1:{db_port}");
+
+        let mut install_args: Vec<String> = vec![
+            format!("{src}/bin/magento"),
+            "setup:install".into(),
+            format!("--base-url={base_url}"),
+            format!("--db-host={db_host}"),
+            "--db-name=magento".into(),
+            "--db-user=magento".into(),
+            format!("--db-password={db_pw}"),
+            "--admin-firstname=Admin".into(),
+            "--admin-lastname=User".into(),
+            format!("--admin-email={admin_email}"),
+            "--admin-user=admin".into(),
+            format!("--admin-password={admin_pw}"),
+            "--language=en_US".into(),
+            "--currency=USD".into(),
+            "--timezone=UTC".into(),
+            "--use-rewrites=1".into(),
+            "--search-engine=opensearch".into(),
+            "--opensearch-host=127.0.0.1".into(),
+            format!("--opensearch-port={os_port}"),
+            "--session-save=redis".into(),
+            "--session-save-redis-host=127.0.0.1".into(),
+            format!("--session-save-redis-port={redis_port}"),
+            "--session-save-redis-db=2".into(),
+            "--cache-backend=redis".into(),
+            "--cache-backend-redis-server=127.0.0.1".into(),
+            format!("--cache-backend-redis-port={redis_port}"),
+            "--cache-backend-redis-db=0".into(),
+            "--page-cache=redis".into(),
+            "--page-cache-redis-server=127.0.0.1".into(),
+            format!("--page-cache-redis-port={redis_port}"),
+            "--page-cache-redis-db=1".into(),
+            "--no-interaction".into(),
+        ];
+        if https {
+            install_args.push(format!("--base-url-secure={base_url}"));
+            install_args.push("--use-secure=1".into());
+            install_args.push("--use-secure-admin=1".into());
+        }
+        if s.use_rabbitmq {
+            install_args.extend([
+                "--amqp-host=127.0.0.1".into(),
+                format!("--amqp-port={amqp_port}"),
+                "--amqp-user=magento".into(),
+                format!("--amqp-password={db_pw}"),
+                "--amqp-virtualhost=/".into(),
+            ]);
+        }
+        let arg_refs: Vec<&str> = install_args.iter().map(String::as_str).collect();
+        let out = run_logged(root, &php, &arg_refs, Some(&src), &[], 1800).await?;
+
+        // capture the generated admin URI (line: "Magento Admin URI: /admin_xyz")
+        if let Some(line) = out.lines().find(|l| l.contains("Admin URI")) {
+            if let Some(uri) = line.split("Admin URI:").nth(1) {
+                admin_path = uri.trim().to_string();
+                let admin_url = format!("{scheme}://{}{}", s.domain, admin_path);
+                store::set_admin_url(&pool, s.id, &admin_url).await;
+                log_line(root, &format!("admin url: {admin_url}"));
+            }
         }
     }
 
-    // sensible dev defaults for a fresh box
-    let _ = run_logged(
-        root,
-        &php,
-        &[
-            &format!("{src}/bin/magento"),
-            "deploy:mode:set",
-            "developer",
-        ],
-        Some(&src),
-        &[],
-        300,
-    )
-    .await;
+    // sensible dev defaults for a fresh initialized box
+    if s.install_magento {
+        let _ = run_logged(
+            root,
+            &php,
+            &[
+                &format!("{src}/bin/magento"),
+                "deploy:mode:set",
+                "developer",
+            ],
+            Some(&src),
+            &[],
+            300,
+        )
+        .await;
+    }
 
     // ── 4b. per-store PHP-FPM pool (as run_user) ─────────────────────
     // A dedicated pool lets each store run PHP as any user (e.g. `ubuntu`
@@ -509,6 +529,20 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     if s.use_varnish {
         store::set_status(&pool, s.id, "provisioning", "configuring varnish FPC").await;
         let magento_bin = format!("{src}/bin/magento");
+        if !std::path::Path::new(&env_php).exists() {
+            log_line(
+                root,
+                "warning: varnish selected but Magento is not initialized; skipping FPC config",
+            );
+            store::set_status(
+                &pool,
+                s.id,
+                "running",
+                "stack ready; Magento source configured but not initialized",
+            )
+            .await;
+            return Ok(());
+        }
         // FPC engine = Varnish
         run_logged(
             root,

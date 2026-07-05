@@ -128,6 +128,10 @@ struct CreateStoreBody {
     run_user: Option<String>,
     /// Per-service image overrides, e.g. {"db":"mariadb:11.4","redis":"redis:7.4"}.
     service_versions: Option<serde_json::Map<String, Value>>,
+    /// False means create/start only the data-plane stack; do not run composer/setup:install.
+    install_magento: Option<bool>,
+    /// Existing Magento source tree, e.g. /srv/shop/current. Defaults to root_path/src.
+    magento_source_path: Option<String>,
 }
 
 /// POST /magento/stores — insert row + spawn the provisioning task.
@@ -167,12 +171,7 @@ async fn create_store(
         ));
     }
 
-    // PHP must exist before we start
-    if !std::path::Path::new(&format!("/usr/bin/php{php_version}")).exists() {
-        return Err(ApiError::bad_request(format!(
-            "PHP {php_version} is not installed — install it first via /api/v1/php/versions/{php_version}/install"
-        )));
-    }
+    let install_magento = b.install_magento.unwrap_or(false);
 
     let ssl_mode = b.ssl.unwrap_or_else(|| "none".into());
     if !matches!(ssl_mode.as_str(), "none" | "self-signed" | "letsencrypt") {
@@ -241,6 +240,13 @@ async fn create_store(
             ));
         }
     }
+    if let Some(src) = &b.magento_source_path {
+        if !src.starts_with('/') || src.contains("..") {
+            return Err(ApiError::bad_request(
+                "magento_source_path must be an absolute path",
+            ));
+        }
+    }
     let magento_routes = b.magento_routes.unwrap_or_default();
     for r in &magento_routes {
         if !r.starts_with('/')
@@ -263,6 +269,14 @@ async fn create_store(
         }
         None => format!("{base_dir}/{name}"),
     };
+    if (install_magento || b.magento_source_path.is_some())
+        && !std::path::Path::new(&format!("/usr/bin/php{php_version}")).exists()
+    {
+        return Err(ApiError::bad_request(format!(
+            "PHP {php_version} is not installed — install it first via /api/v1/php/versions/{php_version}/install"
+        )));
+    }
+
     let db_password = sk_magento::generate_password(20);
     // Magento requires alnum + special char in admin passwords
     let admin_password = format!("{}#A1", sk_magento::generate_password(14));
@@ -290,6 +304,8 @@ async fn create_store(
         &le_challenge,
         &run_user,
         service_versions_json.as_deref(),
+        install_magento,
+        b.magento_source_path.as_deref(),
     )
     .await?;
     if b.admin_domain.is_some() || b.frontend_cmd.is_some() {

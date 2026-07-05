@@ -1,6 +1,6 @@
-// Magento store management — sk-magento fork extension.
-// One-call store provisioning (data-plane containers + composer + install +
-// vhost + cron), quick actions, health, and the provisioning log.
+// Magento stack management — sk-magento fork extension.
+// Data-plane stack creation is separate from optional Composer/setup:install,
+// with custom Magento and frontend source paths supported.
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { useToast } from '../contexts/ToastContext';
@@ -31,6 +31,40 @@ const PRIMARY_ACTIONS = [
     { id: 'cron-run', label: 'Run Cron' },
 ];
 
+const SERVICE_FIELDS = [
+    ['db', 'Database image'],
+    ['opensearch', 'Search image'],
+    ['redis', 'Redis image'],
+    ['rabbitmq', 'RabbitMQ image'],
+    ['varnish', 'Varnish image'],
+    ['mailpit', 'Mailpit image'],
+];
+
+const initialMagentoForm = () => ({
+    name: '',
+    domain: '',
+    magento_version: '2.4.8',
+    distribution: 'mage-os',
+    php_version: '',
+    install_magento: false,
+    root_path: '',
+    magento_source_path: '',
+    ssl: 'none',
+    use_rabbitmq: false,
+    use_varnish: false,
+    headless_mode: 'none',
+    frontend_domain: '',
+    frontend_port: 3000,
+    frontend_root: '',
+    magento_routes: '',
+    admin_domain: '',
+    frontend_cmd: '',
+    run_user: 'www-data',
+    le_challenge: 'dns',
+    le_email: '',
+    service_versions: {},
+});
+
 const Magento = () => {
     const toast = useToast();
     const { confirm } = useConfirm();
@@ -42,7 +76,7 @@ const Magento = () => {
 
     const [showCreate, setShowCreate] = useState(false);
     const [creating, setCreating] = useState(false);
-    const [form, setForm] = useState({ name: '', domain: '', magento_version: '2.4.8', distribution: 'mage-os', ssl: 'none', use_rabbitmq: false, use_varnish: false, headless_mode: 'none', frontend_domain: '', frontend_port: 3000, frontend_root: '', magento_routes: '', admin_domain: '', frontend_cmd: '', run_user: 'www-data', le_challenge: 'dns', le_email: '', service_versions: {} });
+    const [form, setForm] = useState(initialMagentoForm());
     const [credentials, setCredentials] = useState(null);
 
     const [logStore, setLogStore] = useState(null);
@@ -97,8 +131,12 @@ const Magento = () => {
         try {
             const payload = { ...form };
             payload.frontend_port = Number(payload.frontend_port) || 0;
+            payload.install_magento = Boolean(form.install_magento);
             payload.magento_routes = (form.magento_routes || '').split(',').map((r) => r.trim()).filter(Boolean);
             if (!payload.frontend_domain) delete payload.frontend_domain;
+            if (!payload.php_version) delete payload.php_version;
+            if (!payload.root_path) delete payload.root_path;
+            if (!payload.magento_source_path) delete payload.magento_source_path;
             if (!payload.frontend_root) delete payload.frontend_root;
             if (!payload.admin_domain) delete payload.admin_domain;
             if (!payload.frontend_cmd) delete payload.frontend_cmd;
@@ -109,9 +147,9 @@ const Magento = () => {
             delete payload.le_email; if (form.ssl==='letsencrypt' && form.le_email) payload.le_email = form.le_email;
             const res = await api.createMagentoStore(payload);
             setCredentials(res.store);
-            toast.success('Store provisioning started');
+            toast.success(payload.install_magento ? 'Magento initialization started' : 'Magento stack creation started');
             setShowCreate(false);
-            setForm({ name: '', domain: '', magento_version: '2.4.8', distribution: 'mage-os', ssl: 'none', use_rabbitmq: false, use_varnish: false, headless_mode: 'none', frontend_domain: '', frontend_port: 3000, frontend_root: '', magento_routes: '', admin_domain: '', frontend_cmd: '', run_user: 'www-data', le_challenge: 'dns', le_email: '', service_versions: {} });
+            setForm(initialMagentoForm());
             load();
         } catch (err) {
             toast.error(err.message);
@@ -319,10 +357,10 @@ const Magento = () => {
                 <EmptyState
                     icon={ShoppingBag}
                     title="No Magento stores yet"
-                    description="Provision a complete store — MariaDB, OpenSearch, Redis and Mailpit containers, Composer, Magento install, nginx vhost and cron — with one click."
+                    description="Create the Magento data-plane stack first, then optionally initialize Magento or attach your existing Magento and frontend source paths."
                     action={(
                         <Button onClick={() => setShowCreate(true)}>
-                            <Plus size={14} className="mr-1" /> Provision your first store
+                            <Plus size={14} className="mr-1" /> Create your first stack
                         </Button>
                     )}
                 />
@@ -344,7 +382,7 @@ const Magento = () => {
                                                 {store.domain}
                                             </a>
                                             <span className="mx-1">·</span>
-                                            Magento {store.magento_version} · PHP {store.php_version} · {store.distribution}
+                                            Magento {store.magento_version} · PHP {store.php_version} · {store.distribution} · {store.install_magento ? 'initialized by ServerKit' : 'stack only/custom source'}
                                         </div>
                                     </div>
                                 </div>
@@ -443,184 +481,194 @@ const Magento = () => {
             )}
 
             {/* Create store modal */}
-            <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Provision Magento Store" size="md">
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <Label>Store name</Label>
-                            <Input
-                                placeholder="shop1"
-                                value={form.name}
-                                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">lowercase, digits, hyphens</p>
-                        </div>
-                        <div>
-                            <Label>Domain</Label>
-                            <Input
-                                placeholder="shop1.example.com"
-                                value={form.domain}
-                                onChange={(e) => setForm({ ...form, domain: e.target.value })}
-                            />
-                        </div>
+            <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create Magento stack" size="xl">
+                <div className="space-y-5">
+                    <div className="rounded-lg border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                        <strong>Stack creation is separate from Magento initialization.</strong> By default ServerKit only creates the data services and records your paths. Enable “Initialize Magento” when you want ServerKit to run Composer and <code>setup:install</code>.
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+
+                    <section className="rounded-lg border bg-card p-4 space-y-3">
                         <div>
-                            <Label>Magento version</Label>
-                            <select
-                                className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                                value={form.magento_version}
-                                onChange={(e) => setForm({ ...form, magento_version: e.target.value })}
-                            >
-                                {versions.map((v) => (
-                                    <option key={v.magento} value={v.magento}>
-                                        {v.magento} (PHP {v.php}, Composer {v.composer})
-                                    </option>
-                                ))}
-                            </select>
+                            <h3 className="text-sm font-semibold">1. Identity and paths</h3>
+                            <p className="text-xs text-muted-foreground">Choose where ServerKit should keep stack files and, optionally, where your existing Magento source lives.</p>
                         </div>
-                        <div>
-                            <Label>Distribution</Label>
-                            <select
-                                className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                                value={form.distribution}
-                                onChange={(e) => setForm({ ...form, distribution: e.target.value })}
-                            >
-                                <option value="mage-os">Mage-OS mirror (no auth keys)</option>
-                                <option value="magento">Magento Open Source (repo.magento.com)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <Label>Headless mode</Label>
-                            <select
-                                className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                                value={form.headless_mode}
-                                onChange={(e) => setForm({ ...form, headless_mode: e.target.value })}
-                            >
-                                <option value="none">None (Luma storefront)</option>
-                                <option value="shared">Shared domain (frontend at /, Magento routed)</option>
-                                <option value="separate">Separate domains (frontend + Magento API/admin)</option>
-                                <option value="split">Split (frontend + API-only + admin-only domains)</option>
-                            </select>
-                        </div>
-                        {(form.headless_mode === 'separate' || form.headless_mode === 'split') && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                                <Label>Frontend domain</Label>
-                                <Input placeholder="store.example.com" value={form.frontend_domain}
-                                    onChange={(e) => setForm({ ...form, frontend_domain: e.target.value })} />
+                                <Label>Store name</Label>
+                                <Input placeholder="shop1" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                                <p className="text-xs text-muted-foreground mt-1">lowercase, digits, hyphens</p>
                             </div>
-                        )}
-                        {form.headless_mode === 'split' && (
                             <div>
-                                <Label>Admin domain</Label>
-                                <Input placeholder="admin.example.com" value={form.admin_domain || ''}
-                                    onChange={(e) => setForm({ ...form, admin_domain: e.target.value })} />
+                                <Label>Primary Magento domain</Label>
+                                <Input placeholder="api.shop.example.com or shop.example.com" value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} />
                             </div>
+                            <div>
+                                <Label>Stack root path</Label>
+                                <Input placeholder="/var/www/magento/shop1" value={form.root_path} onChange={(e) => setForm({ ...form, root_path: e.target.value })} />
+                                <p className="text-xs text-muted-foreground mt-1">compose, logs and generated files live here. Blank uses /var/www/magento/&lt;name&gt;.</p>
+                            </div>
+                            <div>
+                                <Label>Existing Magento source path</Label>
+                                <Input placeholder="/srv/shop/current" value={form.magento_source_path} onChange={(e) => setForm({ ...form, magento_source_path: e.target.value })} />
+                                <p className="text-xs text-muted-foreground mt-1">Use your own checkout/release. Blank uses &lt;stack root&gt;/src.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="rounded-lg border bg-card p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <h3 className="text-sm font-semibold">2. Magento runtime</h3>
+                                <p className="text-xs text-muted-foreground">Magento version picks defaults only. Override PHP explicitly when your project needs a different installed PHP minor.</p>
+                            </div>
+                            <label className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer">
+                                <input type="checkbox" checked={form.install_magento} onChange={(e) => setForm({ ...form, install_magento: e.target.checked })} />
+                                Initialize Magento
+                            </label>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                                <Label>Magento version</Label>
+                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.magento_version} onChange={(e) => { const selected = versions.find((v) => v.magento === e.target.value); setForm({ ...form, magento_version: e.target.value, php_version: form.php_version || selected?.php || '' }); }}>
+                                    {versions.map((v) => <option key={v.magento} value={v.magento}>{v.magento} (default PHP {v.php}, Composer {v.composer})</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <Label>PHP version</Label>
+                                <Input placeholder={versions.find((v) => v.magento === form.magento_version)?.php || '8.3'} value={form.php_version} onChange={(e) => setForm({ ...form, php_version: e.target.value })} />
+                                <p className="text-xs text-muted-foreground mt-1">Example: 8.2 or 8.3. Must be installed on the host if initializing or serving PHP.</p>
+                            </div>
+                            <div>
+                                <Label>Distribution</Label>
+                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.distribution} onChange={(e) => setForm({ ...form, distribution: e.target.value })}>
+                                    <option value="mage-os">Mage-OS mirror (no auth keys)</option>
+                                    <option value="magento">Magento Open Source (repo.magento.com)</option>
+                                </select>
+                            </div>
+                        </div>
+                        {!form.install_magento && (
+                            <p className="text-xs text-muted-foreground">Initialization is off: ServerKit will not run <code>composer create-project</code> or <code>bin/magento setup:install</code>. If no source path is provided, only the data services are started.</p>
                         )}
-                    </div>
-                    {form.headless_mode !== 'none' && (
-                        <div className="grid grid-cols-3 gap-3">
+                    </section>
+
+                    <section className="rounded-lg border bg-card p-4 space-y-3">
+                        <div>
+                            <h3 className="text-sm font-semibold">3. Data service images</h3>
+                            <p className="text-xs text-muted-foreground">Use full image references, not just major versions. This supports Magento/PHP stack combinations where patch releases change service requirements.</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {SERVICE_FIELDS.map(([svc, label]) => (
+                                <div key={svc}>
+                                    <Label>{label}</Label>
+                                    <Input placeholder={catalog.service_versions?.[svc] || svc} value={form.service_versions?.[svc] || ''} onChange={(e) => setForm({ ...form, service_versions: { ...form.service_versions, [svc]: e.target.value } })} />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
+                                <input type="checkbox" checked={form.use_rabbitmq} onChange={(e) => setForm({ ...form, use_rabbitmq: e.target.checked })} />
+                                Include RabbitMQ service
+                            </label>
+                            <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
+                                <input type="checkbox" checked={form.use_varnish} onChange={(e) => setForm({ ...form, use_varnish: e.target.checked })} />
+                                Include Varnish FPC service
+                            </label>
+                        </div>
+                    </section>
+
+                    <section className="rounded-lg border bg-card p-4 space-y-3">
+                        <div>
+                            <h3 className="text-sm font-semibold">4. Web, headless and custom frontend</h3>
+                            <p className="text-xs text-muted-foreground">Point ServerKit at your own Next.js/Nuxt/custom frontend path and command, or leave headless disabled.</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                                <Label>Headless mode</Label>
+                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.headless_mode} onChange={(e) => setForm({ ...form, headless_mode: e.target.value })}>
+                                    <option value="none">None / Magento storefront</option>
+                                    <option value="shared">Shared domain (frontend at /, Magento routed)</option>
+                                    <option value="separate">Separate domains</option>
+                                    <option value="split">Split frontend + API + admin domains</option>
+                                </select>
+                            </div>
+                            <div>
+                                <Label>Frontend / Next.js path</Label>
+                                <Input placeholder="/srv/shop-frontend" value={form.frontend_root} onChange={(e) => setForm({ ...form, frontend_root: e.target.value })} />
+                            </div>
+                            <div>
+                                <Label>Frontend command</Label>
+                                <Input placeholder="/usr/bin/npm run start" value={form.frontend_cmd} onChange={(e) => setForm({ ...form, frontend_cmd: e.target.value })} />
+                            </div>
                             <div>
                                 <Label>Frontend port</Label>
-                                <Input type="number" value={form.frontend_port}
-                                    onChange={(e) => setForm({ ...form, frontend_port: e.target.value })} />
-                                <p className="text-xs text-muted-foreground mt-1">0 = static export</p>
+                                <Input type="number" value={form.frontend_port} onChange={(e) => setForm({ ...form, frontend_port: e.target.value })} />
+                                <p className="text-xs text-muted-foreground mt-1">0 = serve static export from frontend path.</p>
                             </div>
-                            <div>
-                                <Label>Frontend folder</Label>
-                                <Input placeholder="/var/www/frontend/out" value={form.frontend_root}
-                                    onChange={(e) => setForm({ ...form, frontend_root: e.target.value })} />
-                            </div>
-                            {form.headless_mode === 'shared' && (
+                            {(form.headless_mode === 'separate' || form.headless_mode === 'split') && (
                                 <div>
-                                    <Label>Extra Magento routes</Label>
-                                    <Input placeholder="/checkout, /customer" value={form.magento_routes}
-                                        onChange={(e) => setForm({ ...form, magento_routes: e.target.value })} />
+                                    <Label>Frontend domain</Label>
+                                    <Input placeholder="store.example.com" value={form.frontend_domain} onChange={(e) => setForm({ ...form, frontend_domain: e.target.value })} />
+                                </div>
+                            )}
+                            {form.headless_mode === 'split' && (
+                                <div>
+                                    <Label>Admin domain</Label>
+                                    <Input placeholder="admin.example.com" value={form.admin_domain || ''} onChange={(e) => setForm({ ...form, admin_domain: e.target.value })} />
+                                </div>
+                            )}
+                            {form.headless_mode === 'shared' && (
+                                <div className="md:col-span-2">
+                                    <Label>Magento routes on shared domain</Label>
+                                    <Input placeholder="/checkout, /customer, /graphql" value={form.magento_routes} onChange={(e) => setForm({ ...form, magento_routes: e.target.value })} />
                                 </div>
                             )}
                         </div>
-                    )}
-                    <div className="grid grid-cols-3 gap-3">
+                    </section>
+
+                    <section className="rounded-lg border bg-card p-4 space-y-3">
                         <div>
-                            <Label>TLS</Label>
-                            <select className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                                value={form.ssl}
-                                onChange={(e) => setForm({ ...form, ssl: e.target.value })}>
-                                <option value="none">None (HTTP)</option>
-                                <option value="self-signed">Self-signed</option>
-                                <option value="letsencrypt">Let's Encrypt</option>
-                            </select>
+                            <h3 className="text-sm font-semibold">5. TLS and process user</h3>
                         </div>
-                        <div>
-                            <Label>Run as user</Label>
-                            <Input placeholder="www-data" value={form.run_user}
-                                onChange={(e) => setForm({ ...form, run_user: e.target.value })} />
-                        </div>
-                        {form.ssl === 'letsencrypt' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
-                                <Label>LE challenge</Label>
-                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                                    value={form.le_challenge}
-                                    onChange={(e) => setForm({ ...form, le_challenge: e.target.value })}>
-                                    <option value="dns">DNS-01 (Cloudflare)</option>
-                                    <option value="http">HTTP-01 (webroot)</option>
+                                <Label>TLS</Label>
+                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.ssl} onChange={(e) => setForm({ ...form, ssl: e.target.value })}>
+                                    <option value="none">None (HTTP)</option>
+                                    <option value="self-signed">Self-signed</option>
+                                    <option value="letsencrypt">Let's Encrypt</option>
                                 </select>
                             </div>
-                        )}
-                    </div>
-                    {form.ssl === 'letsencrypt' && (
-                        <div>
-                            <Label>Let's Encrypt email</Label>
-                            <Input placeholder="admin@example.com" value={form.le_email}
-                                onChange={(e) => setForm({ ...form, le_email: e.target.value })} />
+                            <div>
+                                <Label>Run PHP/managed frontend as user</Label>
+                                <Input placeholder="www-data" value={form.run_user} onChange={(e) => setForm({ ...form, run_user: e.target.value })} />
+                            </div>
+                            {form.ssl === 'letsencrypt' && (
+                                <div>
+                                    <Label>LE challenge</Label>
+                                    <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.le_challenge} onChange={(e) => setForm({ ...form, le_challenge: e.target.value })}>
+                                        <option value="dns">DNS-01 (Cloudflare)</option>
+                                        <option value="http">HTTP-01 (webroot)</option>
+                                    </select>
+                                </div>
+                            )}
+                            {form.ssl === 'letsencrypt' && (
+                                <div className="md:col-span-2">
+                                    <Label>Let's Encrypt email</Label>
+                                    <Input placeholder="admin@example.com" value={form.le_email} onChange={(e) => setForm({ ...form, le_email: e.target.value })} />
+                                </div>
+                            )}
                         </div>
-                    )}
-                    <div>
-                        <Label>Service versions (blank = default)</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {['db','opensearch','redis','rabbitmq','varnish','mailpit'].map((svc) => (
-                                <Input key={svc} placeholder={catalog.service_versions?.[svc] || svc}
-                                    value={form.service_versions?.[svc] || ''}
-                                    onChange={(e) => setForm({ ...form, service_versions: { ...form.service_versions, [svc]: e.target.value } })} />
-                            ))}
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                        <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={form.use_rabbitmq}
-                                onChange={(e) => setForm({ ...form, use_rabbitmq: e.target.checked })}
-                            />
-                            RabbitMQ
-                        </label>
-                        <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={form.use_varnish}
-                                onChange={(e) => setForm({ ...form, use_varnish: e.target.checked })}
-                            />
-                            Varnish FPC
-                        </label>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Provisions MariaDB, OpenSearch, Redis and Mailpit containers, installs the exact
-                        Composer version, runs <code>composer create-project</code> + <code>setup:install</code>,
-                        creates the nginx vhost and the <code>cron:run</code> crontab entry.
-                    </p>
+                    </section>
+
                     <div className="flex justify-end gap-2">
                         <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-                        <Button onClick={createStore} disabled={creating}>
-                            {creating ? 'Starting…' : 'Provision Store'}
-                        </Button>
+                        <Button onClick={createStore} disabled={creating}>{creating ? 'Starting…' : (form.install_magento ? 'Create stack + initialize Magento' : 'Create stack only')}</Button>
                     </div>
                 </div>
             </Modal>
 
             {/* One-time credentials modal */}
-            <Modal open={!!credentials} onClose={() => setCredentials(null)} title="Store credentials (shown once)" size="md">
+            <Modal open={!!credentials} onClose={() => setCredentials(null)} title="Stack credentials (shown once)" size="md">
                 {credentials && (
                     <div className="space-y-3 text-sm">
                         <p className="text-muted-foreground text-xs">
@@ -628,7 +676,7 @@ const Magento = () => {
                         </p>
                         {[
                             ['Admin user', 'admin'],
-                            ['Admin password', credentials.admin_password],
+                            ...(credentials.install_magento ? [['Admin password', credentials.admin_password]] : []),
                             ['DB password', credentials.db_password],
                         ].map(([label, value]) => (
                             <div key={label} className="flex items-center justify-between rounded border px-3 py-2">

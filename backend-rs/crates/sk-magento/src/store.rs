@@ -34,6 +34,8 @@ pub async fn ensure_schema(pool: &SqlitePool) -> anyhow::Result<()> {
             le_challenge VARCHAR(10) NOT NULL DEFAULT 'dns',
             run_user VARCHAR(32) NOT NULL DEFAULT 'www-data',
             service_versions TEXT,
+            install_magento INTEGER NOT NULL DEFAULT 0,
+            magento_source_path VARCHAR(255),
             backup_schedule VARCHAR(10) NOT NULL DEFAULT 'none',
             backup_retention INTEGER NOT NULL DEFAULT 7,
             created_at DATETIME,
@@ -59,6 +61,8 @@ pub async fn ensure_schema(pool: &SqlitePool) -> anyhow::Result<()> {
         "ALTER TABLE magento_stores ADD COLUMN le_challenge VARCHAR(10) NOT NULL DEFAULT 'dns'",
         "ALTER TABLE magento_stores ADD COLUMN run_user VARCHAR(32) NOT NULL DEFAULT 'www-data'",
         "ALTER TABLE magento_stores ADD COLUMN service_versions TEXT",
+        "ALTER TABLE magento_stores ADD COLUMN install_magento INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE magento_stores ADD COLUMN magento_source_path VARCHAR(255)",
         "ALTER TABLE magento_stores ADD COLUMN backup_schedule VARCHAR(10) NOT NULL DEFAULT 'none'",
         "ALTER TABLE magento_stores ADD COLUMN backup_retention INTEGER NOT NULL DEFAULT 7",
     ] {
@@ -148,6 +152,8 @@ pub struct Store {
     pub le_challenge: String,
     pub run_user: String,
     pub service_versions: Option<String>,
+    pub install_magento: bool,
+    pub magento_source_path: Option<String>,
     pub backup_schedule: String,
     pub backup_retention: i64,
     pub created_at: Option<String>,
@@ -191,6 +197,12 @@ impl Store {
         self.admin_password
             .as_deref()
             .map(sk_core::crypto::decrypt_or_plain)
+    }
+
+    pub fn magento_src(&self) -> String {
+        self.magento_source_path
+            .clone()
+            .unwrap_or_else(|| format!("{}/src", self.root_path))
     }
 
     /// Custom path prefixes routed to Magento in shared headless mode.
@@ -238,6 +250,8 @@ impl Store {
             "le_challenge": self.le_challenge,
             "run_user": self.run_user,
             "service_versions": self.service_versions_map(),
+            "install_magento": self.install_magento,
+            "magento_source_path": self.magento_source_path,
             "backup_schedule": self.backup_schedule,
             "backup_retention": self.backup_retention,
             "magento_routes": self.custom_routes(),
@@ -261,8 +275,8 @@ const COLS: &str = "id, name, domain, magento_version, distribution, php_version
     composer_version, root_path, db_password, admin_password, admin_url, status, \
     status_detail, ssl_mode, use_rabbitmq, use_varnish, headless_mode, frontend_domain, \
     frontend_port, magento_routes, frontend_root, admin_domain, frontend_cmd, \
-    le_email, le_challenge, run_user, service_versions, backup_schedule, \
-    backup_retention, created_at, updated_at";
+    le_email, le_challenge, run_user, service_versions, install_magento, magento_source_path, \
+    backup_schedule, backup_retention, created_at, updated_at";
 
 pub async fn list(pool: &SqlitePool) -> anyhow::Result<Vec<Store>> {
     Ok(
@@ -313,6 +327,8 @@ pub async fn insert(
     le_challenge: &str,
     run_user: &str,
     service_versions: Option<&str>,
+    install_magento: bool,
+    magento_source_path: Option<&str>,
 ) -> anyhow::Result<i64> {
     let now = sk_core::time::now_sql();
     let res = sqlx::query(
@@ -321,8 +337,8 @@ pub async fn insert(
             root_path, db_password, admin_password, status, status_detail, ssl_mode,
             use_rabbitmq, use_varnish, headless_mode, frontend_domain, frontend_port,
             magento_routes, frontend_root, le_email, le_challenge, run_user,
-            service_versions, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'provisioning', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+            service_versions, install_magento, magento_source_path, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'provisioning', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
     )
     .bind(name)
     .bind(domain)
@@ -345,6 +361,8 @@ pub async fn insert(
     .bind(le_challenge)
     .bind(run_user)
     .bind(service_versions)
+    .bind(if install_magento { 1 } else { 0 })
+    .bind(magento_source_path)
     .bind(&now)
     .bind(&now)
     .execute(pool)

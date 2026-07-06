@@ -104,6 +104,9 @@ async fn get_store(
 struct CreateStoreBody {
     name: Option<String>,
     domain: Option<String>,
+    /// Explicit Magento API domain for split headless mode. Stored separately
+    /// and mirrored to domain for existing API compatibility.
+    api_domain: Option<String>,
     magento_version: Option<String>,
     distribution: Option<String>,
     php_version: Option<String>,
@@ -120,6 +123,8 @@ struct CreateStoreBody {
     /// "none" (default) | "shared" | "separate" | "split" (frontend_domain +
     /// api domain (allowlisted) + admin_domain).
     headless_mode: Option<String>,
+    /// split mode route policy: api_only (strict) | full_proxy (broad Magento proxy).
+    split_route_mode: Option<String>,
     admin_domain: Option<String>,
     frontend_cmd: Option<String>,
     frontend_domain: Option<String>,
@@ -156,9 +161,8 @@ async fn create_store(
     let name = b
         .name
         .ok_or_else(|| ApiError::bad_request("name is required"))?;
-    let domain = b
-        .domain
-        .ok_or_else(|| ApiError::bad_request("domain is required"))?;
+    let requested_domain = b.domain.clone();
+    let requested_api_domain = b.api_domain.clone();
     if !sk_magento::valid_store_name(&name) {
         return Err(ApiError::bad_request(
             "Invalid store name: lowercase letters, digits and hyphens, starting with a letter",
@@ -215,21 +219,44 @@ async fn create_store(
     let headless_mode = b.headless_mode.unwrap_or_else(|| "none".into());
     if !matches!(
         headless_mode.as_str(),
-        "none" | "shared" | "separate" | "split" | "legacy_split"
+        "none" | "shared" | "separate" | "split"
     ) {
         return Err(ApiError::bad_request(
-            "headless_mode must be 'none', 'shared', 'separate', 'split' or 'legacy_split'",
+            "headless_mode must be 'none', 'shared', 'separate' or 'split'",
         ));
     }
-    if matches!(
-        headless_mode.as_str(),
-        "separate" | "split" | "legacy_split"
-    ) && b.frontend_domain.is_none()
-    {
+    let split_route_mode = b.split_route_mode.unwrap_or_else(|| "api_only".into());
+    if !matches!(split_route_mode.as_str(), "api_only" | "full_proxy") {
+        return Err(ApiError::bad_request(
+            "split_route_mode must be 'api_only' or 'full_proxy'",
+        ));
+    }
+    if matches!(headless_mode.as_str(), "separate" | "split") && b.frontend_domain.is_none() {
         return Err(ApiError::bad_request(
             "frontend_domain is required for this headless mode",
         ));
     }
+    if headless_mode == "split" && b.admin_domain.is_none() {
+        return Err(ApiError::bad_request(
+            "admin_domain is required for split headless mode",
+        ));
+    }
+    let api_domain = if headless_mode == "split" {
+        requested_api_domain
+            .filter(|d| !d.trim().is_empty())
+            .ok_or_else(|| {
+                ApiError::bad_request("api_domain is required for split headless mode")
+            })?
+    } else {
+        requested_domain
+            .clone()
+            .ok_or_else(|| ApiError::bad_request("domain is required"))?
+    };
+    let domain = if headless_mode == "split" {
+        api_domain.clone()
+    } else {
+        requested_domain.unwrap_or_else(|| api_domain.clone())
+    };
     if let Some(cmd) = &b.frontend_cmd {
         if !sk_magento::provision::valid_frontend_cmd(cmd) {
             return Err(ApiError::bad_request(
@@ -340,6 +367,12 @@ async fn create_store(
         use_rabbitmq,
         use_varnish,
         &headless_mode,
+        if headless_mode == "split" {
+            Some(api_domain.as_str())
+        } else {
+            None
+        },
+        &split_route_mode,
         b.frontend_domain.as_deref(),
         frontend_port,
         &magento_routes,
@@ -357,6 +390,12 @@ async fn create_store(
             &state.db,
             id,
             None,
+            if headless_mode == "split" {
+                Some(api_domain.as_str())
+            } else {
+                None
+            },
+            Some(&split_route_mode),
             None,
             b.admin_domain.as_deref(),
             None,
@@ -430,6 +469,8 @@ struct PatchBody {
     /// "none" | "self-signed" — applied on apply-web (cert re-issued with SANs)
     ssl: Option<String>,
     headless_mode: Option<String>,
+    api_domain: Option<String>,
+    split_route_mode: Option<String>,
     frontend_domain: Option<String>,
     admin_domain: Option<String>,
     frontend_port: Option<i64>,
@@ -448,16 +489,32 @@ async fn patch_store(
     Json(b): Json<PatchBody>,
 ) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
-    store::find(&state.db, id)
+    let existing = store::find(&state.db, id)
         .await?
         .ok_or_else(|| ApiError::not_found("Store not found"))?;
     if let Some(m) = &b.headless_mode {
-        if !matches!(
-            m.as_str(),
-            "none" | "shared" | "separate" | "split" | "legacy_split"
-        ) {
+        if !matches!(m.as_str(), "none" | "shared" | "separate" | "split") {
             return Err(ApiError::bad_request("Invalid headless_mode"));
         }
+    }
+    if let Some(mode) = &b.split_route_mode {
+        if !matches!(mode.as_str(), "api_only" | "full_proxy") {
+            return Err(ApiError::bad_request("Invalid split_route_mode"));
+        }
+    }
+    let effective_mode = b
+        .headless_mode
+        .as_deref()
+        .unwrap_or(existing.headless_mode.as_str());
+    let effective_api_domain = b
+        .api_domain
+        .as_deref()
+        .or(existing.api_domain.as_deref())
+        .unwrap_or("");
+    if effective_mode == "split" && effective_api_domain.trim().is_empty() {
+        return Err(ApiError::bad_request(
+            "api_domain is required for split headless mode",
+        ));
     }
     if let Some(cmd) = &b.frontend_cmd {
         if !sk_magento::provision::valid_frontend_cmd(cmd) {
@@ -500,6 +557,8 @@ async fn patch_store(
         &state.db,
         id,
         b.headless_mode.as_deref(),
+        b.api_domain.as_deref(),
+        b.split_route_mode.as_deref(),
         b.frontend_domain.as_deref(),
         b.admin_domain.as_deref(),
         b.frontend_port,

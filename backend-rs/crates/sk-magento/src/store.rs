@@ -24,6 +24,8 @@ pub async fn ensure_schema(pool: &SqlitePool) -> anyhow::Result<()> {
             use_rabbitmq INTEGER NOT NULL DEFAULT 0,
             use_varnish INTEGER NOT NULL DEFAULT 0,
             headless_mode VARCHAR(20) NOT NULL DEFAULT 'none',
+            api_domain VARCHAR(255),
+            split_route_mode VARCHAR(20) NOT NULL DEFAULT 'api_only',
             frontend_domain VARCHAR(255),
             frontend_port INTEGER NOT NULL DEFAULT 3000,
             magento_routes TEXT,
@@ -51,6 +53,8 @@ pub async fn ensure_schema(pool: &SqlitePool) -> anyhow::Result<()> {
         "ALTER TABLE magento_stores ADD COLUMN use_rabbitmq INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE magento_stores ADD COLUMN use_varnish INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE magento_stores ADD COLUMN headless_mode VARCHAR(20) NOT NULL DEFAULT 'none'",
+        "ALTER TABLE magento_stores ADD COLUMN api_domain VARCHAR(255)",
+        "ALTER TABLE magento_stores ADD COLUMN split_route_mode VARCHAR(20) NOT NULL DEFAULT 'api_only'",
         "ALTER TABLE magento_stores ADD COLUMN frontend_domain VARCHAR(255)",
         "ALTER TABLE magento_stores ADD COLUMN frontend_port INTEGER NOT NULL DEFAULT 3000",
         "ALTER TABLE magento_stores ADD COLUMN magento_routes TEXT",
@@ -142,6 +146,8 @@ pub struct Store {
     pub use_rabbitmq: bool,
     pub use_varnish: bool,
     pub headless_mode: String,
+    pub api_domain: Option<String>,
+    pub split_route_mode: String,
     pub frontend_domain: Option<String>,
     pub frontend_port: i64,
     pub magento_routes: Option<String>,
@@ -241,6 +247,8 @@ impl Store {
             "use_rabbitmq": self.use_rabbitmq,
             "use_varnish": self.use_varnish,
             "headless_mode": self.headless_mode,
+            "api_domain": self.api_domain,
+            "split_route_mode": self.split_route_mode,
             "frontend_domain": self.frontend_domain,
             "frontend_port": self.frontend_port,
             "frontend_root": self.frontend_root,
@@ -273,8 +281,8 @@ impl Store {
 
 const COLS: &str = "id, name, domain, magento_version, distribution, php_version, \
     composer_version, root_path, db_password, admin_password, admin_url, status, \
-    status_detail, ssl_mode, use_rabbitmq, use_varnish, headless_mode, frontend_domain, \
-    frontend_port, magento_routes, frontend_root, admin_domain, frontend_cmd, \
+    status_detail, ssl_mode, use_rabbitmq, use_varnish, headless_mode, api_domain, split_route_mode, \
+    frontend_domain, frontend_port, magento_routes, frontend_root, admin_domain, frontend_cmd, \
     le_email, le_challenge, run_user, service_versions, install_magento, magento_source_path, \
     backup_schedule, backup_retention, created_at, updated_at";
 
@@ -319,6 +327,8 @@ pub async fn insert(
     use_rabbitmq: bool,
     use_varnish: bool,
     headless_mode: &str,
+    api_domain: Option<&str>,
+    split_route_mode: &str,
     frontend_domain: Option<&str>,
     frontend_port: i64,
     magento_routes: &[String],
@@ -335,10 +345,10 @@ pub async fn insert(
         r#"INSERT INTO magento_stores
            (name, domain, magento_version, distribution, php_version, composer_version,
             root_path, db_password, admin_password, status, status_detail, ssl_mode,
-            use_rabbitmq, use_varnish, headless_mode, frontend_domain, frontend_port,
-            magento_routes, frontend_root, le_email, le_challenge, run_user,
-            service_versions, install_magento, magento_source_path, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'provisioning', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+            use_rabbitmq, use_varnish, headless_mode, api_domain, split_route_mode,
+            frontend_domain, frontend_port, magento_routes, frontend_root, le_email, le_challenge,
+            run_user, service_versions, install_magento, magento_source_path, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'provisioning', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
     )
     .bind(name)
     .bind(domain)
@@ -353,6 +363,8 @@ pub async fn insert(
     .bind(use_rabbitmq)
     .bind(use_varnish)
     .bind(headless_mode)
+    .bind(api_domain)
+    .bind(split_route_mode)
     .bind(frontend_domain)
     .bind(frontend_port)
     .bind(serde_json::to_string(magento_routes).unwrap_or_else(|_| "[]".into()))
@@ -409,6 +421,8 @@ pub async fn update_web_fields(
     pool: &SqlitePool,
     id: i64,
     headless_mode: Option<&str>,
+    api_domain: Option<&str>,
+    split_route_mode: Option<&str>,
     frontend_domain: Option<&str>,
     admin_domain: Option<&str>,
     frontend_port: Option<i64>,
@@ -428,6 +442,8 @@ pub async fn update_web_fields(
         };
     }
     push!("headless_mode", headless_mode);
+    push!("api_domain", api_domain);
+    push!("split_route_mode", split_route_mode);
     push!("frontend_domain", frontend_domain);
     push!("admin_domain", admin_domain);
     push!(

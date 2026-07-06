@@ -108,6 +108,7 @@ const serviceOptionValues = (field) => field.options.map(([value]) => value);
 const initialMagentoForm = () => ({
     name: '',
     domain: '',
+    api_domain: '',
     magento_version: '2.4.8',
     distribution: 'mage-os',
     php_version: '',
@@ -120,6 +121,7 @@ const initialMagentoForm = () => ({
     use_rabbitmq: false,
     use_varnish: false,
     headless_mode: 'none',
+    split_route_mode: 'api_only',
     frontend_domain: '',
     frontend_port: 3000,
     frontend_root: '',
@@ -220,16 +222,20 @@ const Magento = () => {
     }, [stores]);
 
     const createStore = async () => {
-        if (!form.name || !form.domain) {
-            toast.error('Name and domain are required');
+        const primaryDomain = form.headless_mode === 'split' ? form.api_domain : form.domain;
+        if (!form.name || !primaryDomain) {
+            toast.error(form.headless_mode === 'split' ? 'Name and API domain are required' : 'Name and domain are required');
             return;
         }
         setCreating(true);
         try {
             const payload = { ...form };
+            if (payload.headless_mode === 'split') payload.domain = payload.api_domain;
             payload.frontend_port = Number(payload.frontend_port) || 0;
             payload.install_magento = Boolean(form.install_magento);
             payload.magento_routes = (form.magento_routes || '').split(',').map((r) => r.trim()).filter(Boolean);
+            if (!payload.api_domain) delete payload.api_domain;
+            if (payload.headless_mode !== 'split') delete payload.split_route_mode;
             if (!payload.frontend_domain) delete payload.frontend_domain;
             if (!payload.php_version) delete payload.php_version;
             if (!payload.auto_install_php) delete payload.php_extension_profile;
@@ -315,6 +321,8 @@ const Magento = () => {
             le_challenge: store.le_challenge || 'dns',
             le_email: store.le_email || '',
             headless_mode: store.headless_mode || 'none',
+            api_domain: store.api_domain || '',
+            split_route_mode: store.split_route_mode || 'api_only',
             frontend_domain: store.frontend_domain || '',
             admin_domain: store.admin_domain || '',
             frontend_port: store.frontend_port ?? 3000,
@@ -332,10 +340,16 @@ const Magento = () => {
             const payload = {
                 ssl: webForm.ssl,
                 headless_mode: webForm.headless_mode,
+                api_domain: webForm.api_domain,
+                split_route_mode: webForm.split_route_mode,
                 frontend_port: Number(webForm.frontend_port) || 0,
                 magento_routes: (webForm.magento_routes || '').split(',').map((r) => r.trim()).filter(Boolean),
                 run_user: webForm.run_user || 'www-data',
             };
+            if (webForm.headless_mode !== 'split') {
+                delete payload.api_domain;
+                delete payload.split_route_mode;
+            }
             if (webForm.ssl === 'letsencrypt') {
                 payload.le_challenge = webForm.le_challenge;
                 if (webForm.le_email) payload.le_email = webForm.le_email;
@@ -670,8 +684,8 @@ const Magento = () => {
                                 <p className="text-xs text-muted-foreground mt-1">lowercase, digits, hyphens</p>
                             </div>
                             <div>
-                                <Label>Primary Magento domain</Label>
-                                <Input placeholder="api.shop.example.com or shop.example.com" value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} />
+                                <Label>{form.headless_mode === 'split' ? 'Primary Magento domain (unused in split)' : 'Primary Magento domain'}</Label>
+                                <Input placeholder={form.headless_mode === 'split' ? 'leave blank for split mode' : 'shop.example.com'} value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} />
                             </div>
                             <div>
                                 <Label>Stack root path</Label>
@@ -680,7 +694,7 @@ const Magento = () => {
                             </div>
                             <div>
                                 <Label>Existing Magento source path</Label>
-                                <Input placeholder="/srv/shop/magento/current" value={form.magento_source_path} onChange={(e) => setForm({ ...form, magento_source_path: e.target.value })} />
+                                <Input placeholder="/home/ubuntu/mjsg/magento/current" value={form.magento_source_path} onChange={(e) => setForm({ ...form, magento_source_path: e.target.value })} />
                                 <p className="text-xs text-muted-foreground mt-1">Use your own checkout/release. Blank uses &lt;stack root&gt;/src.</p>
                             </div>
                         </div>
@@ -808,13 +822,12 @@ const Magento = () => {
                                         <SelectItem value="shared">Shared domain (frontend at /, Magento routed)</SelectItem>
                                         <SelectItem value="separate">Separate domains</SelectItem>
                                         <SelectItem value="split">Split frontend + API + admin domains</SelectItem>
-                                        <SelectItem value="legacy_split">Legacy split (broad API/admin proxy)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div>
                                 <Label>Frontend / Next.js path</Label>
-                                <Input placeholder="/srv/shop/frontend/current" value={form.frontend_root} onChange={(e) => setForm({ ...form, frontend_root: e.target.value })} />
+                                <Input placeholder="/home/ubuntu/mjsg/frontend/current" value={form.frontend_root} onChange={(e) => setForm({ ...form, frontend_root: e.target.value })} />
                             </div>
                             <div>
                                 <Label>Frontend command</Label>
@@ -825,17 +838,33 @@ const Magento = () => {
                                 <Input type="number" value={form.frontend_port} onChange={(e) => setForm({ ...form, frontend_port: e.target.value })} />
                                 <p className="text-xs text-muted-foreground mt-1">0 = serve static export from frontend path.</p>
                             </div>
-                            {(form.headless_mode === 'separate' || form.headless_mode === 'split' || form.headless_mode === 'legacy_split') && (
+                            {(form.headless_mode === 'separate' || form.headless_mode === 'split') && (
                                 <div>
                                     <Label>Frontend domain</Label>
-                                    <Input placeholder="store.example.com" value={form.frontend_domain} onChange={(e) => setForm({ ...form, frontend_domain: e.target.value })} />
+                                    <Input placeholder="mjsg-dev.hcm1.smartosc.com" value={form.frontend_domain} onChange={(e) => setForm({ ...form, frontend_domain: e.target.value })} />
                                 </div>
                             )}
-                            {(form.headless_mode === 'split' || form.headless_mode === 'legacy_split') && (
-                                <div>
-                                    <Label>Admin domain</Label>
-                                    <Input placeholder="admin.example.com" value={form.admin_domain || ''} onChange={(e) => setForm({ ...form, admin_domain: e.target.value })} />
-                                </div>
+                            {form.headless_mode === 'split' && (
+                                <>
+                                    <div>
+                                        <Label>Magento API domain</Label>
+                                        <Input placeholder="mjsgapi-dev.hcm1.smartosc.com" value={form.api_domain || ''} onChange={(e) => setForm({ ...form, api_domain: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <Label>Admin domain</Label>
+                                        <Input placeholder="mjsg-boservices.hcm1.smartosc.com" value={form.admin_domain || ''} onChange={(e) => setForm({ ...form, admin_domain: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <Label>Split route policy</Label>
+                                        <Select value={form.split_route_mode} onValueChange={(value) => setForm({ ...form, split_route_mode: value })}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="api_only">API/admin surfaces only</SelectItem>
+                                                <SelectItem value="full_proxy">Full Magento proxy on API/admin domains</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </>
                             )}
                             {form.headless_mode === 'shared' && (
                                 <div className="md:col-span-2">
@@ -1021,7 +1050,6 @@ const Magento = () => {
                                                 <SelectItem value="shared">Shared</SelectItem>
                                                 <SelectItem value="separate">Separate</SelectItem>
                                                 <SelectItem value="split">Split (FE + API + admin)</SelectItem>
-                                                <SelectItem value="legacy_split">Legacy split (broad API/admin proxy)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -1035,11 +1063,27 @@ const Magento = () => {
                                                     <Input value={webForm.frontend_domain} onChange={(e) => setWebForm({ ...webForm, frontend_domain: e.target.value })} />
                                                 </div>
                                             )}
-                                            {(webForm.headless_mode === 'split' || webForm.headless_mode === 'legacy_split') && (
-                                                <div>
-                                                    <Label>Admin domain</Label>
-                                                    <Input value={webForm.admin_domain} onChange={(e) => setWebForm({ ...webForm, admin_domain: e.target.value })} />
-                                                </div>
+                                            {webForm.headless_mode === 'split' && (
+                                                <>
+                                                    <div>
+                                                        <Label>Magento API domain</Label>
+                                                        <Input value={webForm.api_domain} onChange={(e) => setWebForm({ ...webForm, api_domain: e.target.value })} />
+                                                    </div>
+                                                    <div>
+                                                        <Label>Admin domain</Label>
+                                                        <Input value={webForm.admin_domain} onChange={(e) => setWebForm({ ...webForm, admin_domain: e.target.value })} />
+                                                    </div>
+                                                    <div>
+                                                        <Label>Split route policy</Label>
+                                                        <Select value={webForm.split_route_mode} onValueChange={(value) => setWebForm({ ...webForm, split_route_mode: value })}>
+                                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="api_only">API/admin surfaces only</SelectItem>
+                                                                <SelectItem value="full_proxy">Full Magento proxy on API/admin domains</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-3 gap-3">
@@ -1049,7 +1093,7 @@ const Magento = () => {
                                             </div>
                                             <div>
                                                 <Label>Frontend folder</Label>
-                                                <Input placeholder="/srv/shop/frontend/current" value={webForm.frontend_root} onChange={(e) => setWebForm({ ...webForm, frontend_root: e.target.value })} />
+                                                <Input placeholder="/home/ubuntu/mjsg/frontend/current" value={webForm.frontend_root} onChange={(e) => setWebForm({ ...webForm, frontend_root: e.target.value })} />
                                             </div>
                                             {webForm.headless_mode === 'shared' && (
                                                 <div>

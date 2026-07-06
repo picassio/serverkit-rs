@@ -472,17 +472,44 @@ pub fn magento_vhost_headless_split(
     php_version: &str,
     backend_port: u16,
     admin_path: &str,
+    route_mode: &str,
     ssl: Option<(&str, &str)>,
 ) -> String {
     let upstream = upstream_name(name);
     let pool = name.replace('-', "_");
     let admin = admin_path.trim_start_matches('/').trim_end_matches('/');
-    let api_locations =
-        magento_proxy_location("~* ^/(rest|graphql|static|media)(/|$)", backend_port);
-    let admin_locations = magento_proxy_location(
-        &format!("~* ^/({admin}|static|media|setup)(/|$)"),
-        backend_port,
-    );
+    let (api_locations, api_terminal_location, admin_locations, admin_terminal_location) =
+        if route_mode == "full_proxy" {
+            (
+                [
+                    magento_proxy_location("^~ /rest", backend_port),
+                    magento_proxy_location("~ ^/(en/graphql|vi/graphql|graphql)", backend_port),
+                    magento_proxy_location("~ ^/(media/)", backend_port),
+                    magento_proxy_location("/", backend_port),
+                ]
+                .join("\n\n"),
+                String::new(),
+                [
+                    magento_proxy_location("~ ^/(en/graphql|vi/graphql|graphql)", backend_port),
+                    magento_proxy_location("~ ^/(media/)", backend_port),
+                    magento_proxy_location("/", backend_port),
+                ]
+                .join("\n\n"),
+                String::new(),
+            )
+        } else {
+            (
+            magento_proxy_location("~* ^/(rest|graphql|static|media)(/|$)", backend_port),
+            "\n    location / {\n        return 404;\n    }\n".to_string(),
+            magento_proxy_location(
+                &format!("~* ^/({admin}|static|media|setup)(/|$)"),
+                backend_port,
+            ),
+            format!(
+                "\n    location = / {{\n        return 302 /{admin};\n    }}\n\n    location / {{\n        return 404;\n    }}\n"
+            ),
+        )
+        };
     let (api_listen, api_redirect) = public_listen(api_domain, ssl);
     let (admin_listen, admin_redirect) = public_listen(admin_domain, ssl);
     format!(
@@ -503,7 +530,7 @@ server {{
     include {mage_root}/nginx.conf.serverkit;
 }}
 
-{api_redirect}# API domain — REST/GraphQL/assets only; no admin exposure
+{api_redirect}# API domain — route policy: {route_mode}
 server {{
 {api_listen}
     server_name {api_domain};
@@ -511,13 +538,10 @@ server {{
     access_log /var/log/nginx/{name}.api.log;
 
 {api_locations}
-
-    location / {{
-        return 404;
-    }}
+{api_terminal_location}
 }}
 
-{admin_redirect}# Admin domain — admin path + assets
+{admin_redirect}# Admin domain — route policy: {route_mode}
 server {{
 {admin_listen}
     server_name {admin_domain};
@@ -525,85 +549,7 @@ server {{
     access_log /var/log/nginx/{name}.admin.log;
 
 {admin_locations}
-
-    location = / {{
-        return 302 /{admin};
-    }}
-
-    location / {{
-        return 404;
-    }}
-}}
-"#
-    )
-}
-
-/// Legacy three-domain split mode for migrated headless stores where the API
-/// and admin domains intentionally proxy broad Magento surfaces instead of the
-/// stricter allowlist used by `split`.
-#[allow(clippy::too_many_arguments)]
-pub fn magento_vhost_headless_legacy_split(
-    name: &str,
-    api_domain: &str,
-    admin_domain: &str,
-    mage_root: &str,
-    php_version: &str,
-    backend_port: u16,
-    ssl: Option<(&str, &str)>,
-) -> String {
-    let upstream = upstream_name(name);
-    let pool = name.replace('-', "_");
-    let api_locations = [
-        magento_proxy_location("^~ /rest", backend_port),
-        magento_proxy_location("~ ^/(en/graphql|vi/graphql|graphql)", backend_port),
-        magento_proxy_location("~ ^/(media/)", backend_port),
-        magento_proxy_location("/", backend_port),
-    ]
-    .join("\n\n");
-    let admin_locations = [
-        magento_proxy_location("~ ^/(en/graphql|vi/graphql|graphql)", backend_port),
-        magento_proxy_location("~ ^/(media/)", backend_port),
-        magento_proxy_location("/", backend_port),
-    ]
-    .join("\n\n");
-    let (api_listen, api_redirect) = public_listen(api_domain, ssl);
-    let (admin_listen, admin_redirect) = public_listen(admin_domain, ssl);
-    format!(
-        r#"upstream {upstream} {{
-    server unix:/run/php/php{php_version}-fpm-{pool}.sock;
-}}
-
-# Internal Magento backend (legacy split mode) — loopback only
-server {{
-    listen 127.0.0.1:{backend_port};
-    server_name {api_domain} {admin_domain};
-
-    set $MAGE_ROOT {mage_root};
-
-    access_log /var/log/nginx/{name}.backend.log;
-    error_log /var/log/nginx/{name}.error.log;
-
-    include {mage_root}/nginx.conf.serverkit;
-}}
-
-{api_redirect}# API domain — legacy broad Magento proxy
-server {{
-{api_listen}
-    server_name {api_domain};
-
-    access_log /var/log/nginx/{name}.api.log;
-
-{api_locations}
-}}
-
-{admin_redirect}# Admin/domain services — legacy broad Magento proxy
-server {{
-{admin_listen}
-    server_name {admin_domain};
-
-    access_log /var/log/nginx/{name}.admin.log;
-
-{admin_locations}
+{admin_terminal_location}
 }}
 "#
     )
@@ -830,6 +776,7 @@ mod tests {
             "8.3",
             34027,
             "/admin_abc",
+            "api_only",
             None,
         );
         assert!(v.contains("server_name api.shop2.test admin.shop2.test;"));

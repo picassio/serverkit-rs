@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 //! sk-magento — Magento store lifecycle management.
 //!
 //! The reason this fork exists. Ports the magento-vm-provisioner architecture
@@ -60,7 +62,11 @@ pub fn versions_payload() -> Value {
         "service_profiles": {
             "2.4.8-p5": compose::service_versions_for("2.4.8-p5")
         },
-        "headless_modes": ["none", "shared", "separate", "split", "legacy_split"],
+        "headless_modes": ["none", "shared", "separate", "split"],
+        "split_route_modes": [
+            { "id": "api_only", "label": "API/admin surfaces only" },
+            { "id": "full_proxy", "label": "Full Magento proxy on API/admin domains" }
+        ],
         "ssl_modes": ["none", "self-signed", "letsencrypt"],
         "le_challenges": ["dns", "http"],
         "run_user_default": "www-data",

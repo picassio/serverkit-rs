@@ -444,9 +444,8 @@ const Magento = () => {
             if (webForm.admin_domain) payload.admin_domain = webForm.admin_domain;
             if (webForm.frontend_root) payload.frontend_root = webForm.frontend_root;
             if (webForm.frontend_cmd) payload.frontend_cmd = webForm.frontend_cmd;
-            await api.patchMagentoStore(webStore.id, payload);
-            const res = await api.applyMagentoWeb(webStore.id);
-            toast.success(`Applied: ${(res.applied || []).join(', ')}`);
+            const res = await api.patchMagentoStore(webStore.id, payload);
+            toast.success(`Applied: ${(res.applied || []).join(', ') || 'web config saved'}`);
             setWebStore(null);
             load();
         } catch (err) {

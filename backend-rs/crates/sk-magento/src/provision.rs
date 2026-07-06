@@ -540,18 +540,10 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
             &format!("{magento_bin} already present — skipping create-project"),
         );
     } else {
-        store::set_status(
-            &pool,
-            s.id,
-            "running",
-            "data services ready; Magento initialization skipped",
-        )
-        .await;
         log_line(
             root,
-            "DONE — data services are running; Magento init skipped",
+            "Magento init skipped — continuing with placeholder source/vhost setup",
         );
-        return Ok(());
     }
 
     // ── 4. optional setup:install ────────────────────────────────────
@@ -734,12 +726,13 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
         store::set_status(&pool, s.id, "running", "manual nginx vhost preserved").await;
         return Ok(());
     }
-    // Per-store copy of nginx.conf.sample with the upstream reference
-    // rewritten to this store's unique name (see compose::upstream_name).
-    let sample = std::fs::read_to_string(format!("{src}/nginx.conf.sample"))
-        .map_err(|e| format!("nginx.conf.sample missing: {e}"))?;
-    let rewritten = sample.replace("fastcgi_backend", &crate::compose::upstream_name(&s.name));
-    std::fs::write(format!("{src}/nginx.conf.serverkit"), rewritten).map_err(|e| e.to_string())?;
+    let placeholder_source = prepare_nginx_serverkit_include(s).await?;
+    if placeholder_source {
+        log_line(
+            root,
+            "Magento nginx sample missing — placeholder nginx.conf.serverkit written",
+        );
+    }
     let cert_paths = if https {
         Some(issue_cert(s).await?)
     } else {
@@ -810,6 +803,7 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     ])
     .await?;
     // separate/split headless modes: additional vhost for the frontend domain
+    let mut frontend_written = false;
     if matches!(s.headless_mode.as_str(), "separate" | "split") {
         if let Some(fd) = &s.frontend_domain {
             let fe_vhost = crate::compose::frontend_vhost(
@@ -829,10 +823,28 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
                 &format!("/etc/nginx/sites-enabled/{}-frontend", s.name),
             ])
             .await?;
+            frontend_written = true;
             log_line(root, &format!("frontend vhost for {fd} enabled"));
         }
     }
 
+    let test = sk_web::nginx::test_config().await;
+    if !test["success"].as_bool().unwrap_or(false) {
+        let _ =
+            run_privileged(&["rm", "-f", &format!("/etc/nginx/sites-enabled/{}", s.name)]).await;
+        if frontend_written {
+            let _ = run_privileged(&[
+                "rm",
+                "-f",
+                &format!("/etc/nginx/sites-enabled/{}-frontend", s.name),
+            ])
+            .await;
+        }
+        return Err(format!(
+            "nginx config preflight failed; generated vhosts were disabled: {}",
+            test["message"].as_str().unwrap_or("?")
+        ));
+    }
     let reload = sk_web::nginx::reload().await;
     if !reload["success"].as_bool().unwrap_or(false) {
         return Err(format!(
@@ -948,26 +960,35 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     }
 
     // ── 6. cron ──────────────────────────────────────────────────────
-    store::set_status(&pool, s.id, "provisioning", "installing magento cron").await;
-    let cron_cmd = format!("/usr/bin/{php} {src}/bin/magento cron:run");
-    let cron = sk_ops::cron::add_job(
-        "* * * * *",
-        &cron_cmd,
-        Some(&format!("magento-{}", s.name)),
-        None,
-    )
-    .await;
-    if !cron["success"].as_bool().unwrap_or(false) {
-        log_line(
-            root,
-            &format!(
-                "warning: cron install failed: {}",
-                cron["error"].as_str().unwrap_or("?")
-            ),
-        );
+    if std::path::Path::new(&magento_bin).exists() {
+        store::set_status(&pool, s.id, "provisioning", "installing magento cron").await;
+        let cron_cmd = format!("/usr/bin/{php} {src}/bin/magento cron:run");
+        let cron = sk_ops::cron::add_job(
+            "* * * * *",
+            &cron_cmd,
+            Some(&format!("magento-{}", s.name)),
+            None,
+        )
+        .await;
+        if !cron["success"].as_bool().unwrap_or(false) {
+            log_line(
+                root,
+                &format!(
+                    "warning: cron install failed: {}",
+                    cron["error"].as_str().unwrap_or("?")
+                ),
+            );
+        }
+    } else {
+        log_line(root, "Magento bin missing — cron install skipped");
     }
 
-    store::set_status(&pool, s.id, "running", "store provisioned").await;
+    let detail = if s.install_magento || std::path::Path::new(&magento_bin).exists() {
+        "store provisioned"
+    } else {
+        "data services and placeholder web vhosts ready; Magento initialization skipped"
+    };
+    store::set_status(&pool, s.id, "running", detail).await;
     log_line(root, "DONE — store is running");
     Ok(())
 }
@@ -1006,6 +1027,31 @@ async fn run_privileged(args: &[&str]) -> Result<(), String> {
     } else {
         Err(String::from_utf8_lossy(&out.stderr).into_owned())
     }
+}
+
+async fn prepare_nginx_serverkit_include(s: &Store) -> Result<bool, String> {
+    let src = s.magento_src();
+    run_privileged(&["install", "-d", "-o", &s.run_user, "-g", &s.run_user, &src]).await?;
+    let sample_path = format!("{src}/nginx.conf.sample");
+    let serverkit_path = format!("{src}/nginx.conf.serverkit");
+    let content = if std::path::Path::new(&sample_path).exists() {
+        std::fs::read_to_string(&sample_path)
+            .map_err(|e| format!("failed to read nginx.conf.sample: {e}"))?
+            .replace("fastcgi_backend", &crate::compose::upstream_name(&s.name))
+    } else {
+        format!(
+            "# Generated by ServerKit while Magento source is not attached yet.\nlocation = /serverkit-health {{\n    default_type text/plain;\n    return 200 \"ok\\n\";\n}}\n\nlocation / {{\n    default_type text/plain;\n    add_header X-Robots-Tag \"noindex, follow\" always;\n    return 503 \"ServerKit Magento stack '{}' is ready, but Magento source is not attached yet.\\n\";\n}}\n",
+            s.name
+        )
+    };
+    write_privileged(&serverkit_path, &content).await?;
+    run_privileged(&[
+        "chown",
+        &format!("{}:{}", s.run_user, s.run_user),
+        &serverkit_path,
+    ])
+    .await?;
+    Ok(!std::path::Path::new(&sample_path).exists())
 }
 
 fn my_cnf_value(value: &str) -> String {
@@ -1362,6 +1408,11 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
         "nginx worker user set to {}:{}",
         s.run_user, s.run_user
     ));
+    if prepare_nginx_serverkit_include(s).await? {
+        notes.push(
+            "placeholder nginx.conf.serverkit written (Magento source not attached yet)".into(),
+        );
+    }
 
     let vhost = match s.headless_mode.as_str() {
         "shared" => crate::compose::magento_vhost_headless_shared(
@@ -1443,6 +1494,22 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
         let _ = run_privileged(&["rm", "-f", &fe_available]).await;
     }
 
+    let test = sk_web::nginx::test_config().await;
+    if !test["success"].as_bool().unwrap_or(false) {
+        let _ =
+            run_privileged(&["rm", "-f", &format!("/etc/nginx/sites-enabled/{}", s.name)]).await;
+        let _ = run_privileged(&[
+            "rm",
+            "-f",
+            &format!("/etc/nginx/sites-enabled/{}-frontend", s.name),
+        ])
+        .await;
+        return Err(format!(
+            "nginx config preflight failed; generated vhosts were disabled: {}",
+            test["message"].as_str().unwrap_or("?")
+        ));
+    }
+    notes.push("nginx config preflight passed".into());
     let reload = sk_web::nginx::reload().await;
     if !reload["success"].as_bool().unwrap_or(false) {
         return Err(format!(

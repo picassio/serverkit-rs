@@ -615,7 +615,17 @@ async fn patch_store(
     )
     .await?;
     let s = store::find(&state.db, id).await?.unwrap();
-    Ok(Json(json!({ "success": true, "store": s.to_dict(false) })))
+    let applied = if s.status == "running" {
+        match sk_magento::provision::apply_web(&s).await {
+            Ok(notes) => notes,
+            Err(e) => return Err(ApiError::bad_request(e)),
+        }
+    } else {
+        Vec::new()
+    };
+    Ok(Json(
+        json!({ "success": true, "store": s.to_dict(false), "applied": applied }),
+    ))
 }
 
 /// POST /magento/stores/{id}/apply-web — regenerate vhosts + frontend unit

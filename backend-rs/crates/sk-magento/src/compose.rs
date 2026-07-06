@@ -344,6 +344,18 @@ fn frontend_location(frontend_port: i64, frontend_root: Option<&str>) -> String 
         try_files $uri $uri/ /index.html;
     }}"#
         ),
+        Some(root) if !std::path::Path::new(root).exists() => format!(
+            r#"    location = /serverkit-health {{
+        default_type text/plain;
+        return 200 "ok\n";
+    }}
+
+    location / {{
+        default_type text/plain;
+        add_header X-Robots-Tag "noindex, follow" always;
+        return 503 "ServerKit frontend source path {root} is not attached yet.\n";
+    }}"#
+        ),
         _ => format!(
             r#"    location / {{
         proxy_pass http://127.0.0.1:{frontend_port};

@@ -17,7 +17,7 @@ use std::process::Stdio;
 use tokio::process::Command;
 
 pub struct ProvisionSpec {
-    pub base_dir: String, // e.g. /var/www/magento
+    pub base_dir: String, // e.g. /srv/serverkit/stacks
 }
 
 fn log_line(root: &str, msg: &str) {

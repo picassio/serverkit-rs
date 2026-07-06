@@ -268,7 +268,7 @@ async fn create_store(
     }
 
     // Custom project folder: explicit root_path wins over base_dir/{name}.
-    let base_dir = b.base_dir.unwrap_or_else(|| "/var/www/magento".into());
+    let base_dir = b.base_dir.unwrap_or_else(|| "/srv/serverkit/stacks".into());
     let root_path = match b.root_path {
         Some(rp) => {
             if !rp.starts_with('/') || rp.contains("..") {

@@ -602,12 +602,12 @@ const Magento = () => {
                             </div>
                             <div>
                                 <Label>Stack root path</Label>
-                                <Input placeholder="/var/www/magento/shop1" value={form.root_path} onChange={(e) => setForm({ ...form, root_path: e.target.value })} />
-                                <p className="text-xs text-muted-foreground mt-1">compose, logs and generated files live here. Blank uses /var/www/magento/&lt;name&gt;.</p>
+                                <Input placeholder="/srv/serverkit/stacks/shop1" value={form.root_path} onChange={(e) => setForm({ ...form, root_path: e.target.value })} />
+                                <p className="text-xs text-muted-foreground mt-1">Compose files, logs and generated stack state live here. Blank uses /srv/serverkit/stacks/&lt;name&gt;.</p>
                             </div>
                             <div>
                                 <Label>Existing Magento source path</Label>
-                                <Input placeholder="/srv/shop/current" value={form.magento_source_path} onChange={(e) => setForm({ ...form, magento_source_path: e.target.value })} />
+                                <Input placeholder="/srv/shop/magento/current" value={form.magento_source_path} onChange={(e) => setForm({ ...form, magento_source_path: e.target.value })} />
                                 <p className="text-xs text-muted-foreground mt-1">Use your own checkout/release. Blank uses &lt;stack root&gt;/src.</p>
                             </div>
                         </div>
@@ -741,7 +741,7 @@ const Magento = () => {
                             </div>
                             <div>
                                 <Label>Frontend / Next.js path</Label>
-                                <Input placeholder="/srv/shop-frontend" value={form.frontend_root} onChange={(e) => setForm({ ...form, frontend_root: e.target.value })} />
+                                <Input placeholder="/srv/shop/frontend/current" value={form.frontend_root} onChange={(e) => setForm({ ...form, frontend_root: e.target.value })} />
                             </div>
                             <div>
                                 <Label>Frontend command</Label>
@@ -976,7 +976,7 @@ const Magento = () => {
                                             </div>
                                             <div>
                                                 <Label>Frontend folder</Label>
-                                                <Input placeholder="/var/www/fe" value={webForm.frontend_root} onChange={(e) => setWebForm({ ...webForm, frontend_root: e.target.value })} />
+                                                <Input placeholder="/srv/shop/frontend/current" value={webForm.frontend_root} onChange={(e) => setWebForm({ ...webForm, frontend_root: e.target.value })} />
                                             </div>
                                             {webForm.headless_mode === 'shared' && (
                                                 <div>

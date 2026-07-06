@@ -28,6 +28,11 @@ pub fn router() -> Router<SharedState> {
             get(get_runtime).patch(update_runtime),
         )
         .route("/stores/{id}/permissions/repair", post(repair_permissions))
+        .route("/stores/{id}/service-access", get(service_access))
+        .route(
+            "/stores/{id}/mysql-client-config",
+            post(write_mysql_client_config),
+        )
         .route("/stores/{id}/frontend/{action}", post(frontend_action))
         .route("/stores/{id}/log", get(store_log))
         .route("/stores/{id}/vhost", get(get_vhost).put(put_vhost))
@@ -778,6 +783,33 @@ async fn repair_permissions(
         .await
         .map_err(ApiError::bad_request)?;
     Ok(Json(json!({ "success": true, "applied": notes })))
+}
+
+async fn service_access(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    Ok(Json(s.service_access(true)))
+}
+
+async fn write_mysql_client_config(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    let result = sk_magento::provision::write_mysql_client_config(&s)
+        .await
+        .map_err(ApiError::bad_request)?;
+    Ok(Json(result))
 }
 
 /// POST /magento/stores/{id}/frontend/{start|stop|restart|status|logs}

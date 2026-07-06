@@ -1008,6 +1008,52 @@ async fn run_privileged(args: &[&str]) -> Result<(), String> {
     }
 }
 
+fn my_cnf_value(value: &str) -> String {
+    value.replace(['\n', '\r'], "")
+}
+
+pub async fn write_mysql_client_config(s: &Store) -> Result<serde_json::Value, String> {
+    if s.run_user.is_empty()
+        || !s
+            .run_user
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err("run_user must be a valid unix username".into());
+    }
+    let out = Command::new("getent")
+        .args(["passwd", &s.run_user])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(format!("user {} does not exist on this VM", s.run_user));
+    }
+    let passwd = String::from_utf8_lossy(&out.stdout);
+    let home = passwd
+        .trim()
+        .split(':')
+        .nth(5)
+        .filter(|h| h.starts_with('/'))
+        .ok_or_else(|| format!("could not resolve home directory for {}", s.run_user))?;
+    let path = format!("{home}/.my.cnf");
+    let port = crate::port_base(s.id);
+    let password = my_cnf_value(&s.db_password_plain().unwrap_or_default());
+    let content = format!(
+        "[client]\nhost=127.0.0.1\nport={port}\nuser=magento\npassword={password}\ndatabase=magento\nprotocol=tcp\n\n[mysql]\ndatabase=magento\n"
+    );
+    write_privileged(&path, &content).await?;
+    run_privileged(&["chown", &format!("{}:{}", s.run_user, s.run_user), &path]).await?;
+    run_privileged(&["chmod", "600", &path]).await?;
+    Ok(serde_json::json!({
+        "success": true,
+        "path": path,
+        "owner": s.run_user,
+        "mode": "0600",
+        "command": "mysql magento"
+    }))
+}
+
 pub async fn repair_permissions(s: &Store) -> Result<Vec<String>, String> {
     let src = s.magento_src();
     if !std::path::Path::new(&src).exists() {

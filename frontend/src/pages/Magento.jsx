@@ -360,6 +360,34 @@ const Magento = () => {
         setHealth(res);
     };
 
+    // ── Service access: endpoints, ports, credentials ────────────────
+    const [serviceStore, setServiceStore] = useState(null);
+    const [serviceInfo, setServiceInfo] = useState(null);
+    const [serviceBusy, setServiceBusy] = useState(false);
+
+    const openServices = async (store) => {
+        setServiceStore(store);
+        setServiceInfo(null);
+        const res = await api.getMagentoServiceAccess(store.id).catch((e) => {
+            toast.error(e.message);
+            return null;
+        });
+        setServiceInfo(res);
+    };
+
+    const writeMysqlCnf = async () => {
+        if (!serviceStore) return;
+        setServiceBusy(true);
+        try {
+            const res = await api.writeMagentoMysqlClientConfig(serviceStore.id);
+            toast.success(`Wrote ${res.path}; use: ${res.command}`);
+        } catch (e) {
+            toast.error(e.message);
+        } finally {
+            setServiceBusy(false);
+        }
+    };
+
     // ── Web Config (PATCH + apply-web + editable vhost) ──────────────
     const [webStore, setWebStore] = useState(null);
     const [webForm, setWebForm] = useState(null);
@@ -659,6 +687,11 @@ const Magento = () => {
                                     {store.status === 'running' && (
                                         <Button variant="outline" size="sm" onClick={() => openRuntime(store)}>
                                             <Zap size={13} className="mr-1" /> Runtime
+                                        </Button>
+                                    )}
+                                    {store.status === 'running' && (
+                                        <Button variant="outline" size="sm" onClick={() => openServices(store)}>
+                                            <Database size={13} className="mr-1" /> Services
                                         </Button>
                                     )}
                                     {store.status === 'running' && (
@@ -1078,6 +1111,92 @@ const Magento = () => {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Service access modal */}
+            <Modal open={!!serviceStore} onClose={() => setServiceStore(null)} title={`Services — ${serviceStore?.name || ''}`} size="xl">
+                {!serviceInfo ? (
+                    <div className="text-sm text-muted-foreground">Loading service access…</div>
+                ) : (
+                    <div className="space-y-4 text-sm">
+                        <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+                            <div><strong>Stack root:</strong> <span className="font-mono">{serviceInfo.store?.stack_root}</span></div>
+                            <div><strong>Magento source:</strong> <span className="font-mono">{serviceInfo.store?.magento_source_path}</span></div>
+                            <div><strong>Run user:</strong> <span className="font-mono">{serviceInfo.store?.run_user}</span></div>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                            <div>
+                                <div className="font-semibold">MySQL fast login on VM</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Writes <code>{serviceInfo.mysql_client_config?.filename}</code> for user <code>{serviceInfo.mysql_client_config?.target_user}</code>. Then SSH in and run <code>{serviceInfo.mysql_client_config?.quick_command}</code>.
+                                </div>
+                            </div>
+                            <Button variant="outline" onClick={writeMysqlCnf} disabled={serviceBusy}>
+                                {serviceBusy ? <RefreshCw size={13} className="mr-1 animate-spin" /> : <Database size={13} className="mr-1" />}
+                                Generate ~/.my.cnf
+                            </Button>
+                        </div>
+                        <div className="grid gap-3">
+                            {(serviceInfo.services || []).map((svc) => {
+                                const endpoints = [svc.endpoint, svc.ui_endpoint, svc.socket, svc.domain, svc.primary_domain, svc.api_domain, svc.frontend_domain, svc.admin_domain, svc.admin_url].filter(Boolean);
+                                const credentials = [
+                                    svc.username && ['User', svc.username],
+                                    svc.password && ['Password', svc.password],
+                                    svc.root_username && ['Root user', svc.root_username],
+                                    svc.root_password && ['Root password', svc.root_password],
+                                    svc.database && ['Database', svc.database],
+                                ].filter(Boolean);
+                                return (
+                                    <div key={svc.id} className={`rounded-lg border p-3 ${svc.enabled === false ? 'opacity-60' : ''}`}>
+                                        <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div>
+                                                <div className="font-semibold flex items-center gap-2">
+                                                    {svc.name}
+                                                    <Pill kind={svc.enabled === false ? 'gray' : 'green'}>{svc.enabled === false ? 'disabled' : 'enabled'}</Pill>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                                                    {svc.kind && <span>{svc.kind}</span>}
+                                                    {svc.image && <span className="font-mono">{svc.image}</span>}
+                                                    {svc.container && <span className="font-mono">{svc.container}</span>}
+                                                    {svc.port != null && <span>port {svc.port}</span>}
+                                                    {svc.smtp_port != null && <span>smtp {svc.smtp_port}</span>}
+                                                    {svc.ui_port != null && <span>ui {svc.ui_port}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            <div className="rounded border bg-muted/20 p-2">
+                                                <div className="text-xs font-medium mb-1">Endpoints</div>
+                                                {endpoints.length ? endpoints.map((value) => (
+                                                    <div key={value} className="flex items-center justify-between gap-2 text-xs py-0.5">
+                                                        <span className="font-mono break-all">{value}</span>
+                                                        <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(String(value)); toast.success('Copied'); }}><Copy size={12} /></Button>
+                                                    </div>
+                                                )) : <span className="text-xs text-muted-foreground">No endpoint</span>}
+                                            </div>
+                                            <div className="rounded border bg-muted/20 p-2">
+                                                <div className="text-xs font-medium mb-1">Credentials</div>
+                                                {credentials.length ? credentials.map(([label, value]) => (
+                                                    <div key={label} className="flex items-center justify-between gap-2 text-xs py-0.5">
+                                                        <span className="text-muted-foreground">{label}</span>
+                                                        <span className="font-mono break-all">{String(value)}</span>
+                                                        <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(String(value)); toast.success('Copied'); }}><Copy size={12} /></Button>
+                                                    </div>
+                                                )) : <span className="text-xs text-muted-foreground">No credentials</span>}
+                                            </div>
+                                        </div>
+                                        {svc.cli && (
+                                            <div className="mt-2 flex items-center justify-between gap-2 rounded border bg-muted/20 px-2 py-1 text-xs">
+                                                <span className="font-mono break-all">{svc.cli}</span>
+                                                <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(svc.cli); toast.success('Copied'); }}><Copy size={12} /></Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}

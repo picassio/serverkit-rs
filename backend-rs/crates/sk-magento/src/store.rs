@@ -229,6 +229,180 @@ impl Store {
             .unwrap_or_default()
     }
 
+    pub fn service_access(&self, reveal: bool) -> Value {
+        let base = crate::port_base(self.id);
+        let images = self.service_versions_map();
+        let secret = |value: Option<String>| {
+            if reveal {
+                json!(value)
+            } else if value.is_some() {
+                json!("********")
+            } else {
+                serde_json::Value::Null
+            }
+        };
+        let db_password = self.db_password_plain();
+        let scheme = if self.ssl_mode == "none" {
+            "http"
+        } else {
+            "https"
+        };
+        json!({
+            "store": {
+                "id": self.id,
+                "name": self.name,
+                "stack_root": self.root_path,
+                "magento_source_path": self.magento_src(),
+                "frontend_root": self.frontend_root,
+                "run_user": self.run_user,
+            },
+            "mysql_client_config": {
+                "filename": "~/.my.cnf",
+                "target_user": self.run_user,
+                "database": "magento",
+                "quick_command": "mysql magento",
+            },
+            "services": [
+                {
+                    "id": "db",
+                    "name": "MariaDB / MySQL",
+                    "enabled": true,
+                    "kind": "container",
+                    "container": format!("magento-{}-db", self.name),
+                    "image": images["db"],
+                    "host": "127.0.0.1",
+                    "port": base,
+                    "protocol": "mysql",
+                    "database": "magento",
+                    "username": "magento",
+                    "password": secret(db_password.clone()),
+                    "root_username": "root",
+                    "root_password": secret(db_password.clone()),
+                    "endpoint": format!("127.0.0.1:{base}"),
+                    "cli": format!("mysql -h 127.0.0.1 -P {base} -u magento -p magento"),
+                },
+                {
+                    "id": "opensearch",
+                    "name": "OpenSearch",
+                    "enabled": true,
+                    "kind": "container",
+                    "container": format!("magento-{}-opensearch", self.name),
+                    "image": images["opensearch"],
+                    "host": "127.0.0.1",
+                    "port": base + 1,
+                    "protocol": "http",
+                    "endpoint": format!("http://127.0.0.1:{}", base + 1),
+                    "username": serde_json::Value::Null,
+                    "password": serde_json::Value::Null,
+                },
+                {
+                    "id": "redis",
+                    "name": "Redis / Valkey",
+                    "enabled": true,
+                    "kind": "container",
+                    "container": format!("magento-{}-redis", self.name),
+                    "image": images["redis"],
+                    "host": "127.0.0.1",
+                    "port": base + 2,
+                    "protocol": "redis",
+                    "endpoint": format!("redis://127.0.0.1:{}", base + 2),
+                    "username": serde_json::Value::Null,
+                    "password": serde_json::Value::Null,
+                },
+                {
+                    "id": "rabbitmq",
+                    "name": "RabbitMQ AMQP",
+                    "enabled": self.use_rabbitmq,
+                    "kind": "container",
+                    "container": if self.use_rabbitmq { json!(format!("magento-{}-rabbitmq", self.name)) } else { serde_json::Value::Null },
+                    "image": images["rabbitmq"],
+                    "host": "127.0.0.1",
+                    "port": base + 3,
+                    "protocol": "amqp",
+                    "endpoint": format!("amqp://127.0.0.1:{}", base + 3),
+                    "username": if self.use_rabbitmq { json!("magento") } else { serde_json::Value::Null },
+                    "password": if self.use_rabbitmq { secret(db_password.clone()) } else { serde_json::Value::Null },
+                },
+                {
+                    "id": "mailpit",
+                    "name": "Mailpit",
+                    "enabled": true,
+                    "kind": "container",
+                    "container": format!("magento-{}-mailpit", self.name),
+                    "image": images["mailpit"],
+                    "smtp_host": "127.0.0.1",
+                    "smtp_port": base + 4,
+                    "ui_host": "127.0.0.1",
+                    "ui_port": base + 5,
+                    "protocol": "smtp/http",
+                    "endpoint": format!("smtp://127.0.0.1:{}", base + 4),
+                    "ui_endpoint": format!("http://127.0.0.1:{}", base + 5),
+                    "username": serde_json::Value::Null,
+                    "password": serde_json::Value::Null,
+                },
+                {
+                    "id": "varnish",
+                    "name": "Varnish",
+                    "enabled": self.use_varnish,
+                    "kind": "container",
+                    "container": if self.use_varnish { json!(format!("magento-{}-varnish", self.name)) } else { serde_json::Value::Null },
+                    "image": images["varnish"],
+                    "host": "127.0.0.1",
+                    "port": base + 6,
+                    "protocol": "http",
+                    "endpoint": format!("http://127.0.0.1:{}", base + 6),
+                    "username": serde_json::Value::Null,
+                    "password": serde_json::Value::Null,
+                },
+                {
+                    "id": "backend",
+                    "name": "Internal Magento backend nginx",
+                    "enabled": true,
+                    "kind": "host",
+                    "host": "127.0.0.1",
+                    "port": base + 7,
+                    "protocol": "http",
+                    "endpoint": format!("http://127.0.0.1:{}", base + 7),
+                },
+                {
+                    "id": "php_fpm",
+                    "name": "PHP-FPM pool",
+                    "enabled": true,
+                    "kind": "host",
+                    "version": self.php_version,
+                    "pool": self.fpm_pool(),
+                    "socket": format!("/run/php/php{}-fpm-{}.sock", self.php_version, self.fpm_pool()),
+                    "run_user": self.run_user,
+                },
+                {
+                    "id": "frontend",
+                    "name": "Managed frontend",
+                    "enabled": self.frontend_root.is_some() || self.frontend_cmd.is_some() || self.frontend_domain.is_some(),
+                    "kind": "host",
+                    "host": "127.0.0.1",
+                    "port": self.frontend_port,
+                    "protocol": "http",
+                    "endpoint": format!("http://127.0.0.1:{}", self.frontend_port),
+                    "domain": self.frontend_domain,
+                    "root": self.frontend_root,
+                    "command": self.frontend_cmd,
+                },
+                {
+                    "id": "public_web",
+                    "name": "Public web domains",
+                    "enabled": true,
+                    "kind": "nginx",
+                    "scheme": scheme,
+                    "primary_domain": self.domain,
+                    "api_domain": self.api_domain,
+                    "frontend_domain": self.frontend_domain,
+                    "admin_domain": self.admin_domain,
+                    "admin_url": self.admin_url,
+                }
+            ]
+        })
+    }
+
     /// API shape. Secrets are masked; `reveal` includes them (admin-only path).
     pub fn to_dict(&self, reveal: bool) -> Value {
         json!({

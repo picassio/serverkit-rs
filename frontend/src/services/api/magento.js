@@ -67,6 +67,14 @@ export async function repairMagentoPermissions(id) {
     return this.request(`/magento/stores/${id}/permissions/repair`, { method: 'POST' });
 }
 
+export async function getMagentoServiceAccess(id) {
+    return this.request(`/magento/stores/${id}/service-access`);
+}
+
+export async function writeMagentoMysqlClientConfig(id) {
+    return this.request(`/magento/stores/${id}/mysql-client-config`, { method: 'POST' });
+}
+
 export async function getMagentoVhost(id) {
     return this.request(`/magento/stores/${id}/vhost`);
 }

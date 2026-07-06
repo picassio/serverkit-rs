@@ -5,7 +5,7 @@ use crate::extract::AuthUser;
 use crate::state::SharedState;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
@@ -76,11 +76,15 @@ pub fn php_router() -> Router<SharedState> {
             "/versions/{version}/extensions",
             get(get_extensions).post(install_extension),
         )
+        .route("/versions/{version}/ini", get(get_ini).put(set_ini))
         .route(
             "/versions/{version}/pools",
             get(get_pools).post(create_pool),
         )
-        .route("/versions/{version}/pools/{pool}", delete(delete_pool))
+        .route(
+            "/versions/{version}/pools/{pool}",
+            put(update_pool).delete(delete_pool),
+        )
         .route("/versions/{version}/fpm/restart", post(fpm_restart))
         .route("/versions/{version}/fpm/reload", post(fpm_reload))
         .route("/versions/{version}/fpm/status", get(fpm_status))
@@ -687,6 +691,41 @@ async fn create_pool(
     Ok(by_success(
         sk_web::php::create_pool(&version, &name, &b.config).await,
         StatusCode::CREATED,
+    ))
+}
+
+async fn update_pool(
+    AuthUser(u): AuthUser,
+    Path((version, pool)): Path<(String, String)>,
+    Json(b): Json<PoolBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    Ok(by_success(
+        sk_web::php::update_pool(&version, &pool, &b.config).await,
+        StatusCode::OK,
+    ))
+}
+
+#[derive(Deserialize, Default)]
+struct IniBody {
+    #[serde(default)]
+    settings: Map<String, Value>,
+}
+
+async fn get_ini(AuthUser(u): AuthUser, Path(version): Path<String>) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(sk_web::php::ini_overrides(&version)))
+}
+
+async fn set_ini(
+    AuthUser(u): AuthUser,
+    Path(version): Path<String>,
+    Json(b): Json<IniBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    Ok(by_success(
+        sk_web::php::set_ini_overrides(&version, &b.settings).await,
+        StatusCode::OK,
     ))
 }
 

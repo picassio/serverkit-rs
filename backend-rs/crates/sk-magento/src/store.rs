@@ -394,6 +394,17 @@ pub async fn set_admin_url(pool: &SqlitePool, id: i64, url: &str) {
 
 /// PATCH support: update the headless/web-facing fields of a store.
 #[allow(clippy::too_many_arguments)]
+pub async fn update_run_user(pool: &SqlitePool, id: i64, run_user: &str) -> anyhow::Result<()> {
+    sqlx::query("UPDATE magento_stores SET run_user = ?, updated_at = ? WHERE id = ?")
+        .bind(run_user)
+        .bind(sk_core::time::now_sql())
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 pub async fn update_web_fields(
     pool: &SqlitePool,
     id: i64,

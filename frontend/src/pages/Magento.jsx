@@ -373,6 +373,74 @@ const Magento = () => {
         }
     };
 
+    // ── Runtime: run user, PHP-FPM pool, php.ini, extensions, permissions ─
+    const [runtimeStore, setRuntimeStore] = useState(null);
+    const [runtimeData, setRuntimeData] = useState(null);
+    const [runtimeForm, setRuntimeForm] = useState(null);
+    const [runtimeBusy, setRuntimeBusy] = useState(false);
+
+    const openRuntime = async (store) => {
+        setRuntimeStore(store);
+        setRuntimeData(null);
+        const data = await api.getMagentoRuntime(store.id).catch((e) => {
+            toast.error(e.message);
+            return null;
+        });
+        if (!data) return;
+        setRuntimeData(data);
+        const ini = data.php?.ini?.settings || {};
+        const pool = data.php?.pool || {};
+        setRuntimeForm({
+            run_user: data.store?.run_user || store.run_user || 'www-data',
+            memory_limit: ini.memory_limit || data.php?.info?.memory_limit || '2G',
+            max_execution_time: ini.max_execution_time || data.php?.info?.max_execution_time || '300',
+            post_max_size: ini.post_max_size || data.php?.info?.post_max_size || '64M',
+            upload_max_filesize: ini.upload_max_filesize || data.php?.info?.upload_max_filesize || '64M',
+            opcache_memory: ini['opcache.memory_consumption'] || data.php?.info?.['opcache.memory_consumption'] || '256',
+            max_children: pool.max_children || '10',
+            install_extensions: '',
+        });
+    };
+
+    const saveRuntime = async ({ repairOnly = false } = {}) => {
+        if (!runtimeStore || !runtimeForm) return;
+        setRuntimeBusy(true);
+        try {
+            const payload = repairOnly ? { repair_permissions: true } : {
+                run_user: runtimeForm.run_user || 'www-data',
+                pool_config: {
+                    user: runtimeForm.run_user || 'www-data',
+                    group: runtimeForm.run_user || 'www-data',
+                    memory_limit: runtimeForm.memory_limit,
+                    max_execution_time: runtimeForm.max_execution_time,
+                    post_max_size: runtimeForm.post_max_size,
+                    upload_max_filesize: runtimeForm.upload_max_filesize,
+                    opcache_memory: runtimeForm.opcache_memory,
+                    max_children: runtimeForm.max_children,
+                    disable_functions: '',
+                },
+                ini: {
+                    memory_limit: runtimeForm.memory_limit,
+                    max_execution_time: runtimeForm.max_execution_time,
+                    post_max_size: runtimeForm.post_max_size,
+                    upload_max_filesize: runtimeForm.upload_max_filesize,
+                    'opcache.memory_consumption': runtimeForm.opcache_memory,
+                },
+                repair_permissions: true,
+            };
+            const exts = (runtimeForm.install_extensions || '').split(',').map((x) => x.trim()).filter(Boolean);
+            if (!repairOnly && exts.length) payload.install_extensions = exts;
+            const res = await api.updateMagentoRuntime(runtimeStore.id, payload);
+            toast.success(`Runtime updated: ${(res.applied || []).join(', ')}`);
+            await openRuntime(runtimeStore);
+            load();
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setRuntimeBusy(false);
+        }
+    };
+
     const frontendCtl = async (store, action) => {
         try {
             const res = await api.magentoFrontendAction(store.id, action);
@@ -504,6 +572,11 @@ const Magento = () => {
                                     {store.status === 'running' && (
                                         <Button variant="outline" size="sm" onClick={() => openWeb(store)}>
                                             <Globe size={13} className="mr-1" /> Web
+                                        </Button>
+                                    )}
+                                    {store.status === 'running' && (
+                                        <Button variant="outline" size="sm" onClick={() => openRuntime(store)}>
+                                            <Zap size={13} className="mr-1" /> Runtime
                                         </Button>
                                     )}
                                     {store.status === 'running' && (
@@ -1038,6 +1111,89 @@ const Magento = () => {
                     </div>
                 )}
             </Modal>
+            {/* Runtime: PHP-FPM, php.ini, extensions, permissions */}
+            <Modal open={!!runtimeStore} onClose={() => setRuntimeStore(null)} title={`Runtime — ${runtimeStore?.name || ''}`} size="lg">
+                {!runtimeData || !runtimeForm ? (
+                    <div className="text-sm text-muted-foreground">Loading runtime…</div>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+                            <div><strong>PHP:</strong> {runtimeData.php?.version} · <strong>FPM:</strong> {runtimeData.php?.fpm_status?.status}</div>
+                            <div><strong>Pool:</strong> {runtimeData.php?.pool_name} · <strong>Socket:</strong> {runtimeData.php?.pool?.listen || 'not created yet'}</div>
+                            <div><strong>Source:</strong> <span className="font-mono">{runtimeData.paths?.magento_source_path}</span></div>
+                        </div>
+                        <section className="rounded-lg border bg-card p-4 space-y-3">
+                            <div>
+                                <h3 className="text-sm font-semibold">User and PHP-FPM pool</h3>
+                                <p className="text-xs text-muted-foreground">For dev, set run user to <code>ubuntu</code>. ServerKit updates the store pool and repairs nginx/PHP ACLs.</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <Label>Run user/group</Label>
+                                    <Input value={runtimeForm.run_user} onChange={(e) => setRuntimeForm({ ...runtimeForm, run_user: e.target.value })} />
+                                </div>
+                                <div>
+                                    <Label>FPM max children</Label>
+                                    <Input value={runtimeForm.max_children} onChange={(e) => setRuntimeForm({ ...runtimeForm, max_children: e.target.value })} />
+                                </div>
+                                <div>
+                                    <Label>Memory limit</Label>
+                                    <Input value={runtimeForm.memory_limit} onChange={(e) => setRuntimeForm({ ...runtimeForm, memory_limit: e.target.value })} />
+                                </div>
+                            </div>
+                        </section>
+                        <section className="rounded-lg border bg-card p-4 space-y-3">
+                            <div>
+                                <h3 className="text-sm font-semibold">php.ini overrides</h3>
+                                <p className="text-xs text-muted-foreground">Writes ServerKit-managed overrides to PHP CLI and FPM conf.d, then restarts FPM.</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <div>
+                                    <Label>Max execution</Label>
+                                    <Input value={runtimeForm.max_execution_time} onChange={(e) => setRuntimeForm({ ...runtimeForm, max_execution_time: e.target.value })} />
+                                </div>
+                                <div>
+                                    <Label>Post max size</Label>
+                                    <Input value={runtimeForm.post_max_size} onChange={(e) => setRuntimeForm({ ...runtimeForm, post_max_size: e.target.value })} />
+                                </div>
+                                <div>
+                                    <Label>Upload max filesize</Label>
+                                    <Input value={runtimeForm.upload_max_filesize} onChange={(e) => setRuntimeForm({ ...runtimeForm, upload_max_filesize: e.target.value })} />
+                                </div>
+                                <div>
+                                    <Label>OPcache memory</Label>
+                                    <Input value={runtimeForm.opcache_memory} onChange={(e) => setRuntimeForm({ ...runtimeForm, opcache_memory: e.target.value })} />
+                                </div>
+                            </div>
+                        </section>
+                        <section className="rounded-lg border bg-card p-4 space-y-3">
+                            <div>
+                                <h3 className="text-sm font-semibold">Extensions and permissions</h3>
+                                <p className="text-xs text-muted-foreground">Install selected supported PHP extensions or repair source ownership/ACLs for nginx and PHP-FPM.</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <Label>Install extensions</Label>
+                                    <Input placeholder="redis, igbinary" value={runtimeForm.install_extensions} onChange={(e) => setRuntimeForm({ ...runtimeForm, install_extensions: e.target.value })} />
+                                    <p className="text-xs text-muted-foreground mt-1">Comma-separated. Supported: {(runtimeData.php?.supported_extensions || []).join(', ')}</p>
+                                </div>
+                                <div>
+                                    <Label>Installed extensions</Label>
+                                    <div className="min-h-9 rounded border bg-muted px-3 py-2 text-xs text-muted-foreground max-h-24 overflow-auto">
+                                        {(runtimeData.php?.extensions || []).map((ext) => ext.name).join(', ') || 'none reported'}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => saveRuntime({ repairOnly: true })} disabled={runtimeBusy}>Repair permissions only</Button>
+                            <Button variant="outline" onClick={() => setRuntimeStore(null)}>Cancel</Button>
+                            <Button onClick={() => saveRuntime()} disabled={runtimeBusy}>{runtimeBusy ? 'Applying…' : 'Save runtime'}</Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
             {/* DB Backups */}
             <Modal open={!!backupStore} onClose={() => setBackupStore(null)} title={`Database backups — ${backupStore?.name || ''}`} size="lg">
                 <div className="space-y-4">

@@ -9,7 +9,7 @@ use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 use sk_magento::{provision, store};
 
 pub fn router() -> Router<SharedState> {
@@ -22,6 +22,11 @@ pub fn router() -> Router<SharedState> {
             get(get_store).patch(patch_store).delete(delete_store),
         )
         .route("/stores/{id}/apply-web", post(apply_web))
+        .route(
+            "/stores/{id}/runtime",
+            get(get_runtime).patch(update_runtime),
+        )
+        .route("/stores/{id}/permissions/repair", post(repair_permissions))
         .route("/stores/{id}/frontend/{action}", post(frontend_action))
         .route("/stores/{id}/log", get(store_log))
         .route("/stores/{id}/vhost", get(get_vhost).put(put_vhost))
@@ -431,6 +436,7 @@ struct PatchBody {
     frontend_root: Option<String>,
     frontend_cmd: Option<String>,
     magento_routes: Option<Vec<String>>,
+    run_user: Option<String>,
 }
 
 /// PATCH /magento/stores/{id} — update web-facing fields (apply with
@@ -466,6 +472,18 @@ async fn patch_store(
                 "frontend_root must be an absolute path",
             ));
         }
+    }
+    if let Some(run_user) = &b.run_user {
+        if run_user.is_empty()
+            || !run_user
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(ApiError::bad_request(
+                "run_user must be a valid unix username",
+            ));
+        }
+        store::update_run_user(&state.db, id, run_user).await?;
     }
     if let Some(ssl) = &b.ssl {
         if !matches!(ssl.as_str(), "none" | "self-signed") {
@@ -509,6 +527,146 @@ async fn apply_web(
         Ok(notes) => Ok(Json(json!({ "success": true, "applied": notes }))),
         Err(e) => Err(ApiError::bad_request(e)),
     }
+}
+
+async fn get_runtime(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    let pools = sk_web::php::pools(&s.php_version);
+    let pool_name = s.fpm_pool();
+    let pool = pools
+        .iter()
+        .find(|p| p.get("name").and_then(|v| v.as_str()) == Some(pool_name.as_str()))
+        .cloned();
+    Ok(Json(json!({
+        "store": s.to_dict(false),
+        "php": {
+            "version": s.php_version,
+            "fpm_status": sk_web::php::fpm_status(&s.php_version).await,
+            "info": sk_web::php::php_info(&s.php_version).await,
+            "ini": sk_web::php::ini_overrides(&s.php_version),
+            "extensions": sk_web::php::extensions(&s.php_version).await,
+            "supported_extensions": sk_web::php::SUPPORTED_EXTENSIONS,
+            "supported_ini_settings": sk_web::php::SUPPORTED_INI_SETTINGS,
+            "pool_name": pool_name,
+            "pool": pool,
+        },
+        "paths": {
+            "stack_root": s.root_path,
+            "magento_source_path": s.magento_src(),
+            "frontend_root": s.frontend_root,
+        }
+    })))
+}
+
+#[derive(Deserialize, Default)]
+struct RuntimeBody {
+    run_user: Option<String>,
+    #[serde(default)]
+    pool_config: Map<String, Value>,
+    #[serde(default)]
+    ini: Map<String, Value>,
+    install_extensions: Option<Vec<String>>,
+    repair_permissions: Option<bool>,
+}
+
+async fn update_runtime(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+    Json(b): Json<RuntimeBody>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let mut s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    let mut applied = Vec::new();
+    if let Some(run_user) = &b.run_user {
+        if run_user.is_empty()
+            || !run_user
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(ApiError::bad_request(
+                "run_user must be a valid unix username",
+            ));
+        }
+        store::update_run_user(&state.db, id, run_user).await?;
+        s.run_user = run_user.clone();
+        applied.push("run_user".to_string());
+    }
+    if let Some(exts) = &b.install_extensions {
+        let refs: Vec<&str> = exts.iter().map(String::as_str).collect();
+        let result = sk_web::php::install_version_with_options(
+            &s.php_version,
+            sk_web::php::InstallOptions {
+                extensions: refs,
+                set_default: false,
+            },
+        )
+        .await;
+        if !result["success"].as_bool().unwrap_or(false) {
+            return Err(ApiError::bad_request(format!(
+                "extension install failed: {}",
+                result["error"].as_str().unwrap_or("unknown error")
+            )));
+        }
+        applied.push("extensions".to_string());
+    }
+    if !b.ini.is_empty() {
+        let result = sk_web::php::set_ini_overrides(&s.php_version, &b.ini).await;
+        if !result["success"].as_bool().unwrap_or(false) {
+            return Err(ApiError::bad_request(format!(
+                "php.ini update failed: {}",
+                result["error"].as_str().unwrap_or("unknown error")
+            )));
+        }
+        applied.push("php_ini".to_string());
+    }
+    if !b.pool_config.is_empty() || b.run_user.is_some() {
+        let mut cfg = b.pool_config.clone();
+        cfg.entry("user").or_insert(json!(s.run_user.clone()));
+        cfg.entry("group").or_insert(json!(s.run_user.clone()));
+        cfg.entry("open_basedir")
+            .or_insert(json!(format!("{}:/tmp:/usr/share", s.magento_src())));
+        cfg.entry("disable_functions").or_insert(json!(""));
+        let result = sk_web::php::update_pool(&s.php_version, &s.fpm_pool(), &cfg).await;
+        if !result["success"].as_bool().unwrap_or(false) {
+            return Err(ApiError::bad_request(format!(
+                "php-fpm pool update failed: {}",
+                result["error"].as_str().unwrap_or("unknown error")
+            )));
+        }
+        applied.push("php_fpm_pool".to_string());
+    }
+    if b.repair_permissions.unwrap_or(false) || b.run_user.is_some() {
+        let notes = sk_magento::provision::repair_permissions(&s)
+            .await
+            .map_err(ApiError::bad_request)?;
+        applied.extend(notes);
+    }
+    Ok(Json(json!({ "success": true, "applied": applied })))
+}
+
+async fn repair_permissions(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    let notes = sk_magento::provision::repair_permissions(&s)
+        .await
+        .map_err(ApiError::bad_request)?;
+    Ok(Json(json!({ "success": true, "applied": notes })))
 }
 
 /// POST /magento/stores/{id}/frontend/{start|stop|restart|status|logs}

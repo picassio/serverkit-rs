@@ -385,9 +385,6 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     }
 
     // ── 4c. permissions ──────────────────────────────────────
-    // Files owned by run_user (php-fpm runs as run_user via its pool);
-    // nginx (www-data) needs read on served dirs; the panel user needs rwX
-    // to run bin/magento. Default ACLs cover existing AND future files.
     store::set_status(
         &pool,
         s.id,
@@ -395,32 +392,9 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
         "fixing file permissions (ACLs)",
     )
     .await;
-    let panel_user = std::env::var("USER").unwrap_or_else(|_| "ubuntu".into());
-    let run_group = format!("{}:{}", s.run_user, s.run_user);
-    let acl_run = format!("u:{}:rwX", s.run_user);
-    let acl_nginx = "u:www-data:rwX".to_string();
-    let acl_panel = format!("u:{panel_user}:rwX");
-    run_privileged(&["chown", "-R", &run_group, &src]).await?;
-    for dir in ["var", "generated", "pub/static", "pub/media", "app/etc"] {
-        let path = format!("{src}/{dir}");
-        if std::path::Path::new(&path).exists() {
-            run_privileged(&[
-                "setfacl", "-R", "-m", &acl_run, "-m", &acl_nginx, "-m", &acl_panel, &path,
-            ])
-            .await?;
-            run_privileged(&[
-                "setfacl", "-dR", "-m", &acl_run, "-m", &acl_nginx, "-m", &acl_panel, &path,
-            ])
-            .await?;
-        }
+    for note in repair_permissions(s).await? {
+        log_line(root, &note);
     }
-    log_line(
-        root,
-        &format!(
-            "permissions fixed (owner {}, ACLs for nginx + panel)",
-            s.run_user
-        ),
-    );
 
     // ── 5. nginx vhost ───────────────────────────────────────────────
     store::set_status(&pool, s.id, "provisioning", "creating nginx vhost").await;
@@ -704,6 +678,53 @@ async fn run_privileged(args: &[&str]) -> Result<(), String> {
     } else {
         Err(String::from_utf8_lossy(&out.stderr).into_owned())
     }
+}
+
+pub async fn repair_permissions(s: &Store) -> Result<Vec<String>, String> {
+    let src = s.magento_src();
+    if !std::path::Path::new(&src).exists() {
+        return Ok(vec![format!(
+            "source path {src} does not exist yet; permissions skipped"
+        )]);
+    }
+    let panel_user = std::env::var("USER").unwrap_or_else(|_| "ubuntu".into());
+    let run_group = format!("{}:{}", s.run_user, s.run_user);
+    let acl_run = format!("u:{}:rwX", s.run_user);
+    let acl_nginx = "u:www-data:rwX".to_string();
+    let acl_panel = format!("u:{panel_user}:rwX");
+    run_privileged(&["chown", "-R", &run_group, &src]).await?;
+
+    // nginx must traverse every parent directory to read a source under /srv or /home.
+    run_privileged(&["setfacl", "-m", "u:www-data:--x", &src])
+        .await
+        .ok();
+    let mut current = std::path::PathBuf::from(&src);
+    while current.pop() {
+        if current.as_os_str().is_empty() || current == std::path::Path::new("/") {
+            break;
+        }
+        if let Some(p) = current.to_str() {
+            let _ = run_privileged(&["setfacl", "-m", "u:www-data:--x", p]).await;
+        }
+    }
+
+    for dir in ["var", "generated", "pub/static", "pub/media", "app/etc"] {
+        let path = format!("{src}/{dir}");
+        if std::path::Path::new(&path).exists() {
+            run_privileged(&[
+                "setfacl", "-R", "-m", &acl_run, "-m", &acl_nginx, "-m", &acl_panel, &path,
+            ])
+            .await?;
+            run_privileged(&[
+                "setfacl", "-dR", "-m", &acl_run, "-m", &acl_nginx, "-m", &acl_panel, &path,
+            ])
+            .await?;
+        }
+    }
+    Ok(vec![format!(
+        "permissions fixed (owner {}, ACLs for nginx + panel)",
+        s.run_user
+    )])
 }
 
 /// Days until the cert at `cert_path` expires (None if missing/unparseable).

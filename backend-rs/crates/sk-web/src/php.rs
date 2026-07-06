@@ -20,6 +20,20 @@ pub const MAGENTO_EXTENSIONS: &[&str] = &[
     "opcache", "soap", "xml", "zip",
 ];
 
+pub const SUPPORTED_INI_SETTINGS: &[&str] = &[
+    "memory_limit",
+    "max_execution_time",
+    "max_input_time",
+    "post_max_size",
+    "upload_max_filesize",
+    "date.timezone",
+    "opcache.enable",
+    "opcache.memory_consumption",
+    "opcache.max_accelerated_files",
+    "realpath_cache_size",
+    "realpath_cache_ttl",
+];
+
 pub fn extension_profile(profile: &str) -> Option<&'static [&'static str]> {
     match profile {
         "minimal" => Some(&["cli", "fpm", "common"]),
@@ -294,6 +308,19 @@ pub fn pools(version: &str) -> Vec<Value> {
 
 /// `PHPService.create_pool`
 pub async fn create_pool(version: &str, pool_name: &str, config: &Map<String, Value>) -> Value {
+    write_pool(version, pool_name, config, false).await
+}
+
+pub async fn update_pool(version: &str, pool_name: &str, config: &Map<String, Value>) -> Value {
+    write_pool(version, pool_name, config, true).await
+}
+
+async fn write_pool(
+    version: &str,
+    pool_name: &str,
+    config: &Map<String, Value>,
+    overwrite: bool,
+) -> Value {
     if !valid_version(version) {
         return json!({ "success": false, "error": format!("Unsupported PHP version: {version}") });
     }
@@ -305,7 +332,7 @@ pub async fn create_pool(version: &str, pool_name: &str, config: &Map<String, Va
         return json!({ "success": false, "error": "Invalid pool name" });
     }
     let pool_file = format!("{}/{pool_name}.conf", pool_dir(version));
-    if Path::new(&pool_file).exists() {
+    if !overwrite && Path::new(&pool_file).exists() {
         return json!({ "success": false, "error": format!("Pool {pool_name} already exists") });
     }
 
@@ -367,7 +394,11 @@ pub async fn create_pool(version: &str, pool_name: &str, config: &Map<String, Va
     let r = privileged_with_stdin(&["tee", &pool_file], Some(&content), 30).await;
     if r.ok {
         restart_fpm(version).await;
-        json!({ "success": true, "message": format!("Pool {pool_name} created"), "file": pool_file })
+        json!({
+            "success": true,
+            "message": if overwrite { format!("Pool {pool_name} updated") } else { format!("Pool {pool_name} created") },
+            "file": pool_file
+        })
     } else {
         json!({ "success": false, "error": r.stderr })
     }
@@ -439,22 +470,71 @@ pub async fn php_info(version: &str) -> Value {
     if !r.ok {
         return json!({ "error": r.stderr });
     }
-    const KEYS: &[&str] = &[
-        "memory_limit",
-        "max_execution_time",
-        "upload_max_filesize",
-        "post_max_size",
-        "max_input_time",
-        "date.timezone",
-    ];
     let mut info = Map::new();
     for line in r.stdout.lines() {
         if let Some((key, value)) = line.split_once("=>") {
             let key = key.trim();
-            if KEYS.contains(&key) && !info.contains_key(key) {
+            if SUPPORTED_INI_SETTINGS.contains(&key) && !info.contains_key(key) {
                 info.insert(key.to_string(), json!(value.trim()));
             }
         }
     }
     Value::Object(info)
+}
+
+fn ini_override_path(version: &str, sapi: &str) -> String {
+    format!("/etc/php/{version}/{sapi}/conf.d/99-serverkit.ini")
+}
+
+pub fn ini_overrides(version: &str) -> Value {
+    let path = ini_override_path(version, "fpm");
+    let content = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut settings = Map::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with(';') {
+            continue;
+        }
+        if let Some((k, v)) = line.split_once('=') {
+            settings.insert(k.trim().to_string(), json!(v.trim()));
+        }
+    }
+    json!({
+        "version": version,
+        "file": path,
+        "settings": settings,
+        "supported": SUPPORTED_INI_SETTINGS,
+    })
+}
+
+pub async fn set_ini_overrides(version: &str, settings: &Map<String, Value>) -> Value {
+    if !valid_version(version) {
+        return json!({ "success": false, "error": format!("Unsupported PHP version: {version}") });
+    }
+    for key in settings.keys() {
+        if !SUPPORTED_INI_SETTINGS.contains(&key.as_str()) {
+            return json!({ "success": false, "error": format!("Unsupported php.ini setting: {key}") });
+        }
+    }
+    let mut content = String::from("; Managed by ServerKit. Edit via ServerKit UI/API.\n");
+    for (key, value) in settings {
+        let val = value
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| value.to_string());
+        if !val.trim().is_empty() {
+            content.push_str(&format!("{key} = {}\n", val.trim()));
+        }
+    }
+    for sapi in ["fpm", "cli"] {
+        let dir = format!("/etc/php/{version}/{sapi}/conf.d");
+        let path = ini_override_path(version, sapi);
+        let _ = privileged(&["mkdir", "-p", &dir], 15).await;
+        let r = privileged_with_stdin(&["tee", &path], Some(&content), 30).await;
+        if !r.ok {
+            return json!({ "success": false, "error": r.stderr });
+        }
+    }
+    restart_fpm(version).await;
+    json!({ "success": true, "message": format!("PHP {version} ini overrides updated"), "settings": settings })
 }

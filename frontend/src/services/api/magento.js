@@ -51,6 +51,18 @@ export async function magentoFrontendAction(id, action) {
     return this.request(`/magento/stores/${id}/frontend/${action}`, { method: 'POST' });
 }
 
+export async function getMagentoRuntime(id) {
+    return this.request(`/magento/stores/${id}/runtime`);
+}
+
+export async function updateMagentoRuntime(id, data) {
+    return this.request(`/magento/stores/${id}/runtime`, { method: 'PATCH', body: data });
+}
+
+export async function repairMagentoPermissions(id) {
+    return this.request(`/magento/stores/${id}/permissions/repair`, { method: 'POST' });
+}
+
 export async function getMagentoVhost(id) {
     return this.request(`/magento/stores/${id}/vhost`);
 }

@@ -51,8 +51,8 @@ const POOL_TEMPLATE: &str = r#"[{pool_name}]
 user = {user}
 group = {group}
 listen = /run/php/php{version}-fpm-{pool_name}.sock
-listen.owner = www-data
-listen.group = www-data
+listen.owner = {user}
+listen.group = {group}
 listen.mode = 0660
 
 pm = {pm_type}
@@ -201,11 +201,21 @@ pub async fn install_version_with_options(version: &str, opts: InstallOptions<'_
             "install",
             "-y",
             "software-properties-common",
-            "ca-certificates",
-            "lsb-release",
             "apt-transport-https",
+            "ca-certificates",
+            "gnupg",
+            "lsb-release",
+            "curl",
+            "wget",
+            "unzip",
+            "git",
+            "sudo",
+            "cron",
+            "rsync",
+            "acl",
+            "build-essential",
         ],
-        180,
+        300,
     )
     .await;
     privileged(&["add-apt-repository", "-y", "ppa:ondrej/php"], 120).await;

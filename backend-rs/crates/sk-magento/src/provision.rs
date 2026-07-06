@@ -397,6 +397,19 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     }
 
     // ── 5. nginx vhost ───────────────────────────────────────────────
+    store::set_status(&pool, s.id, "provisioning", "configuring nginx worker user").await;
+    let nginx_user = sk_web::nginx::set_worker_user(&s.run_user, &s.run_user).await;
+    if !nginx_user["success"].as_bool().unwrap_or(false) {
+        return Err(format!(
+            "nginx worker user update failed: {}",
+            nginx_user["error"].as_str().unwrap_or("unknown error")
+        ));
+    }
+    log_line(
+        root,
+        &format!("nginx worker user set to {}:{}", s.run_user, s.run_user),
+    );
+
     store::set_status(&pool, s.id, "provisioning", "creating nginx vhost").await;
     // Per-store copy of nginx.conf.sample with the upstream reference
     // rewritten to this store's unique name (see compose::upstream_name).
@@ -948,6 +961,18 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
         None
     };
     let ssl_ref = cert_paths.as_ref().map(|(c, k)| (c.as_str(), k.as_str()));
+
+    let nginx_user = sk_web::nginx::set_worker_user(&s.run_user, &s.run_user).await;
+    if !nginx_user["success"].as_bool().unwrap_or(false) {
+        return Err(format!(
+            "nginx worker user update failed: {}",
+            nginx_user["error"].as_str().unwrap_or("unknown error")
+        ));
+    }
+    notes.push(format!(
+        "nginx worker user set to {}:{}",
+        s.run_user, s.run_user
+    ));
 
     let vhost = match s.headless_mode.as_str() {
         "shared" => crate::compose::magento_vhost_headless_shared(

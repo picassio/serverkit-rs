@@ -159,6 +159,44 @@ fn validate_name(name: &str) -> bool {
     !name.is_empty() && !name.contains('/') && !name.contains("..") && !name.starts_with('.')
 }
 
+fn validate_unix_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 32
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// Configure the global nginx worker user/group in `/etc/nginx/nginx.conf`.
+/// Nginx only supports one worker identity per master, so Magento stores that
+/// run source/PHP/frontend as `ubuntu` need nginx aligned to `ubuntu:ubuntu`
+/// instead of the distro default `www-data:www-data`.
+pub async fn set_worker_user(user: &str, group: &str) -> Value {
+    if !validate_unix_name(user) || !validate_unix_name(group) {
+        return json!({ "success": false, "error": "Invalid nginx user/group" });
+    }
+    let script = format!(
+        r#"set -e
+getent passwd '{user}' >/dev/null
+getent group '{group}' >/dev/null
+cp -a /etc/nginx/nginx.conf /etc/nginx/nginx.conf.serverkit.bak.$(date +%s) 2>/dev/null || true
+if grep -Eq '^[[:space:]]*user[[:space:]]+' /etc/nginx/nginx.conf; then
+  sed -i -E 's#^[[:space:]]*user[[:space:]]+[^;]+;#user {user} {group};#' /etc/nginx/nginx.conf
+else
+  sed -i '1i user {user} {group};' /etc/nginx/nginx.conf
+fi
+nginx -t
+systemctl restart nginx
+"#
+    );
+    let r = privileged(&["/bin/sh", "-lc", &script], 60).await;
+    if r.ok {
+        json!({ "success": true, "message": format!("nginx worker user set to {user}:{group}") })
+    } else {
+        json!({ "success": false, "error": r.stderr, "stdout": r.stdout })
+    }
+}
+
 pub async fn installed_version() -> Option<String> {
     let r = run(&["nginx", "-v"], 10).await;
     let out = if r.stderr.is_empty() {

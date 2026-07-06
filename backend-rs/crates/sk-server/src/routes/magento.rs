@@ -688,6 +688,16 @@ async fn update_runtime(
         }
         applied.push("php_ini".to_string());
     }
+    if b.run_user.is_some() {
+        let result = sk_web::nginx::set_worker_user(&s.run_user, &s.run_user).await;
+        if !result["success"].as_bool().unwrap_or(false) {
+            return Err(ApiError::bad_request(format!(
+                "nginx worker user update failed: {}",
+                result["error"].as_str().unwrap_or("unknown error")
+            )));
+        }
+        applied.push("nginx_worker_user".to_string());
+    }
     if !b.pool_config.is_empty() || b.run_user.is_some() {
         let mut cfg = b.pool_config.clone();
         cfg.entry("user").or_insert(json!(s.run_user.clone()));

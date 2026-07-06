@@ -906,25 +906,29 @@ const Magento = () => {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <Label>SSL</Label>
-                                        <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={webForm.ssl}
-                                            onChange={(e) => setWebForm({ ...webForm, ssl: e.target.value })}>
-                                            <option value="none">None (HTTP)</option>
-                                            <option value="self-signed">HTTPS (self-signed, multi-domain SAN)</option>
-                                            <option value="letsencrypt">Let's Encrypt</option>
-                                        </select>
+                                        <Select value={webForm.ssl} onValueChange={(value) => setWebForm({ ...webForm, ssl: value })}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">None (HTTP)</SelectItem>
+                                                <SelectItem value="self-signed">HTTPS (self-signed, multi-domain SAN)</SelectItem>
+                                                <SelectItem value="letsencrypt">Let's Encrypt</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                         {certDays != null && (
                                             <p className="text-xs text-muted-foreground mt-1">cert expires in {certDays} days</p>
                                         )}
                                     </div>
                                     <div>
                                         <Label>Headless mode</Label>
-                                        <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={webForm.headless_mode}
-                                            onChange={(e) => setWebForm({ ...webForm, headless_mode: e.target.value })}>
-                                            <option value="none">None</option>
-                                            <option value="shared">Shared</option>
-                                            <option value="separate">Separate</option>
-                                            <option value="split">Split (FE + API + admin)</option>
-                                        </select>
+                                        <Select value={webForm.headless_mode} onValueChange={(value) => setWebForm({ ...webForm, headless_mode: value })}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                <SelectItem value="shared">Shared</SelectItem>
+                                                <SelectItem value="separate">Separate</SelectItem>
+                                                <SelectItem value="split">Split (FE + API + admin)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
                                 {webForm.headless_mode !== 'none' && (
@@ -970,11 +974,13 @@ const Magento = () => {
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <Label>LE challenge</Label>
-                                            <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={webForm.le_challenge}
-                                                onChange={(e) => setWebForm({ ...webForm, le_challenge: e.target.value })}>
-                                                <option value="dns">DNS-01 (Cloudflare)</option>
-                                                <option value="http">HTTP-01 (webroot)</option>
-                                            </select>
+                                            <Select value={webForm.le_challenge} onValueChange={(value) => setWebForm({ ...webForm, le_challenge: value })}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="dns">DNS-01 (Cloudflare)</SelectItem>
+                                                    <SelectItem value="http">HTTP-01 (webroot)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                         <div>
                                             <Label>LE email</Label>
@@ -1017,13 +1023,15 @@ const Magento = () => {
                         <div className="flex items-end gap-2">
                             <div>
                                 <Label>Schedule</Label>
-                                <select className="h-9 rounded-md border bg-background px-3 text-sm" value={backupPolicy.schedule}
-                                    onChange={(e) => setBackupPolicy({ ...backupPolicy, schedule: e.target.value })}>
-                                    <option value="none">Manual only</option>
-                                    <option value="hourly">Hourly</option>
-                                    <option value="daily">Daily</option>
-                                    <option value="weekly">Weekly</option>
-                                </select>
+                                <Select value={backupPolicy.schedule} onValueChange={(value) => setBackupPolicy({ ...backupPolicy, schedule: value })}>
+                                    <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Manual only</SelectItem>
+                                        <SelectItem value="hourly">Hourly</SelectItem>
+                                        <SelectItem value="daily">Daily</SelectItem>
+                                        <SelectItem value="weekly">Weekly</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div>
                                 <Label>Keep</Label>

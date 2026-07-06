@@ -85,7 +85,7 @@ prepare_system() {
     nginx php-fpm php-cli curl jq openssl ca-certificates gnupg unzip lsb-release \
     software-properties-common apt-transport-https wget vim htop iotop zip git sudo cron \
     rsync screen tmux strace lsof net-tools dnsutils tree ncdu bc logrotate acl \
-    build-essential pkg-config libssl-dev >/dev/null
+    default-mysql-client build-essential pkg-config libssl-dev >/dev/null
 
   if ! command -v docker >/dev/null; then
     log "Installing Docker…"; curl -fsSL https://get.docker.com | sh >/dev/null 2>&1 || warn "docker install failed"

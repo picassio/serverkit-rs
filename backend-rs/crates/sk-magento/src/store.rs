@@ -32,6 +32,7 @@ pub async fn ensure_schema(pool: &SqlitePool) -> anyhow::Result<()> {
             frontend_root VARCHAR(255),
             admin_domain VARCHAR(255),
             frontend_cmd TEXT,
+            nginx_extras TEXT,
             le_email VARCHAR(255),
             le_challenge VARCHAR(10) NOT NULL DEFAULT 'dns',
             run_user VARCHAR(32) NOT NULL DEFAULT 'www-data',
@@ -61,6 +62,7 @@ pub async fn ensure_schema(pool: &SqlitePool) -> anyhow::Result<()> {
         "ALTER TABLE magento_stores ADD COLUMN frontend_root VARCHAR(255)",
         "ALTER TABLE magento_stores ADD COLUMN admin_domain VARCHAR(255)",
         "ALTER TABLE magento_stores ADD COLUMN frontend_cmd TEXT",
+        "ALTER TABLE magento_stores ADD COLUMN nginx_extras TEXT",
         "ALTER TABLE magento_stores ADD COLUMN le_email VARCHAR(255)",
         "ALTER TABLE magento_stores ADD COLUMN le_challenge VARCHAR(10) NOT NULL DEFAULT 'dns'",
         "ALTER TABLE magento_stores ADD COLUMN run_user VARCHAR(32) NOT NULL DEFAULT 'www-data'",
@@ -154,6 +156,7 @@ pub struct Store {
     pub frontend_root: Option<String>,
     pub admin_domain: Option<String>,
     pub frontend_cmd: Option<String>,
+    pub nginx_extras: Option<String>,
     pub le_email: Option<String>,
     pub le_challenge: String,
     pub run_user: String,
@@ -211,6 +214,13 @@ impl Store {
             .unwrap_or_else(|| format!("{}/src", self.root_path))
     }
 
+    pub fn nginx_extras_value(&self) -> serde_json::Value {
+        self.nginx_extras
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+            .unwrap_or_else(|| serde_json::json!({}))
+    }
+
     /// Custom path prefixes routed to Magento in shared headless mode.
     pub fn custom_routes(&self) -> Vec<String> {
         self.magento_routes
@@ -254,6 +264,7 @@ impl Store {
             "frontend_root": self.frontend_root,
             "admin_domain": self.admin_domain,
             "frontend_cmd": self.frontend_cmd,
+            "nginx_extras": self.nginx_extras_value(),
             "le_email": self.le_email,
             "le_challenge": self.le_challenge,
             "run_user": self.run_user,
@@ -283,7 +294,7 @@ const COLS: &str = "id, name, domain, magento_version, distribution, php_version
     composer_version, root_path, db_password, admin_password, admin_url, status, \
     status_detail, ssl_mode, use_rabbitmq, use_varnish, headless_mode, api_domain, split_route_mode, \
     frontend_domain, frontend_port, magento_routes, frontend_root, admin_domain, frontend_cmd, \
-    le_email, le_challenge, run_user, service_versions, install_magento, magento_source_path, \
+    nginx_extras, le_email, le_challenge, run_user, service_versions, install_magento, magento_source_path, \
     backup_schedule, backup_retention, created_at, updated_at";
 
 pub async fn list(pool: &SqlitePool) -> anyhow::Result<Vec<Store>> {
@@ -333,6 +344,7 @@ pub async fn insert(
     frontend_port: i64,
     magento_routes: &[String],
     frontend_root: Option<&str>,
+    nginx_extras: Option<&str>,
     le_email: Option<&str>,
     le_challenge: &str,
     run_user: &str,
@@ -346,9 +358,9 @@ pub async fn insert(
            (name, domain, magento_version, distribution, php_version, composer_version,
             root_path, db_password, admin_password, status, status_detail, ssl_mode,
             use_rabbitmq, use_varnish, headless_mode, api_domain, split_route_mode,
-            frontend_domain, frontend_port, magento_routes, frontend_root, le_email, le_challenge,
+            frontend_domain, frontend_port, magento_routes, frontend_root, nginx_extras, le_email, le_challenge,
             run_user, service_versions, install_magento, magento_source_path, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'provisioning', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'provisioning', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
     )
     .bind(name)
     .bind(domain)
@@ -369,6 +381,7 @@ pub async fn insert(
     .bind(frontend_port)
     .bind(serde_json::to_string(magento_routes).unwrap_or_else(|_| "[]".into()))
     .bind(frontend_root)
+    .bind(nginx_extras)
     .bind(le_email)
     .bind(le_challenge)
     .bind(run_user)
@@ -428,6 +441,7 @@ pub async fn update_web_fields(
     frontend_port: Option<i64>,
     frontend_root: Option<&str>,
     frontend_cmd: Option<&str>,
+    nginx_extras: Option<&str>,
     magento_routes: Option<&[String]>,
 ) -> anyhow::Result<()> {
     // build dynamically but with bind params only
@@ -452,6 +466,7 @@ pub async fn update_web_fields(
     );
     push!("frontend_root", frontend_root);
     push!("frontend_cmd", frontend_cmd);
+    push!("nginx_extras", nginx_extras);
     push!(
         "magento_routes",
         magento_routes

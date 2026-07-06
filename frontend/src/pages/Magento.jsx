@@ -103,6 +103,45 @@ const SERVICE_FIELDS = [
 const DEFAULT_SERVICE_VALUE = '__serverkit_default__';
 const CUSTOM_IMAGE_VALUE = '__custom_image__';
 
+const defaultNginxExtras = () => ({
+    manual_vhost: { preserve: false },
+    maintenance: { enabled: false, html: "<!doctype html><title>Maintenance</title><h1>We'll be back soon!</h1><p>Performing scheduled maintenance.</p>" },
+    htpasswd: { enabled: false, realm: 'Restricted', file: '/etc/nginx/.htpasswd' },
+    badbot: { enabled: false, patterns: ['AhrefsBot', 'MJ12bot', 'SemrushBot', 'DotBot', 'BLEXBot', 'SearchmetricsBot', 'MegaIndex'] },
+    ip_filter: { enabled: false, allow: [], deny: [] },
+    extra_locations: [],
+    custom_server_snippet: '',
+});
+
+const mujiExtraLocationsPreset = () => [
+    { enabled: true, path: '/smartosc/', kind: 'alias', target: '/backup/data/database/', autoindex: true, cors: false, match: 'prefix' },
+    { enabled: true, path: '/logs/', kind: 'alias', target: '/var/log/nginx/', autoindex: true, cors: false, match: 'prefix' },
+    { enabled: true, path: '/logs/magento/', kind: 'alias', target: '/home/ubuntu/mjsg/magento/current/var/log/', autoindex: true, cors: false, match: 'prefix' },
+    { enabled: true, path: '/logs/nextjs/', kind: 'alias', target: '/home/ubuntu/.pm2/logs/', autoindex: true, cors: false, match: 'prefix' },
+    { enabled: true, path: '/returnOrder/', kind: 'alias', target: '/home/ubuntu/mjsg/frontend/current/public/returnOrder/', autoindex: false, cors: true, match: 'prefix' },
+];
+
+const mujiNginxExtrasPreset = () => ({
+    ...defaultNginxExtras(),
+    badbot: { enabled: true, patterns: ['AhrefsBot', 'MJ12bot', 'SemrushBot', 'DotBot', 'BLEXBot', 'SearchmetricsBot', 'MegaIndex'] },
+    extra_locations: mujiExtraLocationsPreset(),
+    custom_server_snippet: '',
+});
+
+const mergeNginxExtras = (extras = {}) => ({
+    ...defaultNginxExtras(),
+    ...extras,
+    manual_vhost: { ...defaultNginxExtras().manual_vhost, ...(extras.manual_vhost || {}) },
+    maintenance: { ...defaultNginxExtras().maintenance, ...(extras.maintenance || {}) },
+    htpasswd: { ...defaultNginxExtras().htpasswd, ...(extras.htpasswd || {}) },
+    badbot: { ...defaultNginxExtras().badbot, ...(extras.badbot || {}) },
+    ip_filter: { ...defaultNginxExtras().ip_filter, ...(extras.ip_filter || {}) },
+    extra_locations: Array.isArray(extras.extra_locations) ? extras.extra_locations : [],
+});
+
+const linesToArray = (value) => String(value || '').split('\n').map((x) => x.trim()).filter(Boolean);
+const blankExtraLocation = () => ({ enabled: true, path: '/', kind: 'alias', target: '/', autoindex: false, cors: false, match: 'prefix' });
+
 const serviceOptionValues = (field) => field.options.map(([value]) => value);
 
 const initialMagentoForm = () => ({
@@ -342,6 +381,7 @@ const Magento = () => {
             frontend_root: store.frontend_root || '',
             frontend_cmd: store.frontend_cmd || '',
             magento_routes: (store.magento_routes || []).join(', '),
+            nginx_extras: mergeNginxExtras(store.nginx_extras || {}),
         });
         setCertDays(store.ssl_cert_days);
         setVhostText('');
@@ -357,6 +397,7 @@ const Magento = () => {
                 split_route_mode: webForm.split_route_mode,
                 frontend_port: Number(webForm.frontend_port) || 0,
                 magento_routes: (webForm.magento_routes || '').split(',').map((r) => r.trim()).filter(Boolean),
+                nginx_extras: webForm.nginx_extras,
                 run_user: webForm.run_user || 'www-data',
             };
             if (webForm.headless_mode !== 'split') {
@@ -1150,6 +1191,94 @@ const Magento = () => {
                                         </div>
                                     </div>
                                 )}
+                                <section className="rounded-lg border p-3 space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <h4 className="text-sm font-semibold">Nginx extras</h4>
+                                            <p className="text-xs text-muted-foreground">Common optional snippets. Manual vhost preserve lets direct VM edits survive Apply Web.</p>
+                                        </div>
+                                        <Button type="button" variant="outline" size="sm" onClick={() => setWebForm({ ...webForm, nginx_extras: mujiNginxExtrasPreset() })}>Generate Muji defaults</Button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                        <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
+                                            <input type="checkbox" checked={!!webForm.nginx_extras?.manual_vhost?.preserve} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, manual_vhost: { ...(webForm.nginx_extras?.manual_vhost || {}), preserve: e.target.checked } }) })} />
+                                            Preserve manually edited VM vhost files
+                                        </label>
+                                        <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
+                                            <input type="checkbox" checked={!!webForm.nginx_extras?.maintenance?.enabled} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, maintenance: { ...(webForm.nginx_extras?.maintenance || {}), enabled: e.target.checked } }) })} />
+                                            Maintenance page
+                                        </label>
+                                        <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
+                                            <input type="checkbox" checked={!!webForm.nginx_extras?.htpasswd?.enabled} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, htpasswd: { ...(webForm.nginx_extras?.htpasswd || {}), enabled: e.target.checked } }) })} />
+                                            Basic auth / htpasswd
+                                        </label>
+                                        <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
+                                            <input type="checkbox" checked={!!webForm.nginx_extras?.badbot?.enabled} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, badbot: { ...(webForm.nginx_extras?.badbot || {}), enabled: e.target.checked } }) })} />
+                                            Bad bot blocking
+                                        </label>
+                                        <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
+                                            <input type="checkbox" checked={!!webForm.nginx_extras?.ip_filter?.enabled} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, ip_filter: { ...(webForm.nginx_extras?.ip_filter || {}), enabled: e.target.checked } }) })} />
+                                            IP allow/deny rules
+                                        </label>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                            <Label>htpasswd file</Label>
+                                            <Input value={webForm.nginx_extras?.htpasswd?.file || ''} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, htpasswd: { ...(webForm.nginx_extras?.htpasswd || {}), file: e.target.value } }) })} />
+                                            <p className="text-xs text-muted-foreground mt-1">Create/edit the file on the VM or via the vhost editor. ServerKit references it.</p>
+                                        </div>
+                                        <div>
+                                            <Label>Basic auth realm</Label>
+                                            <Input value={webForm.nginx_extras?.htpasswd?.realm || ''} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, htpasswd: { ...(webForm.nginx_extras?.htpasswd || {}), realm: e.target.value } }) })} />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div>
+                                            <Label>Bad bot patterns</Label>
+                                            <textarea className="w-full min-h-24 rounded-md border bg-background px-3 py-2 text-sm" value={(webForm.nginx_extras?.badbot?.patterns || []).join('\n')} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, badbot: { ...(webForm.nginx_extras?.badbot || {}), patterns: linesToArray(e.target.value) } }) })} />
+                                        </div>
+                                        <div>
+                                            <Label>Allow IP/CIDR</Label>
+                                            <textarea className="w-full min-h-24 rounded-md border bg-background px-3 py-2 text-sm" placeholder="203.0.113.10\n10.0.0.0/8" value={(webForm.nginx_extras?.ip_filter?.allow || []).join('\n')} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, ip_filter: { ...(webForm.nginx_extras?.ip_filter || {}), allow: linesToArray(e.target.value) } }) })} />
+                                        </div>
+                                        <div>
+                                            <Label>Deny IP/CIDR</Label>
+                                            <textarea className="w-full min-h-24 rounded-md border bg-background px-3 py-2 text-sm" placeholder="all or 198.51.100.0/24" value={(webForm.nginx_extras?.ip_filter?.deny || []).join('\n')} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, ip_filter: { ...(webForm.nginx_extras?.ip_filter || {}), deny: linesToArray(e.target.value) } }) })} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Label>Custom path locations</Label>
+                                            <div className="flex gap-2">
+                                                <Button type="button" variant="outline" size="sm" onClick={() => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: mujiExtraLocationsPreset() }) })}>Generate Muji paths</Button>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: [...(webForm.nginx_extras?.extra_locations || []), blankExtraLocation()] }) })}>Add path</Button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {(webForm.nginx_extras?.extra_locations || []).map((loc, idx) => (
+                                                <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 rounded border p-2">
+                                                    <label className="md:col-span-1 flex items-center gap-2 text-xs"><input type="checkbox" checked={loc.enabled !== false} onChange={(e) => {
+                                                        const next = [...(webForm.nginx_extras?.extra_locations || [])]; next[idx] = { ...loc, enabled: e.target.checked };
+                                                        setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: next }) });
+                                                    }} /> On</label>
+                                                    <Input className="md:col-span-2" placeholder="/logs/" value={loc.path || ''} onChange={(e) => { const next = [...(webForm.nginx_extras?.extra_locations || [])]; next[idx] = { ...loc, path: e.target.value }; setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: next }) }); }} />
+                                                    <Select value={loc.kind || 'alias'} onValueChange={(value) => { const next = [...(webForm.nginx_extras?.extra_locations || [])]; next[idx] = { ...loc, kind: value }; setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: next }) }); }}>
+                                                        <SelectTrigger className="md:col-span-2"><SelectValue /></SelectTrigger>
+                                                        <SelectContent><SelectItem value="alias">Alias folder</SelectItem><SelectItem value="proxy">Proxy URL</SelectItem><SelectItem value="return">Return code/URL</SelectItem></SelectContent>
+                                                    </Select>
+                                                    <Input className="md:col-span-4" placeholder="/var/log/nginx/ or http://127.0.0.1:3000" value={loc.target || ''} onChange={(e) => { const next = [...(webForm.nginx_extras?.extra_locations || [])]; next[idx] = { ...loc, target: e.target.value }; setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: next }) }); }} />
+                                                    <label className="md:col-span-1 flex items-center gap-1 text-xs"><input type="checkbox" checked={!!loc.autoindex} onChange={(e) => { const next = [...(webForm.nginx_extras?.extra_locations || [])]; next[idx] = { ...loc, autoindex: e.target.checked }; setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: next }) }); }} /> Index</label>
+                                                    <label className="md:col-span-1 flex items-center gap-1 text-xs"><input type="checkbox" checked={!!loc.cors} onChange={(e) => { const next = [...(webForm.nginx_extras?.extra_locations || [])]; next[idx] = { ...loc, cors: e.target.checked }; setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: next }) }); }} /> CORS</label>
+                                                    <Button type="button" variant="ghost" size="sm" className="md:col-span-1" onClick={() => { const next = [...(webForm.nginx_extras?.extra_locations || [])]; next.splice(idx, 1); setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, extra_locations: next }) }); }}>Remove</Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label>Custom server snippet</Label>
+                                        <textarea className="w-full min-h-24 rounded-md border bg-background px-3 py-2 font-mono text-xs" placeholder={'location /smartosc/ { alias /backup/data/database/; }'} value={webForm.nginx_extras?.custom_server_snippet || ''} onChange={(e) => setWebForm({ ...webForm, nginx_extras: mergeNginxExtras({ ...webForm.nginx_extras, custom_server_snippet: e.target.value }) })} />
+                                    </div>
+                                </section>
                                 <div>
                                     <Label>Run as user</Label>
                                     <Input value={webForm.run_user} onChange={(e) => setWebForm({ ...webForm, run_user: e.target.value })} />

@@ -408,6 +408,7 @@ pub fn magento_vhost_headless_shared(
     frontend_port: i64,
     frontend_root: Option<&str>,
     custom_routes: &[String],
+    server_extras: &str,
     ssl: Option<(&str, &str)>,
 ) -> String {
     let upstream = upstream_name(name);
@@ -451,7 +452,7 @@ server {{
     server_name {domain};
 
     access_log /var/log/nginx/{name}.access.log;
-
+{server_extras}
 {magento_locations}
 
 {frontend}
@@ -473,6 +474,7 @@ pub fn magento_vhost_headless_split(
     backend_port: u16,
     admin_path: &str,
     route_mode: &str,
+    server_extras: &str,
     ssl: Option<(&str, &str)>,
 ) -> String {
     let upstream = upstream_name(name);
@@ -536,7 +538,7 @@ server {{
     server_name {api_domain};
 
     access_log /var/log/nginx/{name}.api.log;
-
+{server_extras}
 {api_locations}
 {api_terminal_location}
 }}
@@ -547,7 +549,7 @@ server {{
     server_name {admin_domain};
 
     access_log /var/log/nginx/{name}.admin.log;
-
+{server_extras}
 {admin_locations}
 {admin_terminal_location}
 }}
@@ -587,6 +589,7 @@ pub fn frontend_vhost(
     frontend_domain: &str,
     frontend_port: i64,
     frontend_root: Option<&str>,
+    server_extras: &str,
     ssl: Option<(&str, &str)>,
 ) -> String {
     let frontend = frontend_location(frontend_port, frontend_root);
@@ -597,7 +600,7 @@ pub fn frontend_vhost(
     server_name {frontend_domain};
 
     access_log /var/log/nginx/{name}.frontend.log;
-
+{server_extras}
 {frontend}
 }}
 "#
@@ -758,6 +761,7 @@ mod tests {
             3000,
             None,
             &["/checkout".to_string()],
+            "",
             None,
         );
         assert!(v.contains("listen 127.0.0.1:34027;"));
@@ -777,6 +781,7 @@ mod tests {
             34027,
             "/admin_abc",
             "api_only",
+            "",
             None,
         );
         assert!(v.contains("server_name api.shop2.test admin.shop2.test;"));
@@ -810,7 +815,7 @@ mod tests {
 
     #[test]
     fn headless_static_frontend() {
-        let v = super::frontend_vhost("shop2", "store.test", 0, Some("/var/www/fe/out"), None);
+        let v = super::frontend_vhost("shop2", "store.test", 0, Some("/var/www/fe/out"), "", None);
         assert!(v.contains("root /var/www/fe/out;"));
         assert!(v.contains("try_files $uri $uri/ /index.html;"));
         assert!(!v.contains("proxy_pass"));
@@ -819,6 +824,7 @@ mod tests {
             "store.test",
             3000,
             None,
+            "",
             Some(("/c.crt", "/c.key")),
         );
         assert!(s.contains("listen 443 ssl http2;"));

@@ -135,6 +135,9 @@ struct CreateStoreBody {
     frontend_root: Option<String>,
     /// Extra path prefixes routed to Magento in shared mode (e.g. "/checkout").
     magento_routes: Option<Vec<String>>,
+    /// Per-store nginx extras: maintenance, htpasswd include, badbot, IP rules,
+    /// custom server snippet, and manual-vhost preservation.
+    nginx_extras: Option<Value>,
     /// Unix user PHP-FPM + files + the frontend process run as (default www-data).
     run_user: Option<String>,
     /// Per-service image overrides, e.g. {"db":"mariadb:11.4","redis":"redis:7.4"}.
@@ -378,6 +381,10 @@ async fn create_store(
         frontend_port,
         &magento_routes,
         frontend_root.as_deref(),
+        b.nginx_extras
+            .as_ref()
+            .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "{}".into()))
+            .as_deref(),
         b.le_email.as_deref(),
         &le_challenge,
         &run_user,
@@ -402,6 +409,7 @@ async fn create_store(
             None,
             None,
             b.frontend_cmd.as_deref(),
+            None,
             None,
         )
         .await?;
@@ -506,6 +514,7 @@ struct PatchBody {
     frontend_root: Option<String>,
     frontend_cmd: Option<String>,
     magento_routes: Option<Vec<String>>,
+    nginx_extras: Option<Value>,
     run_user: Option<String>,
 }
 
@@ -593,6 +602,10 @@ async fn patch_store(
         b.frontend_port,
         b.frontend_root.as_deref(),
         b.frontend_cmd.as_deref(),
+        b.nginx_extras
+            .as_ref()
+            .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "{}".into()))
+            .as_deref(),
         b.magento_routes.as_deref(),
     )
     .await?;

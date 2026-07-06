@@ -105,6 +105,186 @@ pub fn spawn(pool: SqlitePool, store: Store, spec: ProvisionSpec) {
     });
 }
 
+fn bool_extra(v: &serde_json::Value, path: &[&str]) -> bool {
+    let mut cur = v;
+    for key in path {
+        cur = &cur[*key];
+    }
+    cur.as_bool().unwrap_or(false)
+}
+
+fn string_array_extra(v: &serde_json::Value, path: &[&str]) -> Vec<String> {
+    let mut cur = v;
+    for key in path {
+        cur = &cur[*key];
+    }
+    cur.as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn safe_snippet_line(line: &str) -> bool {
+    !line.contains('\0') && !line.contains("include /etc/passwd")
+}
+
+fn escape_nginx_regex_literal(input: &str) -> String {
+    let mut out = String::new();
+    for ch in input.chars() {
+        if matches!(
+            ch,
+            '.' | '^' | '$' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '|' | '\\'
+        ) {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+fn valid_location_path(path: &str) -> bool {
+    path.starts_with('/')
+        && !path.contains("..")
+        && !path.contains('{')
+        && !path.contains('}')
+        && !path.contains(';')
+        && !path.chars().any(char::is_whitespace)
+}
+
+fn nginx_extra_locations_snippet(extras: &serde_json::Value) -> String {
+    let mut out = String::new();
+    let Some(items) = extras["extra_locations"].as_array() else {
+        return out;
+    };
+    for item in items {
+        if item["enabled"].as_bool() == Some(false) {
+            continue;
+        }
+        let path = item["path"].as_str().unwrap_or("").trim();
+        let kind = item["kind"].as_str().unwrap_or("alias");
+        let target = item["target"].as_str().unwrap_or("").trim();
+        if !valid_location_path(path) || target.is_empty() || !safe_snippet_line(target) {
+            continue;
+        }
+        let matcher = if item["match"].as_str() == Some("exact") {
+            format!("= {path}")
+        } else if item["match"].as_str() == Some("regex") {
+            format!("~ {path}")
+        } else {
+            format!("^~ {path}")
+        };
+        out.push_str("\n    # ServerKit extra location\n");
+        match kind {
+            "proxy" if target.starts_with("http://") || target.starts_with("https://") => {
+                out.push_str(&format!(
+                    "    location {matcher} {{\n        proxy_pass {target};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_read_timeout 600;\n    }}\n"
+                ));
+            }
+            "return" => {
+                out.push_str(&format!("    location {matcher} {{ return {target}; }}\n"));
+            }
+            _ if target.starts_with('/') && !target.contains("..") => {
+                out.push_str(&format!(
+                    "    location {matcher} {{\n        alias {target};\n"
+                ));
+                if item["autoindex"].as_bool().unwrap_or(false) {
+                    out.push_str("        autoindex on;\n");
+                }
+                if item["cors"].as_bool().unwrap_or(false) {
+                    out.push_str("        add_header Access-Control-Allow-Origin \"*\" always;\n        add_header Access-Control-Allow-Methods \"GET, OPTIONS\" always;\n");
+                }
+                out.push_str("    }\n");
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+fn nginx_extras_snippet(s: &Store) -> String {
+    let extras = s.nginx_extras_value();
+    let mut out = nginx_extra_locations_snippet(&extras);
+    if bool_extra(&extras, &["badbot", "enabled"]) {
+        let patterns = string_array_extra(&extras, &["badbot", "patterns"]);
+        if !patterns.is_empty() {
+            let escaped = patterns
+                .iter()
+                .map(|p| escape_nginx_regex_literal(p))
+                .collect::<Vec<_>>()
+                .join("|");
+            out.push_str(&format!(
+                "\n    if ($http_user_agent ~* \"({escaped})\") {{ return 444; }}\n"
+            ));
+        }
+    }
+    if bool_extra(&extras, &["ip_filter", "enabled"]) {
+        for ip in string_array_extra(&extras, &["ip_filter", "allow"]) {
+            if safe_snippet_line(&ip) {
+                out.push_str(&format!("    allow {ip};\n"));
+            }
+        }
+        for ip in string_array_extra(&extras, &["ip_filter", "deny"]) {
+            if safe_snippet_line(&ip) {
+                out.push_str(&format!("    deny {ip};\n"));
+            }
+        }
+    }
+    if bool_extra(&extras, &["htpasswd", "enabled"]) {
+        let realm = extras["htpasswd"]["realm"]
+            .as_str()
+            .unwrap_or("Restricted")
+            .replace('"', "");
+        let file = extras["htpasswd"]["file"]
+            .as_str()
+            .unwrap_or("/etc/nginx/.htpasswd");
+        if file.starts_with('/') && !file.contains("..") {
+            out.push_str(&format!(
+                "    auth_basic \"{realm}\";\n    auth_basic_user_file {file};\n"
+            ));
+        }
+    }
+    if bool_extra(&extras, &["maintenance", "enabled"]) {
+        let dir = format!("/etc/nginx/serverkit/{}", s.name);
+        out.push_str(&format!(
+            "    error_page 503 @serverkit_maintenance;\n    location @serverkit_maintenance {{ root {dir}; rewrite ^ /maintenance.html break; }}\n    return 503;\n"
+        ));
+    }
+    if let Some(snippet) = extras["custom_server_snippet"].as_str() {
+        if snippet.lines().all(safe_snippet_line) {
+            out.push_str("\n    # Custom ServerKit nginx extras\n");
+            for line in snippet.lines() {
+                out.push_str("    ");
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+    }
+    out
+}
+
+async fn write_nginx_extra_assets(s: &Store) -> Result<(), String> {
+    let extras = s.nginx_extras_value();
+    let dir = format!("/etc/nginx/serverkit/{}", s.name);
+    run_privileged(&["mkdir", "-p", &dir]).await?;
+    if bool_extra(&extras, &["maintenance", "enabled"]) {
+        let html = extras["maintenance"]["html"].as_str().unwrap_or(
+            "<!doctype html><title>Maintenance</title><style>body{text-align:center;padding:150px;font:20px Helvetica,sans-serif;color:#333;background:#f5f5f5}h1{font-size:50px}</style><h1>We'll be back soon!</h1><p>Performing scheduled maintenance.</p>",
+        );
+        write_privileged(&format!("{dir}/maintenance.html"), html).await?;
+    }
+    Ok(())
+}
+
+fn preserve_manual_vhost(s: &Store) -> bool {
+    bool_extra(&s.nginx_extras_value(), &["manual_vhost", "preserve"])
+}
+
 async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), String> {
     let root = &s.root_path;
     let base = crate::port_base(s.id);
@@ -411,6 +591,27 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     );
 
     store::set_status(&pool, s.id, "provisioning", "creating nginx vhost").await;
+    write_nginx_extra_assets(s).await?;
+    let server_extras = nginx_extras_snippet(s);
+    let vhost_path = format!("/etc/nginx/sites-available/{}", s.name);
+    if preserve_manual_vhost(s) && std::path::Path::new(&vhost_path).exists() {
+        log_line(
+            root,
+            "manual vhost preservation enabled — skipping generated Magento vhost overwrite",
+        );
+        let reload = sk_web::nginx::reload().await;
+        if !reload["success"].as_bool().unwrap_or(false) {
+            return Err(format!(
+                "nginx reload failed: {}",
+                reload["error"]
+                    .as_str()
+                    .or(reload["message"].as_str())
+                    .unwrap_or("?")
+            ));
+        }
+        store::set_status(&pool, s.id, "running", "manual nginx vhost preserved").await;
+        return Ok(());
+    }
     // Per-store copy of nginx.conf.sample with the upstream reference
     // rewritten to this store's unique name (see compose::upstream_name).
     let sample = std::fs::read_to_string(format!("{src}/nginx.conf.sample"))
@@ -441,6 +642,7 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
             s.frontend_port,
             s.frontend_root.as_deref(),
             &s.custom_routes(),
+            &server_extras,
             ssl_ref,
         )
     } else if s.headless_mode == "split" {
@@ -459,6 +661,7 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
             base + 7,
             &admin_path,
             &s.split_route_mode,
+            &server_extras,
             ssl_ref,
         )
     } else if s.use_varnish {
@@ -476,7 +679,6 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     } else {
         crate::compose::magento_vhost(&s.name, &s.domain, &src, &s.php_version)
     };
-    let vhost_path = format!("/etc/nginx/sites-available/{}", s.name);
     write_privileged(&vhost_path, &vhost).await?;
     run_privileged(&[
         "ln",
@@ -493,6 +695,7 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
                 fd,
                 s.frontend_port,
                 s.frontend_root.as_deref(),
+                &server_extras,
                 ssl_ref,
             );
             let fe_path = format!("/etc/nginx/sites-available/{}-frontend", s.name);
@@ -939,7 +1142,7 @@ pub async fn frontend_ctl(s: &Store, action: &str) -> serde_json::Value {
 /// the store's current fields — the backing for PATCH + apply.
 pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
     let mut notes: Vec<String> = Vec::new();
-    let src = format!("{}/src", s.root_path);
+    let src = s.magento_src();
     let base = crate::port_base(s.id);
     // stored admin path from admin_url
     let admin_path = s
@@ -961,6 +1164,24 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
         None
     };
     let ssl_ref = cert_paths.as_ref().map(|(c, k)| (c.as_str(), k.as_str()));
+
+    write_nginx_extra_assets(s).await?;
+    let server_extras = nginx_extras_snippet(s);
+    let vhost_path = format!("/etc/nginx/sites-available/{}", s.name);
+    if preserve_manual_vhost(s) && std::path::Path::new(&vhost_path).exists() {
+        let reload = sk_web::nginx::reload().await;
+        if !reload["success"].as_bool().unwrap_or(false) {
+            return Err(format!(
+                "nginx reload failed: {}",
+                reload["error"]
+                    .as_str()
+                    .or(reload["message"].as_str())
+                    .unwrap_or("?")
+            ));
+        }
+        notes.push("manual nginx vhost preserved".into());
+        return Ok(notes);
+    }
 
     let nginx_user = sk_web::nginx::set_worker_user(&s.run_user, &s.run_user).await;
     if !nginx_user["success"].as_bool().unwrap_or(false) {
@@ -985,6 +1206,7 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
             s.frontend_port,
             s.frontend_root.as_deref(),
             &s.custom_routes(),
+            &server_extras,
             ssl_ref,
         ),
         "split" => {
@@ -1003,6 +1225,7 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
                 base + 7,
                 &admin_path,
                 &s.split_route_mode,
+                &server_extras,
                 ssl_ref,
             )
         }
@@ -1022,7 +1245,6 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
         _ => crate::compose::magento_vhost(&s.name, &s.domain, &src, &s.php_version),
     };
 
-    let vhost_path = format!("/etc/nginx/sites-available/{}", s.name);
     write_privileged(&vhost_path, &vhost).await?;
     run_privileged(&[
         "ln",
@@ -1041,6 +1263,7 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
                 fd,
                 s.frontend_port,
                 s.frontend_root.as_deref(),
+                &server_extras,
                 ssl_ref,
             );
             write_privileged(&fe_available, &fe_vhost).await?;

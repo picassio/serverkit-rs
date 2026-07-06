@@ -32,13 +32,76 @@ const PRIMARY_ACTIONS = [
 ];
 
 const SERVICE_FIELDS = [
-    ['db', 'Database image'],
-    ['opensearch', 'Search image'],
-    ['redis', 'Redis image'],
-    ['rabbitmq', 'RabbitMQ image'],
-    ['varnish', 'Varnish image'],
-    ['mailpit', 'Mailpit image'],
+    {
+        id: 'db',
+        label: 'Database image',
+        helper: 'MariaDB/MySQL image used by the stack database service.',
+        options: [
+            ['mariadb:11.8', 'MariaDB 11.8 — Magento 2.4.8-p5 latest'],
+            ['mariadb:11.4', 'MariaDB 11.4 — Magento 2.4.8'],
+            ['mysql:8.4', 'MySQL 8.4 — Magento 2.4.8'],
+            ['mariadb:10.11', 'MariaDB 10.11 — Magento 2.4.7/2.4.6'],
+            ['mariadb:10.6', 'MariaDB 10.6 — legacy/default'],
+        ],
+    },
+    {
+        id: 'opensearch',
+        label: 'Search image',
+        helper: 'OpenSearch image. Use custom only if the compose env is compatible.',
+        options: [
+            ['opensearchproject/opensearch:3', 'OpenSearch 3 — Magento 2.4.8-p5'],
+            ['opensearchproject/opensearch:3.1.0', 'OpenSearch 3.1'],
+            ['opensearchproject/opensearch:2.19.0', 'OpenSearch 2.19 — Magento 2.4.7/2.4.6'],
+            ['opensearchproject/opensearch:2.12.0', 'OpenSearch 2.12 — ServerKit default'],
+            ['opensearchproject/opensearch:2.5.0', 'OpenSearch 2.5 — legacy stack'],
+        ],
+    },
+    {
+        id: 'redis',
+        label: 'Cache image',
+        helper: 'Redis-protocol cache/session service. Valkey is preferred for newer Magento patches.',
+        options: [
+            ['valkey/valkey:8.1-alpine', 'Valkey 8.1 — Magento 2.4.8-p5'],
+            ['valkey/valkey:8-alpine', 'Valkey 8'],
+            ['redis:7.2-alpine', 'Redis 7.2 — legacy/default'],
+        ],
+    },
+    {
+        id: 'rabbitmq',
+        label: 'RabbitMQ image',
+        helper: 'Used only when RabbitMQ is enabled below.',
+        options: [
+            ['rabbitmq:4.2-management-alpine', 'RabbitMQ 4.2 — Magento latest patches'],
+            ['rabbitmq:4.1-management-alpine', 'RabbitMQ 4.1 — Magento 2.4.8-p4/2.4.7-p9'],
+            ['rabbitmq:3.13-management-alpine', 'RabbitMQ 3.13 — ServerKit default'],
+            ['rabbitmq:3.9-management-alpine', 'RabbitMQ 3.9 — Magento 2.4.4'],
+        ],
+    },
+    {
+        id: 'varnish',
+        label: 'Varnish image',
+        helper: 'Used only when Varnish FPC is enabled below.',
+        options: [
+            ['varnish:8', 'Varnish 8 — Magento latest patches'],
+            ['varnish:7.7', 'Varnish 7.7'],
+            ['varnish:7.4', 'Varnish 7.4 — ServerKit default'],
+        ],
+    },
+    {
+        id: 'mailpit',
+        label: 'Mail capture image',
+        helper: 'Development SMTP/UI mail capture service.',
+        options: [
+            ['axllent/mailpit:latest', 'Mailpit latest — ServerKit default'],
+            ['mailhog/mailhog:latest', 'MailHog latest — legacy stack'],
+            ['mailhog/mailhog', 'MailHog unpinned — legacy exact image'],
+        ],
+    },
 ];
+
+const CUSTOM_IMAGE_VALUE = '__custom_image__';
+
+const serviceOptionValues = (field) => field.options.map(([value]) => value);
 
 const initialMagentoForm = () => ({
     name: '',
@@ -105,6 +168,32 @@ const Magento = () => {
     }, [toast]);
 
     useEffect(() => { load(); }, [load]);
+
+    const serviceValue = (field) => form.service_versions?.[field.id] || '';
+
+    const serviceSelectValue = (field) => {
+        const current = serviceValue(field);
+        if (!current) return '';
+        return serviceOptionValues(field).includes(current) ? current : CUSTOM_IMAGE_VALUE;
+    };
+
+    const updateServiceVersion = (serviceId, value) => {
+        setForm((prev) => {
+            const nextVersions = { ...(prev.service_versions || {}) };
+            if (value) nextVersions[serviceId] = value;
+            else delete nextVersions[serviceId];
+            return { ...prev, service_versions: nextVersions };
+        });
+    };
+
+    const handleServiceChoice = (field, value) => {
+        if (value === CUSTOM_IMAGE_VALUE) {
+            const current = serviceValue(field);
+            updateServiceVersion(field.id, serviceOptionValues(field).includes(current) ? '' : current);
+            return;
+        }
+        updateServiceVersion(field.id, value);
+    };
 
     // Poll while any store is provisioning
     useEffect(() => {
@@ -557,12 +646,36 @@ const Magento = () => {
                             <p className="text-xs text-muted-foreground">Use full image references, not just major versions. This supports Magento/PHP stack combinations where patch releases change service requirements.</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {SERVICE_FIELDS.map(([svc, label]) => (
-                                <div key={svc}>
-                                    <Label>{label}</Label>
-                                    <Input placeholder={catalog.service_versions?.[svc] || svc} value={form.service_versions?.[svc] || ''} onChange={(e) => setForm({ ...form, service_versions: { ...form.service_versions, [svc]: e.target.value } })} />
-                                </div>
-                            ))}
+                            {SERVICE_FIELDS.map((field) => {
+                                const defaultImage = catalog.service_versions?.[field.id];
+                                const selected = serviceSelectValue(field);
+                                const isCustom = selected === CUSTOM_IMAGE_VALUE;
+                                return (
+                                    <div key={field.id} className="space-y-1.5">
+                                        <Label>{field.label}</Label>
+                                        <select
+                                            className="w-full h-9 rounded-md border bg-background px-3 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                            value={selected}
+                                            onChange={(e) => handleServiceChoice(field, e.target.value)}
+                                        >
+                                            <option value="">ServerKit default{defaultImage ? ` — ${defaultImage}` : ''}</option>
+                                            {field.options.map(([value, label]) => (
+                                                <option key={value} value={value}>{label}</option>
+                                            ))}
+                                            <option value={CUSTOM_IMAGE_VALUE}>Custom image…</option>
+                                        </select>
+                                        {isCustom && (
+                                            <Input
+                                                className="mt-2"
+                                                placeholder="registry.example.com/image:tag"
+                                                value={serviceValue(field)}
+                                                onChange={(e) => updateServiceVersion(field.id, e.target.value)}
+                                            />
+                                        )}
+                                        <p className="text-xs text-muted-foreground">{field.helper}</p>
+                                    </div>
+                                );
+                            })}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                             <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">

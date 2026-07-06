@@ -182,8 +182,11 @@ install_binary() {
 if [ "$BUILD_FROM_SOURCE" = "0" ]; then
   log "Installing prebuilt binary from release tarball"
   install_binary "$HERE/sk-server"
+  rm -rf "$INSTALL_DIR/frontend"
   cp -r "$HERE/frontend"  "$INSTALL_DIR/"
+  rm -rf "$INSTALL_DIR/ai-sidecar"
   cp -r "$HERE/ai-sidecar" "$INSTALL_DIR/"
+  rm -rf "$INSTALL_DIR/templates"
   cp -r "$HERE/templates"  "$INSTALL_DIR/"
 else
   log "Building from source (a few minutes)…"
@@ -193,9 +196,12 @@ else
   ( cd "$HERE/frontend" && npm ci && npm run build )
   install_binary "$HERE/backend-rs/target/release/sk-server"
   mkdir -p "$INSTALL_DIR/frontend"
+  rm -rf "$INSTALL_DIR/frontend/dist"
   cp -r "$HERE/frontend/dist" "$INSTALL_DIR/frontend/dist"
+  rm -rf "$INSTALL_DIR/ai-sidecar"
   cp -r "$HERE/backend-rs/ai-sidecar" "$INSTALL_DIR/ai-sidecar"
   rm -rf "$INSTALL_DIR/ai-sidecar/node_modules"
+  rm -rf "$INSTALL_DIR/templates"
   cp -r "$HERE/backend/templates" "$INSTALL_DIR/templates"
 fi
 chmod +x "$INSTALL_DIR/ai-sidecar/start.sh"

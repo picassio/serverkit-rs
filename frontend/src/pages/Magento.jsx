@@ -291,6 +291,19 @@ const Magento = () => {
         }
     };
 
+    const retryProvision = async (store) => {
+        setBusyAction(`${store.id}:retry-provision`);
+        try {
+            await api.retryMagentoProvision(store.id);
+            toast.success(`Provisioning retry started for ${store.name}`);
+            load();
+        } catch (err) {
+            toast.error(`Retry failed: ${err.message}`);
+        } finally {
+            setBusyAction(null);
+        }
+    };
+
     const openLog = async (store) => {
         setLogStore(store);
         const res = await api.getMagentoStoreLog(store.id, 200).catch(() => ({ lines: [] }));
@@ -581,6 +594,16 @@ const Magento = () => {
                                     {store.status === 'running' && (
                                         <Button variant="outline" size="sm" onClick={() => openHealth(store)}>
                                             <Activity size={13} className="mr-1" /> Health
+                                        </Button>
+                                    )}
+                                    {store.status === 'failed' && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => retryProvision(store)}
+                                            disabled={busyAction === `${store.id}:retry-provision`}
+                                        >
+                                            <RefreshCw size={13} className="mr-1" /> Retry provision
                                         </Button>
                                     )}
                                     {store.status === 'running' && (

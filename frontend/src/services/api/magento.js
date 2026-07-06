@@ -47,6 +47,10 @@ export async function applyMagentoWeb(id) {
     return this.request(`/magento/stores/${id}/apply-web`, { method: 'POST' });
 }
 
+export async function retryMagentoProvision(id) {
+    return this.request(`/magento/stores/${id}/provision/retry`, { method: 'POST' });
+}
+
 export async function magentoFrontendAction(id, action) {
     return this.request(`/magento/stores/${id}/frontend/${action}`, { method: 'POST' });
 }

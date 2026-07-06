@@ -22,6 +22,7 @@ pub fn router() -> Router<SharedState> {
             get(get_store).patch(patch_store).delete(delete_store),
         )
         .route("/stores/{id}/apply-web", post(apply_web))
+        .route("/stores/{id}/provision/retry", post(retry_provision))
         .route(
             "/stores/{id}/runtime",
             get(get_runtime).patch(update_runtime),
@@ -449,6 +450,34 @@ async fn delete_store(
 #[derive(Deserialize)]
 struct LogQuery {
     lines: Option<usize>,
+}
+
+async fn retry_provision(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    store::ensure_schema(&state.db).await?;
+    let s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    if s.status == "provisioning" {
+        return Err(ApiError::conflict("Store provisioning is already running"));
+    }
+    store::set_status(&state.db, id, "provisioning", "retry queued").await;
+    provision::spawn(
+        state.db.clone(),
+        s.clone(),
+        provision::ProvisionSpec {
+            base_dir: "/srv/serverkit/stacks".into(),
+        },
+    );
+    Ok(Json(json!({
+        "success": true,
+        "message": format!("Provisioning retry started for {}", s.name),
+        "store": s.to_dict(false),
+    })))
 }
 
 async fn store_log(

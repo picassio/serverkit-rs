@@ -112,6 +112,8 @@ const initialMagentoForm = () => ({
     distribution: 'mage-os',
     php_version: '',
     install_magento: false,
+    auto_install_php: true,
+    php_extension_profile: 'magento',
     root_path: '',
     magento_source_path: '',
     ssl: 'none',
@@ -230,6 +232,7 @@ const Magento = () => {
             payload.magento_routes = (form.magento_routes || '').split(',').map((r) => r.trim()).filter(Boolean);
             if (!payload.frontend_domain) delete payload.frontend_domain;
             if (!payload.php_version) delete payload.php_version;
+            if (!payload.auto_install_php) delete payload.php_extension_profile;
             if (!payload.root_path) delete payload.root_path;
             if (!payload.magento_source_path) delete payload.magento_source_path;
             if (!payload.frontend_root) delete payload.frontend_root;
@@ -634,7 +637,7 @@ const Magento = () => {
                             <div>
                                 <Label>PHP version</Label>
                                 <Input placeholder={versions.find((v) => v.magento === form.magento_version)?.php || '8.3'} value={form.php_version} onChange={(e) => setForm({ ...form, php_version: e.target.value })} />
-                                <p className="text-xs text-muted-foreground mt-1">Example: 8.2 or 8.3. Must be installed on the host if initializing or serving PHP.</p>
+                                <p className="text-xs text-muted-foreground mt-1">Example: 8.4 or 8.3. ServerKit can auto-install it if missing.</p>
                             </div>
                             <div>
                                 <Label>Distribution</Label>
@@ -643,6 +646,23 @@ const Magento = () => {
                                     <SelectContent>
                                         <SelectItem value="mage-os">Mage-OS mirror (no auth keys)</SelectItem>
                                         <SelectItem value="magento">Magento Open Source (repo.magento.com)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <label className="flex items-center gap-2 rounded border px-3 py-2 cursor-pointer">
+                                <input type="checkbox" checked={form.auto_install_php} onChange={(e) => setForm({ ...form, auto_install_php: e.target.checked })} />
+                                Auto-install missing PHP/FPM on the host
+                            </label>
+                            <div>
+                                <Label>PHP extension profile</Label>
+                                <Select value={form.php_extension_profile} onValueChange={(value) => setForm({ ...form, php_extension_profile: value })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="minimal">Minimal</SelectItem>
+                                        <SelectItem value="magento">Magento required</SelectItem>
+                                        <SelectItem value="all-supported">All supported</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -715,6 +735,7 @@ const Magento = () => {
                                         <SelectItem value="shared">Shared domain (frontend at /, Magento routed)</SelectItem>
                                         <SelectItem value="separate">Separate domains</SelectItem>
                                         <SelectItem value="split">Split frontend + API + admin domains</SelectItem>
+                                        <SelectItem value="legacy_split">Legacy split (broad API/admin proxy)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -731,13 +752,13 @@ const Magento = () => {
                                 <Input type="number" value={form.frontend_port} onChange={(e) => setForm({ ...form, frontend_port: e.target.value })} />
                                 <p className="text-xs text-muted-foreground mt-1">0 = serve static export from frontend path.</p>
                             </div>
-                            {(form.headless_mode === 'separate' || form.headless_mode === 'split') && (
+                            {(form.headless_mode === 'separate' || form.headless_mode === 'split' || form.headless_mode === 'legacy_split') && (
                                 <div>
                                     <Label>Frontend domain</Label>
                                     <Input placeholder="store.example.com" value={form.frontend_domain} onChange={(e) => setForm({ ...form, frontend_domain: e.target.value })} />
                                 </div>
                             )}
-                            {form.headless_mode === 'split' && (
+                            {(form.headless_mode === 'split' || form.headless_mode === 'legacy_split') && (
                                 <div>
                                     <Label>Admin domain</Label>
                                     <Input placeholder="admin.example.com" value={form.admin_domain || ''} onChange={(e) => setForm({ ...form, admin_domain: e.target.value })} />
@@ -927,6 +948,7 @@ const Magento = () => {
                                                 <SelectItem value="shared">Shared</SelectItem>
                                                 <SelectItem value="separate">Separate</SelectItem>
                                                 <SelectItem value="split">Split (FE + API + admin)</SelectItem>
+                                                <SelectItem value="legacy_split">Legacy split (broad API/admin proxy)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -940,7 +962,7 @@ const Magento = () => {
                                                     <Input value={webForm.frontend_domain} onChange={(e) => setWebForm({ ...webForm, frontend_domain: e.target.value })} />
                                                 </div>
                                             )}
-                                            {webForm.headless_mode === 'split' && (
+                                            {(webForm.headless_mode === 'split' || webForm.headless_mode === 'legacy_split') && (
                                                 <div>
                                                     <Label>Admin domain</Label>
                                                     <Input value={webForm.admin_domain} onChange={(e) => setWebForm({ ...webForm, admin_domain: e.target.value })} />

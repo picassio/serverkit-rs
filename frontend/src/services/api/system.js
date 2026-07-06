@@ -263,8 +263,19 @@ export async function getPHPVersions() {
     return this.request('/php/versions');
 }
 
-export async function installPHPVersion(version) {
-    return this.request(`/php/versions/${version}/install`, { method: 'POST' });
+export async function installPHPVersion(version, options = {}) {
+    return this.request(`/php/versions/${version}/install`, {
+        method: 'POST',
+        body: options
+    });
+}
+
+export async function getNginxVersions() {
+    return this.request('/nginx/versions');
+}
+
+export async function installNginxVersion(target) {
+    return this.request(`/nginx/versions/${target}/install`, { method: 'POST' });
 }
 
 export async function setDefaultPHPVersion(version) {
@@ -279,9 +290,10 @@ export async function getPHPExtensions(version) {
 }
 
 export async function installPHPExtension(version, extension) {
+    const body = Array.isArray(extension) ? { extensions: extension } : { extension };
     return this.request(`/php/versions/${version}/extensions`, {
         method: 'POST',
-        body: { extension }
+        body
     });
 }
 

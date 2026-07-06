@@ -469,6 +469,18 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
             &admin_path,
             ssl_ref,
         )
+    } else if s.headless_mode == "legacy_split" {
+        crate::compose::magento_vhost_headless_legacy_split(
+            &s.name,
+            &s.domain,
+            s.admin_domain
+                .as_deref()
+                .unwrap_or(&format!("admin.{}", s.domain)),
+            &src,
+            &s.php_version,
+            base + 7,
+            ssl_ref,
+        )
     } else if s.use_varnish {
         crate::compose::magento_vhost_varnish(
             &s.name,
@@ -494,7 +506,10 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     ])
     .await?;
     // separate/split headless modes: additional vhost for the frontend domain
-    if matches!(s.headless_mode.as_str(), "separate" | "split") {
+    if matches!(
+        s.headless_mode.as_str(),
+        "separate" | "split" | "legacy_split"
+    ) {
         if let Some(fd) = &s.frontend_domain {
             let fe_vhost = crate::compose::frontend_vhost(
                 &s.name,
@@ -948,6 +963,17 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
             &admin_path,
             ssl_ref,
         ),
+        "legacy_split" => crate::compose::magento_vhost_headless_legacy_split(
+            &s.name,
+            &s.domain,
+            s.admin_domain
+                .as_deref()
+                .unwrap_or(&format!("admin.{}", s.domain)),
+            &src,
+            &s.php_version,
+            base + 7,
+            ssl_ref,
+        ),
         _ if s.use_varnish => crate::compose::magento_vhost_varnish(
             &s.name,
             &s.domain,
@@ -976,7 +1002,10 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
 
     let fe_available = format!("/etc/nginx/sites-available/{}-frontend", s.name);
     let fe_enabled = format!("/etc/nginx/sites-enabled/{}-frontend", s.name);
-    if matches!(s.headless_mode.as_str(), "separate" | "split") {
+    if matches!(
+        s.headless_mode.as_str(),
+        "separate" | "split" | "legacy_split"
+    ) {
         if let Some(fd) = &s.frontend_domain {
             let fe_vhost = crate::compose::frontend_vhost(
                 &s.name,

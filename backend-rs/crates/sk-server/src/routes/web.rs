@@ -13,6 +13,8 @@ use serde_json::{json, Map, Value};
 pub fn nginx_router() -> Router<SharedState> {
     Router::new()
         .route("/status", get(nginx_status))
+        .route("/versions", get(nginx_versions))
+        .route("/versions/{target}/install", post(nginx_install_version))
         .route("/test", post(nginx_test))
         .route("/reload", post(nginx_reload))
         .route("/restart", post(nginx_restart))
@@ -108,6 +110,25 @@ fn by_success(result: Value, ok: StatusCode) -> (StatusCode, Json<Value>) {
 async fn nginx_status(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
     require_admin(&u)?;
     Ok(Json(sk_web::nginx::status().await))
+}
+
+async fn nginx_versions(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    Ok(Json(json!({
+        "installed": sk_web::nginx::installed_version().await,
+        "supported": sk_web::nginx::SUPPORTED_NGINX_TARGETS,
+    })))
+}
+
+async fn nginx_install_version(
+    AuthUser(u): AuthUser,
+    Path(target): Path<String>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    Ok(by_success(
+        sk_web::nginx::install_version(&target).await,
+        StatusCode::OK,
+    ))
 }
 
 async fn nginx_test(AuthUser(u): AuthUser) -> ApiResult<(StatusCode, Json<Value>)> {
@@ -530,6 +551,8 @@ async fn php_versions(AuthUser(u): AuthUser) -> ApiResult<Json<Value>> {
         "versions": sk_web::php::installed_versions().await,
         "default": sk_web::php::default_version().await,
         "supported": sk_web::php::SUPPORTED_VERSIONS,
+        "supported_extensions": sk_web::php::SUPPORTED_EXTENSIONS,
+        "profiles": ["minimal", "magento", "all-supported"],
     })))
 }
 
@@ -552,13 +575,41 @@ async fn set_default(
     ))
 }
 
+#[derive(Deserialize, Default)]
+struct PhpInstallBody {
+    extensions: Option<Vec<String>>,
+    profile: Option<String>,
+    set_default: Option<bool>,
+}
+
 async fn install_version(
     AuthUser(u): AuthUser,
     Path(version): Path<String>,
+    body: Option<Json<PhpInstallBody>>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     require_admin(&u)?;
+    let b = body.map(|b| b.0).unwrap_or_default();
+    let mut extensions: Vec<&str> = if let Some(profile) = b.profile.as_deref() {
+        sk_web::php::extension_profile(profile)
+            .ok_or_else(|| {
+                ApiError::bad_request(format!("Unsupported PHP extension profile: {profile}"))
+            })?
+            .to_vec()
+    } else {
+        sk_web::php::MAGENTO_EXTENSIONS.to_vec()
+    };
+    if let Some(extra) = &b.extensions {
+        extensions = extra.iter().map(String::as_str).collect();
+    }
     Ok(by_success(
-        sk_web::php::install_version(&version).await,
+        sk_web::php::install_version_with_options(
+            &version,
+            sk_web::php::InstallOptions {
+                extensions,
+                set_default: b.set_default.unwrap_or(false),
+            },
+        )
+        .await,
         StatusCode::OK,
     ))
 }
@@ -577,6 +628,7 @@ async fn get_extensions(
 #[derive(Deserialize)]
 struct ExtensionBody {
     extension: Option<String>,
+    extensions: Option<Vec<String>>,
 }
 
 async fn install_extension(
@@ -585,9 +637,23 @@ async fn install_extension(
     Json(b): Json<ExtensionBody>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     require_admin(&u)?;
+    if let Some(exts) = b.extensions {
+        let refs: Vec<&str> = exts.iter().map(String::as_str).collect();
+        return Ok(by_success(
+            sk_web::php::install_version_with_options(
+                &version,
+                sk_web::php::InstallOptions {
+                    extensions: refs,
+                    set_default: false,
+                },
+            )
+            .await,
+            StatusCode::OK,
+        ));
+    }
     let ext = b
         .extension
-        .ok_or_else(|| ApiError::bad_request("extension is required"))?;
+        .ok_or_else(|| ApiError::bad_request("extension or extensions is required"))?;
     Ok(by_success(
         sk_web::php::install_extension(&version, &ext).await,
         StatusCode::OK,

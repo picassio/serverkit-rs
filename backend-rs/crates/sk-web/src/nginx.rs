@@ -9,6 +9,8 @@ use std::path::Path;
 const SITES_AVAILABLE: &str = "/etc/nginx/sites-available";
 const SITES_ENABLED: &str = "/etc/nginx/sites-enabled";
 
+pub const SUPPORTED_NGINX_TARGETS: &[&str] = &["distro", "stable", "mainline", "1.28", "1.30"];
+
 const PHP_SITE_TEMPLATE: &str = r#"server {
     listen 80;
     listen [::]:80;
@@ -157,6 +159,62 @@ fn validate_name(name: &str) -> bool {
     !name.is_empty() && !name.contains('/') && !name.contains("..") && !name.starts_with('.')
 }
 
+pub async fn installed_version() -> Option<String> {
+    let r = run(&["nginx", "-v"], 10).await;
+    let out = if r.stderr.is_empty() {
+        r.stdout
+    } else {
+        r.stderr
+    };
+    out.split("nginx/").nth(1).map(|v| v.trim().to_string())
+}
+
+pub async fn install_version(target: &str) -> Value {
+    if !SUPPORTED_NGINX_TARGETS.contains(&target) {
+        return json!({ "success": false, "error": format!("Unsupported nginx target: {target}") });
+    }
+
+    let script = if target == "distro" {
+        "set -e; apt-get update; apt-get install -y nginx; systemctl enable nginx; systemctl restart nginx".to_string()
+    } else {
+        let channel = if target == "stable" || target == "1.28" {
+            "stable"
+        } else {
+            "mainline"
+        };
+        let exact_filter = if target
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
+        {
+            format!(" | grep -m1 '{}.'", target)
+        } else {
+            String::new()
+        };
+        format!(
+            r#"set -e
+apt-get update
+apt-get install -y curl gnupg2 ca-certificates lsb-release ubuntu-keyring
+curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor -o /usr/share/keyrings/nginx-archive-keyring.gpg
+CODENAME=$(lsb_release -cs)
+echo 'deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] http://nginx.org/packages/{channel}/ubuntu/ '$CODENAME' nginx' > /etc/apt/sources.list.d/nginx-org.list
+apt-get update
+VERSION=$(apt-cache madison nginx{exact_filter} | awk '{{print $3; exit}}')
+if [ -n "$VERSION" ]; then apt-get install -y nginx="$VERSION"; else apt-get install -y nginx; fi
+systemctl enable nginx
+systemctl restart nginx
+"#
+        )
+    };
+    let r = privileged(&["/bin/sh", "-lc", &script], 900).await;
+    if r.ok {
+        json!({ "success": true, "message": format!("nginx target {target} installed"), "version": installed_version().await })
+    } else {
+        json!({ "success": false, "error": r.stderr, "stdout": r.stdout })
+    }
+}
+
 /// `NginxService.get_status`
 pub async fn status() -> Value {
     let running = service_is_active("nginx").await;
@@ -164,6 +222,8 @@ pub async fn status() -> Value {
     json!({
         "running": running,
         "status": if running { "running" } else { "stopped" },
+        "version": installed_version().await,
+        "supported_targets": SUPPORTED_NGINX_TARGETS,
         "details": details.stdout,
     })
 }

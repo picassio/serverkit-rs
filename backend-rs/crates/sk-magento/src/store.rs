@@ -168,7 +168,7 @@ impl Store {
 
     /// Resolved container image tags (overrides merged over defaults).
     pub fn service_versions_map(&self) -> serde_json::Value {
-        let defaults = crate::compose::default_service_versions();
+        let defaults = crate::compose::service_versions_for(&self.magento_version);
         let mut map = defaults.as_object().cloned().unwrap_or_default();
         if let Some(raw) = &self.service_versions {
             if let Ok(serde_json::Value::Object(over)) =

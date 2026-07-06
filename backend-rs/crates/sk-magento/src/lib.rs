@@ -19,7 +19,9 @@ use serde_json::{json, Value};
 /// Magento → (exact Composer, recommended PHP, OpenSearch supported).
 /// From the magento-vm-provisioner matrix.
 pub const VERSION_MATRIX: &[(&str, &str, &str)] = &[
-    // (magento_series, composer, php)
+    // (magento_series_or_patch, composer, php)
+    ("2.4.8-p5", "2.10.0", "8.4"),
+    ("2.4.8-p4", "2.9.3", "8.4"),
     ("2.4.8", "2.9.3", "8.3"),
     ("2.4.7", "2.7.9", "8.3"),
     ("2.4.6", "2.2.22", "8.2"),
@@ -55,6 +57,10 @@ pub fn versions_payload() -> Value {
         "search_engines": ["opensearch"],
         // Data-plane image defaults — override any per store via service_versions.
         "service_versions": compose::default_service_versions(),
+        "service_profiles": {
+            "2.4.8-p5": compose::service_versions_for("2.4.8-p5")
+        },
+        "headless_modes": ["none", "shared", "separate", "split", "legacy_split"],
         "ssl_modes": ["none", "self-signed", "letsencrypt"],
         "le_challenges": ["dns", "http"],
         "run_user_default": "www-data",
@@ -97,6 +103,7 @@ mod tests {
     #[test]
     fn matrix() {
         assert_eq!(matrix_lookup("2.4.8"), Some(("2.9.3", "8.3")));
+        assert_eq!(matrix_lookup("2.4.8-p5"), Some(("2.10.0", "8.4")));
         assert_eq!(matrix_lookup("2.4.8-p1"), Some(("2.9.3", "8.3")));
         assert_eq!(matrix_lookup("2.4.4"), Some(("2.2.22", "8.1")));
         assert_eq!(matrix_lookup("1.9.0"), None);

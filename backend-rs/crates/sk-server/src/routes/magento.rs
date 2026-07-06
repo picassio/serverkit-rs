@@ -132,6 +132,11 @@ struct CreateStoreBody {
     install_magento: Option<bool>,
     /// Existing Magento source tree, e.g. /srv/shop/current. Defaults to root_path/src.
     magento_source_path: Option<String>,
+    /// Install missing host PHP/FPM + selected extensions before creating the stack.
+    auto_install_php: Option<bool>,
+    /// PHP extension profile or explicit extension list for auto-install.
+    php_extension_profile: Option<String>,
+    php_extensions: Option<Vec<String>>,
 }
 
 /// POST /magento/stores — insert row + spawn the provisioning task.
@@ -205,13 +210,17 @@ async fn create_store(
     let headless_mode = b.headless_mode.unwrap_or_else(|| "none".into());
     if !matches!(
         headless_mode.as_str(),
-        "none" | "shared" | "separate" | "split"
+        "none" | "shared" | "separate" | "split" | "legacy_split"
     ) {
         return Err(ApiError::bad_request(
-            "headless_mode must be 'none', 'shared', 'separate' or 'split'",
+            "headless_mode must be 'none', 'shared', 'separate', 'split' or 'legacy_split'",
         ));
     }
-    if matches!(headless_mode.as_str(), "separate" | "split") && b.frontend_domain.is_none() {
+    if matches!(
+        headless_mode.as_str(),
+        "separate" | "split" | "legacy_split"
+    ) && b.frontend_domain.is_none()
+    {
         return Err(ApiError::bad_request(
             "frontend_domain is required for this headless mode",
         ));
@@ -269,12 +278,42 @@ async fn create_store(
         }
         None => format!("{base_dir}/{name}"),
     };
-    if (install_magento || b.magento_source_path.is_some())
-        && !std::path::Path::new(&format!("/usr/bin/php{php_version}")).exists()
-    {
-        return Err(ApiError::bad_request(format!(
-            "PHP {php_version} is not installed — install it first via /api/v1/php/versions/{php_version}/install"
-        )));
+    if !std::path::Path::new(&format!("/usr/bin/php{php_version}")).exists() {
+        if b.auto_install_php.unwrap_or(false) {
+            let mut extensions: Vec<&str> =
+                if let Some(profile) = b.php_extension_profile.as_deref() {
+                    sk_web::php::extension_profile(profile)
+                        .ok_or_else(|| {
+                            ApiError::bad_request(format!(
+                                "Unsupported PHP extension profile: {profile}"
+                            ))
+                        })?
+                        .to_vec()
+                } else {
+                    sk_web::php::MAGENTO_EXTENSIONS.to_vec()
+                };
+            if let Some(extra) = &b.php_extensions {
+                extensions = extra.iter().map(String::as_str).collect();
+            }
+            let result = sk_web::php::install_version_with_options(
+                &php_version,
+                sk_web::php::InstallOptions {
+                    extensions,
+                    set_default: false,
+                },
+            )
+            .await;
+            if !result["success"].as_bool().unwrap_or(false) {
+                return Err(ApiError::bad_request(format!(
+                    "PHP {php_version} auto-install failed: {}",
+                    result["error"].as_str().unwrap_or("unknown error")
+                )));
+            }
+        } else if install_magento || b.magento_source_path.is_some() || headless_mode != "none" {
+            return Err(ApiError::bad_request(format!(
+                "PHP {php_version} is not installed — install it first via /api/v1/php/versions/{php_version}/install or set auto_install_php=true"
+            )));
+        }
     }
 
     let db_password = sk_magento::generate_password(20);
@@ -407,7 +446,10 @@ async fn patch_store(
         .await?
         .ok_or_else(|| ApiError::not_found("Store not found"))?;
     if let Some(m) = &b.headless_mode {
-        if !matches!(m.as_str(), "none" | "shared" | "separate" | "split") {
+        if !matches!(
+            m.as_str(),
+            "none" | "shared" | "separate" | "split" | "legacy_split"
+        ) {
             return Err(ApiError::bad_request("Invalid headless_mode"));
         }
     }

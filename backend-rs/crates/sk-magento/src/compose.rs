@@ -5,6 +5,20 @@
 /// Default container image refs (full `family:tag`, so overrides can bump a
 /// version *or* swap engines, e.g. `mariadb:11.4` or `mysql:8.4`).
 pub fn default_service_versions() -> serde_json::Value {
+    service_versions_for("default")
+}
+
+pub fn service_versions_for(magento_version: &str) -> serde_json::Value {
+    if magento_version == "2.4.8-p5" {
+        return serde_json::json!({
+            "db": "mariadb:11.8",
+            "opensearch": "opensearchproject/opensearch:3",
+            "redis": "valkey/valkey:8.1-alpine",
+            "rabbitmq": "rabbitmq:4.2-management-alpine",
+            "varnish": "varnish:8",
+            "mailpit": "axllent/mailpit:latest"
+        });
+    }
     serde_json::json!({
         "db": "mariadb:10.6",
         "opensearch": "opensearchproject/opensearch:2.12.0",
@@ -519,6 +533,77 @@ server {{
     location / {{
         return 404;
     }}
+}}
+"#
+    )
+}
+
+/// Legacy three-domain split mode for migrated headless stores where the API
+/// and admin domains intentionally proxy broad Magento surfaces instead of the
+/// stricter allowlist used by `split`.
+#[allow(clippy::too_many_arguments)]
+pub fn magento_vhost_headless_legacy_split(
+    name: &str,
+    api_domain: &str,
+    admin_domain: &str,
+    mage_root: &str,
+    php_version: &str,
+    backend_port: u16,
+    ssl: Option<(&str, &str)>,
+) -> String {
+    let upstream = upstream_name(name);
+    let pool = name.replace('-', "_");
+    let api_locations = [
+        magento_proxy_location("^~ /rest", backend_port),
+        magento_proxy_location("~ ^/(en/graphql|vi/graphql|graphql)", backend_port),
+        magento_proxy_location("~ ^/(media/)", backend_port),
+        magento_proxy_location("/", backend_port),
+    ]
+    .join("\n\n");
+    let admin_locations = [
+        magento_proxy_location("~ ^/(en/graphql|vi/graphql|graphql)", backend_port),
+        magento_proxy_location("~ ^/(media/)", backend_port),
+        magento_proxy_location("/", backend_port),
+    ]
+    .join("\n\n");
+    let (api_listen, api_redirect) = public_listen(api_domain, ssl);
+    let (admin_listen, admin_redirect) = public_listen(admin_domain, ssl);
+    format!(
+        r#"upstream {upstream} {{
+    server unix:/run/php/php{php_version}-fpm-{pool}.sock;
+}}
+
+# Internal Magento backend (legacy split mode) — loopback only
+server {{
+    listen 127.0.0.1:{backend_port};
+    server_name {api_domain} {admin_domain};
+
+    set $MAGE_ROOT {mage_root};
+
+    access_log /var/log/nginx/{name}.backend.log;
+    error_log /var/log/nginx/{name}.error.log;
+
+    include {mage_root}/nginx.conf.serverkit;
+}}
+
+{api_redirect}# API domain — legacy broad Magento proxy
+server {{
+{api_listen}
+    server_name {api_domain};
+
+    access_log /var/log/nginx/{name}.api.log;
+
+{api_locations}
+}}
+
+{admin_redirect}# Admin/domain services — legacy broad Magento proxy
+server {{
+{admin_listen}
+    server_name {admin_domain};
+
+    access_log /var/log/nginx/{name}.admin.log;
+
+{admin_locations}
 }}
 "#
     )

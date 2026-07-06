@@ -10,6 +10,29 @@ use std::path::Path;
 
 pub const SUPPORTED_VERSIONS: &[&str] = &["7.4", "8.0", "8.1", "8.2", "8.3", "8.4"];
 
+pub const SUPPORTED_EXTENSIONS: &[&str] = &[
+    "bcmath", "cli", "common", "curl", "fpm", "gd", "igbinary", "imagick", "intl", "mbstring",
+    "mysql", "opcache", "readline", "redis", "soap", "xml", "xmlrpc", "zip",
+];
+
+pub const MAGENTO_EXTENSIONS: &[&str] = &[
+    "bcmath", "cli", "common", "curl", "fpm", "gd", "imagick", "intl", "mbstring", "mysql",
+    "opcache", "soap", "xml", "zip",
+];
+
+pub fn extension_profile(profile: &str) -> Option<&'static [&'static str]> {
+    match profile {
+        "minimal" => Some(&["cli", "fpm", "common"]),
+        "magento" => Some(MAGENTO_EXTENSIONS),
+        "all-supported" => Some(SUPPORTED_EXTENSIONS),
+        _ => None,
+    }
+}
+
+pub fn supported_extension(name: &str) -> bool {
+    SUPPORTED_EXTENSIONS.contains(&name)
+}
+
 const POOL_TEMPLATE: &str = r#"[{pool_name}]
 user = {user}
 group = {group}
@@ -124,34 +147,79 @@ pub async fn set_default_version(version: &str) -> Value {
     }
 }
 
+pub struct InstallOptions<'a> {
+    pub extensions: Vec<&'a str>,
+    pub set_default: bool,
+}
+
 /// `PHPService.install_version` — ondrej PPA + apt install with the common
-/// extension set (the Magento-required set is a superset installed later
-/// by sk-magento).
+/// extension set.
 pub async fn install_version(version: &str) -> Value {
+    install_version_with_options(
+        version,
+        InstallOptions {
+            extensions: MAGENTO_EXTENSIONS.to_vec(),
+            set_default: false,
+        },
+    )
+    .await
+}
+
+/// Option-aware PHP installer. Used by the PHP routes and Magento auto-prepare.
+pub async fn install_version_with_options(version: &str, opts: InstallOptions<'_>) -> Value {
     if !valid_version(version) {
         return json!({ "success": false, "error": format!("Unsupported PHP version: {version}") });
     }
+    let mut extensions = opts.extensions;
+    if extensions.is_empty() {
+        extensions = MAGENTO_EXTENSIONS.to_vec();
+    }
+    extensions.sort_unstable();
+    extensions.dedup();
+    if let Some(invalid) = extensions.iter().find(|ext| !supported_extension(ext)) {
+        return json!({ "success": false, "error": format!("Unsupported PHP extension: {invalid}") });
+    }
 
+    privileged(&["apt-get", "update"], 120).await;
+    privileged(
+        &[
+            "apt-get",
+            "install",
+            "-y",
+            "software-properties-common",
+            "ca-certificates",
+            "lsb-release",
+            "apt-transport-https",
+        ],
+        180,
+    )
+    .await;
     privileged(&["add-apt-repository", "-y", "ppa:ondrej/php"], 120).await;
     privileged(&["apt-get", "update"], 120).await;
 
-    let packages: Vec<String> = [
-        "fpm", "cli", "common", "mysql", "xml", "xmlrpc", "curl", "gd", "imagick", "mbstring",
-        "opcache", "soap", "zip", "intl", "bcmath",
-    ]
-    .iter()
-    .map(|ext| format!("php{version}-{ext}"))
-    .collect();
+    let packages: Vec<String> = extensions
+        .iter()
+        .map(|ext| format!("php{version}-{ext}"))
+        .collect();
 
     let mut cmd: Vec<&str> = vec!["apt-get", "install", "-y"];
     cmd.extend(packages.iter().map(String::as_str));
-    let r = privileged(&cmd, 600).await;
+    let r = privileged(&cmd, 900).await;
 
     if r.ok {
         let svc = fpm_service(version);
         privileged(&["systemctl", "enable", &svc], 30).await;
         privileged(&["systemctl", "start", &svc], 30).await;
-        json!({ "success": true, "message": format!("PHP {version} installed successfully") })
+        if opts.set_default {
+            let _ = set_default_version(version).await;
+        }
+        json!({
+            "success": true,
+            "message": format!("PHP {version} installed successfully"),
+            "version": version,
+            "extensions": extensions,
+            "set_default": opts.set_default,
+        })
     } else {
         json!({ "success": false, "error": r.stderr })
     }

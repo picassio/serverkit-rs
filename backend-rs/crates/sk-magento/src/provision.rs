@@ -157,6 +157,40 @@ fn valid_location_path(path: &str) -> bool {
         && !path.chars().any(char::is_whitespace)
 }
 
+fn location_access_snippet(item: &serde_json::Value) -> String {
+    let mut out = String::new();
+    if item["satisfy_any"].as_bool().unwrap_or(false) {
+        out.push_str("        satisfy any;\n");
+    }
+    for ip in string_array_extra(item, &["allow"]) {
+        if safe_snippet_line(&ip) {
+            out.push_str(&format!("        allow {ip};\n"));
+        }
+    }
+    for ip in string_array_extra(item, &["deny"]) {
+        if safe_snippet_line(&ip) {
+            out.push_str(&format!("        deny {ip};\n"));
+        }
+    }
+    out
+}
+
+fn cors_snippet(item: &serde_json::Value, indent: &str) -> String {
+    if !item["cors"].as_bool().unwrap_or(false) {
+        return String::new();
+    }
+    let cors = &item["cors_config"];
+    let origin = cors["origin"].as_str().unwrap_or("*").replace('"', "");
+    let methods = cors["methods"]
+        .as_str()
+        .unwrap_or("POST, GET, OPTIONS")
+        .replace('"', "");
+    let headers = cors["headers"].as_str().unwrap_or("Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With,X-Cache-Hash").replace('"', "");
+    format!(
+        "{indent}if ($request_method = 'OPTIONS') {{\n{indent}    add_header 'Access-Control-Allow-Origin' '{origin}' always;\n{indent}    add_header 'Access-Control-Allow-Methods' '{methods}' always;\n{indent}    add_header 'Access-Control-Allow-Headers' '{headers}' always;\n{indent}    add_header 'Access-Control-Max-Age' 1728000;\n{indent}    add_header 'Content-Type' 'text/plain charset=UTF-8';\n{indent}    add_header 'Content-Length' 0;\n{indent}    return 204;\n{indent}}}\n{indent}add_header 'Access-Control-Allow-Origin' '{origin}' always;\n"
+    )
+}
+
 fn nginx_extra_locations_snippet(extras: &serde_json::Value) -> String {
     let mut out = String::new();
     let Some(items) = extras["extra_locations"].as_array() else {
@@ -183,21 +217,46 @@ fn nginx_extra_locations_snippet(extras: &serde_json::Value) -> String {
         match kind {
             "proxy" if target.starts_with("http://") || target.starts_with("https://") => {
                 out.push_str(&format!(
-                    "    location {matcher} {{\n        proxy_pass {target};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_read_timeout 600;\n    }}\n"
+                    "    location {matcher} {{\n        proxy_pass {target};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_read_timeout {};\n        proxy_connect_timeout {};\n        proxy_send_timeout {};\n{}{}    }}\n",
+                    item["proxy_read_timeout"].as_str().unwrap_or("600"),
+                    item["proxy_connect_timeout"].as_str().unwrap_or("600"),
+                    item["proxy_send_timeout"].as_str().unwrap_or("600"),
+                    location_access_snippet(item),
+                    cors_snippet(item, "        "),
                 ));
             }
             "return" => {
-                out.push_str(&format!("    location {matcher} {{ return {target}; }}\n"));
+                out.push_str(&format!(
+                    "    location {matcher} {{\n{}        return {target};\n    }}\n",
+                    location_access_snippet(item)
+                ));
             }
             _ if target.starts_with('/') && !target.contains("..") => {
                 out.push_str(&format!(
                     "    location {matcher} {{\n        alias {target};\n"
                 ));
+                out.push_str(&location_access_snippet(item));
                 if item["autoindex"].as_bool().unwrap_or(false) {
-                    out.push_str("        autoindex on;\n");
+                    out.push_str("        autoindex on;\n        autoindex_localtime on;\n");
                 }
-                if item["cors"].as_bool().unwrap_or(false) {
-                    out.push_str("        add_header Access-Control-Allow-Origin \"*\" always;\n        add_header Access-Control-Allow-Methods \"GET, OPTIONS\" always;\n");
+                out.push_str(&cors_snippet(item, "        "));
+                if let Some(cache) = item["cache_control"].as_str() {
+                    if safe_snippet_line(cache) {
+                        out.push_str(&format!("        add_header Cache-Control \"{cache}\";\n"));
+                    }
+                }
+                if item["x_frame_sameorigin"].as_bool().unwrap_or(false) {
+                    out.push_str("        add_header X-Frame-Options \"SAMEORIGIN\";\n");
+                }
+                if let Some(expires) = item["expires"].as_str() {
+                    if safe_snippet_line(expires) {
+                        out.push_str(&format!("        expires {expires};\n"));
+                    }
+                }
+                if let Some(fallback) = item["try_files_fallback"].as_str() {
+                    if safe_snippet_line(fallback) {
+                        out.push_str(&format!("        try_files $uri $uri/ {fallback};\n"));
+                    }
                 }
                 out.push_str("    }\n");
             }
@@ -207,21 +266,46 @@ fn nginx_extra_locations_snippet(extras: &serde_json::Value) -> String {
     out
 }
 
+fn safe_var_suffix(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
+}
+
 fn nginx_extras_snippet(s: &Store) -> String {
     let extras = s.nginx_extras_value();
-    let mut out = nginx_extra_locations_snippet(&extras);
-    if bool_extra(&extras, &["badbot", "enabled"]) {
-        let patterns = string_array_extra(&extras, &["badbot", "patterns"]);
-        if !patterns.is_empty() {
-            let escaped = patterns
-                .iter()
-                .map(|p| escape_nginx_regex_literal(p))
-                .collect::<Vec<_>>()
-                .join("|");
+    let suffix = safe_var_suffix(&s.name);
+    let mut out = String::new();
+    if let Some(size) = extras["client_max_body_size"].as_str() {
+        if safe_snippet_line(size) {
+            out.push_str(&format!("    client_max_body_size {size};\n"));
+        }
+    }
+    if let Some(value) = extras["x_robots_tag"].as_str() {
+        if safe_snippet_line(value) {
             out.push_str(&format!(
-                "\n    if ($http_user_agent ~* \"({escaped})\") {{ return 444; }}\n"
+                "    add_header X-Robots-Tag \"{}\" always;\n",
+                value.replace('"', "")
             ));
         }
+    }
+    if bool_extra(&extras, &["proxy_tuning", "enabled"]) {
+        let p = &extras["proxy_tuning"];
+        out.push_str(&format!(
+            "    proxy_buffer_size {};\n    proxy_buffers {};\n    proxy_busy_buffers_size {};\n    proxy_read_timeout {};\n    proxy_connect_timeout {};\n    proxy_send_timeout {};\n",
+            p["buffer_size"].as_str().unwrap_or("128k"),
+            p["buffers"].as_str().unwrap_or("4 256k"),
+            p["busy_buffers_size"].as_str().unwrap_or("256k"),
+            p["read_timeout"].as_str().unwrap_or("600"),
+            p["connect_timeout"].as_str().unwrap_or("600"),
+            p["send_timeout"].as_str().unwrap_or("600"),
+        ));
+    }
+    out.push_str(&nginx_extra_locations_snippet(&extras));
+    if bool_extra(&extras, &["badbot", "enabled"]) {
+        out.push_str(&format!(
+            "\n    if ($serverkit_bad_bot_{suffix}) {{ return 444; }}\n"
+        ));
     }
     if bool_extra(&extras, &["ip_filter", "enabled"]) {
         for ip in string_array_extra(&extras, &["ip_filter", "allow"]) {
@@ -247,12 +331,15 @@ fn nginx_extras_snippet(s: &Store) -> String {
             out.push_str(&format!(
                 "    auth_basic \"{realm}\";\n    auth_basic_user_file {file};\n"
             ));
+            if extras["htpasswd"]["satisfy_any"].as_bool().unwrap_or(false) {
+                out.push_str("    satisfy any;\n");
+            }
         }
     }
     if bool_extra(&extras, &["maintenance", "enabled"]) {
         let dir = format!("/etc/nginx/serverkit/{}", s.name);
         out.push_str(&format!(
-            "    error_page 503 @serverkit_maintenance;\n    location @serverkit_maintenance {{ root {dir}; rewrite ^ /maintenance.html break; }}\n    return 503;\n"
+            "    set $serverkit_maintenance_{suffix} off;\n    if ($serverkit_whitelist_{suffix} = 0) {{ set $serverkit_maintenance_{suffix} on; }}\n    if ($serverkit_maintenance_{suffix} = on) {{ return 503; }}\n    error_page 503 @serverkit_maintenance;\n    location @serverkit_maintenance {{ root {dir}; rewrite ^ /maintenance.html break; }}\n"
         ));
     }
     if let Some(snippet) = extras["custom_server_snippet"].as_str() {
@@ -270,6 +357,7 @@ fn nginx_extras_snippet(s: &Store) -> String {
 
 async fn write_nginx_extra_assets(s: &Store) -> Result<(), String> {
     let extras = s.nginx_extras_value();
+    let suffix = safe_var_suffix(&s.name);
     let dir = format!("/etc/nginx/serverkit/{}", s.name);
     run_privileged(&["mkdir", "-p", &dir]).await?;
     if bool_extra(&extras, &["maintenance", "enabled"]) {
@@ -277,6 +365,40 @@ async fn write_nginx_extra_assets(s: &Store) -> Result<(), String> {
             "<!doctype html><title>Maintenance</title><style>body{text-align:center;padding:150px;font:20px Helvetica,sans-serif;color:#333;background:#f5f5f5}h1{font-size:50px}</style><h1>We'll be back soon!</h1><p>Performing scheduled maintenance.</p>",
         );
         write_privileged(&format!("{dir}/maintenance.html"), html).await?;
+    }
+    if bool_extra(&extras, &["badbot", "enabled"]) {
+        let mut map = format!(
+            "map $http_user_agent $serverkit_bad_bot_{suffix} {{\n    default 0;\n    ~*^Lynx 0;\n"
+        );
+        for p in string_array_extra(&extras, &["badbot", "patterns"]) {
+            if safe_snippet_line(&p) {
+                map.push_str(&format!("    ~*{} 1;\n", escape_nginx_regex_literal(&p)));
+            }
+        }
+        map.push_str("}\n");
+        write_privileged(
+            &format!("/etc/nginx/conf.d/serverkit-{}-badbot.conf", s.name),
+            &map,
+        )
+        .await?;
+    }
+    if bool_extra(&extras, &["maintenance", "enabled"])
+        || bool_extra(&extras, &["htpasswd", "enabled"])
+    {
+        let mut geo = format!("geo $serverkit_whitelist_{suffix} {{\n    default 0;\n");
+        let mut wl = string_array_extra(&extras, &["maintenance", "whitelist"]);
+        wl.extend(string_array_extra(&extras, &["htpasswd", "allow"]));
+        for ip in wl {
+            if safe_snippet_line(&ip) {
+                geo.push_str(&format!("    {ip} 1;\n"));
+            }
+        }
+        geo.push_str("}\n");
+        write_privileged(
+            &format!("/etc/nginx/conf.d/serverkit-{}-whitelist.conf", s.name),
+            &geo,
+        )
+        .await?;
     }
     Ok(())
 }

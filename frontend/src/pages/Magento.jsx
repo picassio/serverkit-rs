@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MetricCard, Pill, PageTopbar } from '@/components/ds';
 
 const STATUS_KIND = {
@@ -99,6 +100,7 @@ const SERVICE_FIELDS = [
     },
 ];
 
+const DEFAULT_SERVICE_VALUE = '__serverkit_default__';
 const CUSTOM_IMAGE_VALUE = '__custom_image__';
 
 const serviceOptionValues = (field) => field.options.map(([value]) => value);
@@ -173,7 +175,7 @@ const Magento = () => {
 
     const serviceSelectValue = (field) => {
         const current = serviceValue(field);
-        if (!current) return '';
+        if (!current) return DEFAULT_SERVICE_VALUE;
         return serviceOptionValues(field).includes(current) ? current : CUSTOM_IMAGE_VALUE;
     };
 
@@ -187,6 +189,10 @@ const Magento = () => {
     };
 
     const handleServiceChoice = (field, value) => {
+        if (value === DEFAULT_SERVICE_VALUE) {
+            updateServiceVersion(field.id, '');
+            return;
+        }
         if (value === CUSTOM_IMAGE_VALUE) {
             const current = serviceValue(field);
             updateServiceVersion(field.id, serviceOptionValues(field).includes(current) ? '' : current);
@@ -618,9 +624,12 @@ const Magento = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                                 <Label>Magento version</Label>
-                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.magento_version} onChange={(e) => { const selected = versions.find((v) => v.magento === e.target.value); setForm({ ...form, magento_version: e.target.value, php_version: form.php_version || selected?.php || '' }); }}>
-                                    {versions.map((v) => <option key={v.magento} value={v.magento}>{v.magento} (default PHP {v.php}, Composer {v.composer})</option>)}
-                                </select>
+                                <Select value={form.magento_version} onValueChange={(value) => { const selected = versions.find((v) => v.magento === value); setForm({ ...form, magento_version: value, php_version: form.php_version || selected?.php || '' }); }}>
+                                    <SelectTrigger><SelectValue placeholder="Select Magento version" /></SelectTrigger>
+                                    <SelectContent>
+                                        {versions.map((v) => <SelectItem key={v.magento} value={v.magento}>{v.magento} (default PHP {v.php}, Composer {v.composer})</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div>
                                 <Label>PHP version</Label>
@@ -629,10 +638,13 @@ const Magento = () => {
                             </div>
                             <div>
                                 <Label>Distribution</Label>
-                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.distribution} onChange={(e) => setForm({ ...form, distribution: e.target.value })}>
-                                    <option value="mage-os">Mage-OS mirror (no auth keys)</option>
-                                    <option value="magento">Magento Open Source (repo.magento.com)</option>
-                                </select>
+                                <Select value={form.distribution} onValueChange={(value) => setForm({ ...form, distribution: value })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="mage-os">Mage-OS mirror (no auth keys)</SelectItem>
+                                        <SelectItem value="magento">Magento Open Source (repo.magento.com)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         {!form.install_magento && (
@@ -653,17 +665,16 @@ const Magento = () => {
                                 return (
                                     <div key={field.id} className="space-y-1.5">
                                         <Label>{field.label}</Label>
-                                        <select
-                                            className="w-full h-9 rounded-md border bg-background px-3 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                            value={selected}
-                                            onChange={(e) => handleServiceChoice(field, e.target.value)}
-                                        >
-                                            <option value="">ServerKit default{defaultImage ? ` — ${defaultImage}` : ''}</option>
-                                            {field.options.map(([value, label]) => (
-                                                <option key={value} value={value}>{label}</option>
-                                            ))}
-                                            <option value={CUSTOM_IMAGE_VALUE}>Custom image…</option>
-                                        </select>
+                                        <Select value={selected} onValueChange={(value) => handleServiceChoice(field, value)}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value={DEFAULT_SERVICE_VALUE}>ServerKit default{defaultImage ? ` — ${defaultImage}` : ''}</SelectItem>
+                                                {field.options.map(([value, label]) => (
+                                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                                ))}
+                                                <SelectItem value={CUSTOM_IMAGE_VALUE}>Custom image…</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                         {isCustom && (
                                             <Input
                                                 className="mt-2"
@@ -697,12 +708,15 @@ const Magento = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                                 <Label>Headless mode</Label>
-                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.headless_mode} onChange={(e) => setForm({ ...form, headless_mode: e.target.value })}>
-                                    <option value="none">None / Magento storefront</option>
-                                    <option value="shared">Shared domain (frontend at /, Magento routed)</option>
-                                    <option value="separate">Separate domains</option>
-                                    <option value="split">Split frontend + API + admin domains</option>
-                                </select>
+                                <Select value={form.headless_mode} onValueChange={(value) => setForm({ ...form, headless_mode: value })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">None / Magento storefront</SelectItem>
+                                        <SelectItem value="shared">Shared domain (frontend at /, Magento routed)</SelectItem>
+                                        <SelectItem value="separate">Separate domains</SelectItem>
+                                        <SelectItem value="split">Split frontend + API + admin domains</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div>
                                 <Label>Frontend / Next.js path</Label>
@@ -745,11 +759,14 @@ const Magento = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                                 <Label>TLS</Label>
-                                <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.ssl} onChange={(e) => setForm({ ...form, ssl: e.target.value })}>
-                                    <option value="none">None (HTTP)</option>
-                                    <option value="self-signed">Self-signed</option>
-                                    <option value="letsencrypt">Let's Encrypt</option>
-                                </select>
+                                <Select value={form.ssl} onValueChange={(value) => setForm({ ...form, ssl: value })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">None (HTTP)</SelectItem>
+                                        <SelectItem value="self-signed">Self-signed</SelectItem>
+                                        <SelectItem value="letsencrypt">Let's Encrypt</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div>
                                 <Label>Run PHP/managed frontend as user</Label>
@@ -758,10 +775,13 @@ const Magento = () => {
                             {form.ssl === 'letsencrypt' && (
                                 <div>
                                     <Label>LE challenge</Label>
-                                    <select className="w-full h-9 rounded-md border bg-background px-3 text-sm" value={form.le_challenge} onChange={(e) => setForm({ ...form, le_challenge: e.target.value })}>
-                                        <option value="dns">DNS-01 (Cloudflare)</option>
-                                        <option value="http">HTTP-01 (webroot)</option>
-                                    </select>
+                                    <Select value={form.le_challenge} onValueChange={(value) => setForm({ ...form, le_challenge: value })}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="dns">DNS-01 (Cloudflare)</SelectItem>
+                                            <SelectItem value="http">HTTP-01 (webroot)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             )}
                             {form.ssl === 'letsencrypt' && (

@@ -1032,6 +1032,18 @@ async fn run_privileged(args: &[&str]) -> Result<(), String> {
 async fn prepare_nginx_serverkit_include(s: &Store) -> Result<bool, String> {
     let src = s.magento_src();
     run_privileged(&["install", "-d", "-o", &s.run_user, "-g", &s.run_user, &src]).await?;
+    if let Some(frontend_root) = &s.frontend_root {
+        run_privileged(&[
+            "install",
+            "-d",
+            "-o",
+            &s.run_user,
+            "-g",
+            &s.run_user,
+            frontend_root,
+        ])
+        .await?;
+    }
     let sample_path = format!("{src}/nginx.conf.sample");
     let serverkit_path = format!("{src}/nginx.conf.serverkit");
     let content = if std::path::Path::new(&sample_path).exists() {

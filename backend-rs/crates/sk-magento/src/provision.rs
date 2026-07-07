@@ -217,7 +217,7 @@ fn nginx_extra_locations_snippet(extras: &serde_json::Value) -> String {
         match kind {
             "proxy" if target.starts_with("http://") || target.starts_with("https://") => {
                 out.push_str(&format!(
-                    "    location {matcher} {{\n        proxy_pass {target};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_read_timeout {};\n        proxy_connect_timeout {};\n        proxy_send_timeout {};\n{}{}    }}\n",
+                    "    location {matcher} {{\n        proxy_pass {target};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;\n        proxy_read_timeout {};\n        proxy_connect_timeout {};\n        proxy_send_timeout {};\n{}{}    }}\n",
                     item["proxy_read_timeout"].as_str().unwrap_or("600"),
                     item["proxy_connect_timeout"].as_str().unwrap_or("600"),
                     item["proxy_send_timeout"].as_str().unwrap_or("600"),

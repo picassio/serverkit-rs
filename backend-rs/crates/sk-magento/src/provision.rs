@@ -691,6 +691,13 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
     }
 
     // ── 5. nginx vhost ───────────────────────────────────────────────
+    let placeholder_source = prepare_nginx_serverkit_include(s).await?;
+    if placeholder_source {
+        log_line(
+            root,
+            "Magento nginx sample missing — placeholder nginx.conf.serverkit written",
+        );
+    }
     store::set_status(&pool, s.id, "provisioning", "configuring nginx worker user").await;
     let nginx_user = sk_web::nginx::set_worker_user(&s.run_user, &s.run_user).await;
     if !nginx_user["success"].as_bool().unwrap_or(false) {
@@ -725,13 +732,6 @@ async fn run(pool: SqlitePool, s: &Store, _spec: &ProvisionSpec) -> Result<(), S
         }
         store::set_status(&pool, s.id, "running", "manual nginx vhost preserved").await;
         return Ok(());
-    }
-    let placeholder_source = prepare_nginx_serverkit_include(s).await?;
-    if placeholder_source {
-        log_line(
-            root,
-            "Magento nginx sample missing — placeholder nginx.conf.serverkit written",
-        );
     }
     let cert_paths = if https {
         Some(issue_cert(s).await?)
@@ -1409,6 +1409,11 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
         return Ok(notes);
     }
 
+    if prepare_nginx_serverkit_include(s).await? {
+        notes.push(
+            "placeholder nginx.conf.serverkit written (Magento source not attached yet)".into(),
+        );
+    }
     let nginx_user = sk_web::nginx::set_worker_user(&s.run_user, &s.run_user).await;
     if !nginx_user["success"].as_bool().unwrap_or(false) {
         return Err(format!(
@@ -1420,11 +1425,6 @@ pub async fn apply_web(s: &Store) -> Result<Vec<String>, String> {
         "nginx worker user set to {}:{}",
         s.run_user, s.run_user
     ));
-    if prepare_nginx_serverkit_include(s).await? {
-        notes.push(
-            "placeholder nginx.conf.serverkit written (Magento source not attached yet)".into(),
-        );
-    }
 
     let vhost = match s.headless_mode.as_str() {
         "shared" => crate::compose::magento_vhost_headless_shared(

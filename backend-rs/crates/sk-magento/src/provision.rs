@@ -217,7 +217,7 @@ fn nginx_extra_locations_snippet(extras: &serde_json::Value) -> String {
         match kind {
             "proxy" if target.starts_with("http://") || target.starts_with("https://") => {
                 out.push_str(&format!(
-                    "    location {matcher} {{\n        proxy_pass {target};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;\n        proxy_read_timeout {};\n        proxy_connect_timeout {};\n        proxy_send_timeout {};\n{}{}    }}\n",
+                    "    location {matcher} {{\n        proxy_pass {target};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $serverkit_forwarded_proto;\n        proxy_read_timeout {};\n        proxy_connect_timeout {};\n        proxy_send_timeout {};\n{}{}    }}\n",
                     item["proxy_read_timeout"].as_str().unwrap_or("600"),
                     item["proxy_connect_timeout"].as_str().unwrap_or("600"),
                     item["proxy_send_timeout"].as_str().unwrap_or("600"),
@@ -360,6 +360,11 @@ async fn write_nginx_extra_assets(s: &Store) -> Result<(), String> {
     let suffix = safe_var_suffix(&s.name);
     let dir = format!("/etc/nginx/serverkit/{}", s.name);
     run_privileged(&["mkdir", "-p", &dir]).await?;
+    write_privileged(
+        "/etc/nginx/conf.d/serverkit-forwarded-proto.conf",
+        "map $http_x_forwarded_proto $serverkit_forwarded_proto {\n    default $scheme;\n    ~.+ $http_x_forwarded_proto;\n}\n",
+    )
+    .await?;
     if bool_extra(&extras, &["maintenance", "enabled"]) {
         let html = extras["maintenance"]["html"].as_str().unwrap_or(
             "<!doctype html><title>Maintenance</title><style>body{text-align:center;padding:150px;font:20px Helvetica,sans-serif;color:#333;background:#f5f5f5}h1{font-size:50px}</style><h1>We'll be back soon!</h1><p>Performing scheduled maintenance.</p>",
@@ -1290,6 +1295,273 @@ pub async fn issue_self_signed(s: &Store) -> Result<(String, String), String> {
     Ok((cert, key))
 }
 
+fn frontend_root(s: &Store) -> Result<String, String> {
+    s.frontend_root
+        .clone()
+        .ok_or_else(|| "frontend_root is required".to_string())
+}
+
+fn frontend_env_path(s: &Store) -> Result<String, String> {
+    Ok(format!(
+        "{}/.env.local",
+        frontend_root(s)?.trim_end_matches('/')
+    ))
+}
+
+fn is_secret_env_key(key: &str) -> bool {
+    let lower = key.to_ascii_lowercase();
+    [
+        "secret",
+        "token",
+        "password",
+        "passwd",
+        "private",
+        "credential",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+fn valid_env_key(key: &str) -> bool {
+    !key.is_empty()
+        && key.len() <= 128
+        && key
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_alphabetic() || c == '_')
+            .unwrap_or(false)
+        && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+fn parse_env_file(content: &str) -> Vec<(String, String)> {
+    content
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                return None;
+            }
+            let (key, value) = trimmed.split_once('=')?;
+            let key = key.trim().to_string();
+            if valid_env_key(&key) {
+                Some((key, value.trim().to_string()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn suggested_frontend_env(s: &Store) -> serde_json::Map<String, serde_json::Value> {
+    let mut vars = serde_json::Map::new();
+    let api_domain = s.api_domain.as_deref().unwrap_or(&s.domain);
+    let frontend_domain = s.frontend_domain.as_deref().unwrap_or(&s.domain);
+    vars.insert(
+        "NEXT_PUBLIC_GRAPHQL_ENDPOINT".into(),
+        serde_json::json!(format!("https://{api_domain}/graphql")),
+    );
+    vars.insert(
+        "NEXT_PUBLIC_API".into(),
+        serde_json::json!(format!("https://{frontend_domain}/api")),
+    );
+    vars.insert(
+        "NEXT_PUBLIC_SITE_URL".into(),
+        serde_json::json!(format!("https://{frontend_domain}/")),
+    );
+    vars.insert("HOST_NAME_API".into(), serde_json::json!(api_domain));
+    vars
+}
+
+/// Read a store frontend .env.local without revealing secret-looking values.
+pub fn read_frontend_env(s: &Store) -> serde_json::Value {
+    use serde_json::json;
+    match frontend_env_path(s) {
+        Ok(path) => {
+            let content = std::fs::read_to_string(&path).ok();
+            let vars = content
+                .as_deref()
+                .map(parse_env_file)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(key, value)| {
+                    let secret = is_secret_env_key(&key);
+                    json!({
+                        "key": key,
+                        "value": if secret { "********".to_string() } else { value },
+                        "secret": secret,
+                    })
+                })
+                .collect::<Vec<_>>();
+            json!({
+                "success": true,
+                "path": path,
+                "exists": content.is_some(),
+                "vars": vars,
+                "suggested": suggested_frontend_env(s),
+            })
+        }
+        Err(error) => json!({ "success": false, "error": error }),
+    }
+}
+
+/// Merge or replace a store frontend .env.local. Values are written as provided;
+/// callers should never echo secret values back into logs.
+pub async fn write_frontend_env(
+    s: &Store,
+    vars: serde_json::Map<String, serde_json::Value>,
+    merge: bool,
+) -> serde_json::Value {
+    use serde_json::json;
+    let root = match frontend_root(s) {
+        Ok(root) => root,
+        Err(error) => return json!({ "success": false, "error": error }),
+    };
+    let path = format!("{}/.env.local", root.trim_end_matches('/'));
+    let mut merged: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    if merge {
+        if let Ok(existing) = std::fs::read_to_string(&path) {
+            for (key, value) in parse_env_file(&existing) {
+                merged.insert(key, value);
+            }
+        }
+    }
+    for (key, value) in vars {
+        if !valid_env_key(&key) {
+            return json!({ "success": false, "error": format!("invalid env key: {key}") });
+        }
+        let value = value
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| value.to_string());
+        if value.contains('\n') || value.contains('\r') || value.contains('\0') {
+            return json!({ "success": false, "error": format!("invalid env value for {key}") });
+        }
+        merged.insert(key, value);
+    }
+    let mut content = String::new();
+    for (key, value) in &merged {
+        content.push_str(key);
+        content.push('=');
+        content.push_str(value);
+        content.push('\n');
+    }
+    if let Err(error) =
+        run_privileged(&["install", "-d", "-o", &s.run_user, "-g", &s.run_user, &root]).await
+    {
+        return json!({ "success": false, "error": error });
+    }
+    if let Err(error) = write_privileged(&path, &content).await {
+        return json!({ "success": false, "error": error });
+    }
+    if let Err(error) =
+        run_privileged(&["chown", &format!("{}:{}", s.run_user, s.run_user), &path]).await
+    {
+        return json!({ "success": false, "error": error });
+    }
+    if let Err(error) = run_privileged(&["chmod", "600", &path]).await {
+        return json!({ "success": false, "error": error });
+    }
+    json!({
+        "success": true,
+        "path": path,
+        "mode": "0600",
+        "keys": merged.keys().cloned().collect::<Vec<_>>(),
+    })
+}
+
+fn package_manager(root: &str) -> (&'static str, Vec<&'static str>, Vec<&'static str>) {
+    if std::path::Path::new(&format!("{root}/pnpm-lock.yaml")).exists() {
+        ("pnpm", vec!["install"], vec!["run", "build"])
+    } else if std::path::Path::new(&format!("{root}/yarn.lock")).exists() {
+        ("yarn", vec!["install"], vec!["build"])
+    } else {
+        ("npm", vec!["install"], vec!["run", "build"])
+    }
+}
+
+fn tail_output(stdout: &[u8], stderr: &[u8]) -> String {
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(stdout),
+        String::from_utf8_lossy(stderr)
+    );
+    let lines = combined.lines().collect::<Vec<_>>();
+    lines[lines.len().saturating_sub(80)..].join("\n")
+}
+
+async fn run_frontend_step(
+    root: &str,
+    program: &str,
+    args: &[&str],
+    cwd: &str,
+    timeout_secs: u64,
+) -> serde_json::Value {
+    use serde_json::json;
+    log_line(root, &format!("frontend $ {program} {}", args.join(" ")));
+    let fut = Command::new(program)
+        .args(args)
+        .current_dir(cwd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output();
+    match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), fut).await {
+        Ok(Ok(out)) => json!({
+            "command": format!("{program} {}", args.join(" ")),
+            "success": out.status.success(),
+            "code": out.status.code(),
+            "output": tail_output(&out.stdout, &out.stderr),
+        }),
+        Ok(Err(e)) => json!({
+            "command": format!("{program} {}", args.join(" ")),
+            "success": false,
+            "error": e.to_string(),
+        }),
+        Err(_) => json!({
+            "command": format!("{program} {}", args.join(" ")),
+            "success": false,
+            "error": format!("timed out after {timeout_secs}s"),
+        }),
+    }
+}
+
+/// Install frontend dependencies (optional) and run the package build script.
+pub async fn build_frontend(s: &Store, install: bool) -> serde_json::Value {
+    use serde_json::json;
+    let root = match frontend_root(s) {
+        Ok(root) => root,
+        Err(error) => return json!({ "success": false, "error": error }),
+    };
+    if !std::path::Path::new(&format!("{root}/package.json")).exists() {
+        return json!({ "success": false, "error": format!("package.json not found in {root}") });
+    }
+    let (pm, install_args, build_args) = package_manager(&root);
+    let mut steps = Vec::new();
+    if install {
+        let step = run_frontend_step(&s.root_path, pm, &install_args, &root, 1800).await;
+        if !step["success"].as_bool().unwrap_or(false) {
+            return json!({ "success": false, "root": root, "package_manager": pm, "steps": [step] });
+        }
+        steps.push(step);
+    }
+    let build = run_frontend_step(&s.root_path, pm, &build_args, &root, 1800).await;
+    let success = build["success"].as_bool().unwrap_or(false);
+    steps.push(build);
+    json!({ "success": success, "root": root, "package_manager": pm, "steps": steps })
+}
+
+fn frontend_port_listening(port: i64) -> bool {
+    std::process::Command::new("ss")
+        .args(["-ltn"])
+        .output()
+        .ok()
+        .map(|out| {
+            String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .any(|line| line.contains(&format!(":{port} ")))
+        })
+        .unwrap_or(false)
+}
+
 fn unit_name(store_name: &str) -> String {
     format!("serverkit-fe-{store_name}.service")
 }
@@ -1345,7 +1617,22 @@ pub async fn frontend_ctl(s: &Store, action: &str) -> serde_json::Value {
                 .await
                 .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
                 .unwrap_or_else(|_| "unknown".into());
-            json!({ "success": true, "unit": unit, "active": active == "active", "state": active })
+            let unit_path = format!("/etc/systemd/system/{unit}");
+            let env_path = frontend_env_path(s).ok();
+            json!({
+                "success": true,
+                "unit": unit,
+                "unit_exists": std::path::Path::new(&unit_path).exists(),
+                "active": active == "active",
+                "state": active,
+                "frontend_root": s.frontend_root.as_ref(),
+                "frontend_cmd": s.frontend_cmd.as_ref(),
+                "frontend_domain": s.frontend_domain.as_ref(),
+                "frontend_port": s.frontend_port,
+                "port_listening": frontend_port_listening(s.frontend_port),
+                "env_path": env_path,
+                "env_exists": env_path.as_deref().map(std::path::Path::new).map(|p| p.exists()).unwrap_or(false),
+            })
         }
         "logs" => {
             let out = Command::new("journalctl")
@@ -1651,4 +1938,34 @@ pub async fn teardown(s: &Store, remove_files: bool) -> Vec<String> {
         }
     }
     warnings
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn env_parser_masks_secret_keys() {
+        let parsed = parse_env_file(
+            "# comment\nNEXT_PUBLIC_API=https://example.test/api\nMAGENTO_ADMIN_API_TOKEN=secret\nBAD-KEY=nope\n",
+        );
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].0, "NEXT_PUBLIC_API");
+        assert!(is_secret_env_key("MAGENTO_ADMIN_API_TOKEN"));
+        assert!(!is_secret_env_key("NEXT_PUBLIC_SITE_URL"));
+    }
+
+    #[test]
+    fn package_manager_prefers_lock_files() {
+        let root = std::env::temp_dir().join(format!("sk-magento-pm-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let root_str = root.to_string_lossy().to_string();
+        assert_eq!(package_manager(&root_str).0, "npm");
+        std::fs::write(root.join("yarn.lock"), "").unwrap();
+        assert_eq!(package_manager(&root_str).0, "yarn");
+        std::fs::write(root.join("pnpm-lock.yaml"), "").unwrap();
+        assert_eq!(package_manager(&root_str).0, "pnpm");
+        let _ = std::fs::remove_dir_all(root);
+    }
 }

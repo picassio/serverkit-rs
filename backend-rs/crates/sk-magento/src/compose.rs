@@ -297,7 +297,7 @@ server {{
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $serverkit_forwarded_proto;
         proxy_read_timeout 300;
         # Magento emits very large X-Magento-Tags headers through varnish
         proxy_buffer_size 32k;
@@ -365,7 +365,7 @@ fn frontend_location(frontend_port: i64, frontend_root: Option<&str>) -> String 
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $serverkit_forwarded_proto;
         proxy_cache_bypass $http_upgrade;
         proxy_read_timeout 86400;
     }}"#
@@ -396,7 +396,7 @@ fn magento_proxy_location(matcher: &str, backend_port: u16) -> String {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $serverkit_forwarded_proto;
         proxy_buffer_size 32k;
         proxy_buffers 8 32k;
         proxy_busy_buffers_size 64k;

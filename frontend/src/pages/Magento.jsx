@@ -545,11 +545,33 @@ const Magento = () => {
             const res = await api.magentoFrontendAction(store.id, action);
             if (action === 'logs') {
                 setActionOutput({ store: store.name, action: 'frontend logs', success: true, output: (res.lines || []).join('\n') });
+            } else if (action === 'status') {
+                setActionOutput({
+                    store: store.name,
+                    action: 'frontend status',
+                    success: res.success,
+                    output: JSON.stringify(res, null, 2),
+                });
             } else {
                 toast.success(res.message || `frontend ${action} ok`);
             }
         } catch (err) {
             toast.error(`frontend ${action}: ${err.message}`);
+        }
+    };
+
+    const buildFrontend = async (store) => {
+        setBusyAction(`${store.id}:frontend-build`);
+        try {
+            const res = await api.buildMagentoFrontend(store.id, true);
+            const output = (res.steps || []).map((step) => `# ${step.command}\n${step.output || step.error || ''}`).join('\n\n');
+            setActionOutput({ store: store.name, action: 'frontend build', success: res.success, output });
+            if (res.success) toast.success(`Frontend build completed for ${store.name}`);
+            else toast.error(`Frontend build failed for ${store.name}`);
+        } catch (err) {
+            toast.error(`frontend build: ${err.message}`);
+        } finally {
+            setBusyAction(null);
         }
     };
 
@@ -698,10 +720,19 @@ const Magento = () => {
                                             <Database size={13} className="mr-1" /> Backups
                                         </Button>
                                     )}
-                                    {store.frontend_cmd && store.status === 'running' && (
+                                    {store.frontend_root && store.status === 'running' && (
                                         <>
-                                            <Button variant="outline" size="sm" onClick={() => frontendCtl(store, 'restart')}>FE Restart</Button>
-                                            <Button variant="outline" size="sm" onClick={() => frontendCtl(store, 'logs')}>FE Logs</Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={busyAction === `${store.id}:frontend-build`}
+                                                onClick={() => buildFrontend(store)}
+                                            >
+                                                {busyAction === `${store.id}:frontend-build` ? <RefreshCw size={13} className="animate-spin" /> : 'FE Build'}
+                                            </Button>
+                                            <Button variant="outline" size="sm" onClick={() => frontendCtl(store, 'status')}>FE Status</Button>
+                                            {store.frontend_cmd && <Button variant="outline" size="sm" onClick={() => frontendCtl(store, 'restart')}>FE Restart</Button>}
+                                            {store.frontend_cmd && <Button variant="outline" size="sm" onClick={() => frontendCtl(store, 'logs')}>FE Logs</Button>}
                                         </>
                                     )}
                                     <Button variant="outline" size="sm" onClick={() => openLog(store)}>

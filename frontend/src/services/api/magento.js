@@ -55,6 +55,18 @@ export async function magentoFrontendAction(id, action) {
     return this.request(`/magento/stores/${id}/frontend/${action}`, { method: 'POST' });
 }
 
+export async function buildMagentoFrontend(id, install = true) {
+    return this.request(`/magento/stores/${id}/frontend/build`, { method: 'POST', body: { install } });
+}
+
+export async function getMagentoFrontendEnv(id) {
+    return this.request(`/magento/stores/${id}/frontend/env`);
+}
+
+export async function putMagentoFrontendEnv(id, vars, merge = true) {
+    return this.request(`/magento/stores/${id}/frontend/env`, { method: 'PUT', body: { vars, merge } });
+}
+
 export async function getMagentoRuntime(id) {
     return this.request(`/magento/stores/${id}/runtime`);
 }

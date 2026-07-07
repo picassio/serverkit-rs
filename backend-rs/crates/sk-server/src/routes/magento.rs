@@ -33,6 +33,11 @@ pub fn router() -> Router<SharedState> {
             "/stores/{id}/mysql-client-config",
             post(write_mysql_client_config),
         )
+        .route("/stores/{id}/frontend/build", post(build_frontend))
+        .route(
+            "/stores/{id}/frontend/env",
+            get(get_frontend_env).put(put_frontend_env),
+        )
         .route("/stores/{id}/frontend/{action}", post(frontend_action))
         .route("/stores/{id}/log", get(store_log))
         .route("/stores/{id}/vhost", get(get_vhost).put(put_vhost))
@@ -820,6 +825,79 @@ async fn write_mysql_client_config(
         .await
         .map_err(ApiError::bad_request)?;
     Ok(Json(result))
+}
+
+/// GET /magento/stores/{id}/frontend/env — read a masked frontend .env file.
+async fn get_frontend_env(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    Ok(Json(sk_magento::provision::read_frontend_env(&s)))
+}
+
+#[derive(Deserialize)]
+struct FrontendEnvBody {
+    vars: Option<Map<String, Value>>,
+    merge: Option<bool>,
+}
+
+/// PUT /magento/stores/{id}/frontend/env — write/merge .env.local safely.
+async fn put_frontend_env(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+    Json(b): Json<FrontendEnvBody>,
+) -> ApiResult<Json<Value>> {
+    require_admin(&u)?;
+    let s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    let vars = b
+        .vars
+        .ok_or_else(|| ApiError::bad_request("vars is required"))?;
+    let result = sk_magento::provision::write_frontend_env(&s, vars, b.merge.unwrap_or(true)).await;
+    if result["success"].as_bool().unwrap_or(false) {
+        Ok(Json(result))
+    } else {
+        Err(ApiError::bad_request(
+            result["error"]
+                .as_str()
+                .unwrap_or("frontend env write failed"),
+        ))
+    }
+}
+
+#[derive(Deserialize)]
+struct FrontendBuildBody {
+    install: Option<bool>,
+}
+
+/// POST /magento/stores/{id}/frontend/build — install deps + run frontend build.
+async fn build_frontend(
+    State(state): State<SharedState>,
+    AuthUser(u): AuthUser,
+    Path(id): Path<i64>,
+    Json(b): Json<FrontendBuildBody>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    require_admin(&u)?;
+    let s = store::find(&state.db, id)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Store not found"))?;
+    let result = sk_magento::provision::build_frontend(&s, b.install.unwrap_or(true)).await;
+    let ok = result["success"].as_bool().unwrap_or(false);
+    Ok((
+        if ok {
+            StatusCode::OK
+        } else {
+            StatusCode::BAD_REQUEST
+        },
+        Json(result),
+    ))
 }
 
 /// POST /magento/stores/{id}/frontend/{start|stop|restart|status|logs}
